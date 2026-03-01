@@ -8,7 +8,7 @@ import React from 'react';
 
 const HomePage = () => {
     return (
-        <div className="flex flex-col w-full bg-white">
+        <div className="flex flex-col w-full">
 
             {/* 1. HERO SECTION */}
             {/* No margin-bottom here because the Hero handles its own height (100dvh) */}
@@ -18,7 +18,7 @@ const HomePage = () => {
 
             {/* 2. SPACING CONNECTOR */}
             {/* This creates a visual break. You can adjust 'h-24' or 'h-32' for more/less space. */}
-            <div className="w-full h-24 md:h-32 bg-white" />
+            <div className="w-full h-24 md:h-32" />
 
             {/* 3. WELCOME SECTION */}
             {/* We add a subtle fade-in or just structural padding to ensure it breathes */}

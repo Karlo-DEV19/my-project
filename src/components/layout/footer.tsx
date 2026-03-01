@@ -58,9 +58,9 @@ const Footer = () => {
           <div className="flex flex-col">
             <h4 className="text-sm font-bold tracking-widest uppercase mb-6 text-background/90 font-serif">Contact</h4>
             <div className="flex flex-col gap-4 text-sm text-background/60 leading-relaxed">
-              <p>Email: inquire@mjdecor.com</p>
-              <p>Phone: +63 912 345 6789</p>
-              <p>Address: <br />123 Design Avenue,<br /> Makati City, Metro Manila</p>
+              <p>Email: mjdecor888@gmail.com</p>
+              <p>Phone: 0917 694 8888</p>
+              <p>Address: <br />35 20th Avenue, Murphy Cubao,<br /> Quezon City, Philippines, 1109</p>
             </div>
           </div>
 

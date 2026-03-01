@@ -22,7 +22,7 @@ const HomePage = () => {
 
             {/* 3. WELCOME SECTION */}
             {/* We add a subtle fade-in or just structural padding to ensure it breathes */}
-            <div className="relative z-20 pb-24 md:pb-32">
+            <div className="relative z-20 ">
                 <WelcomeSection />
             </div>
 

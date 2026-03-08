@@ -61,7 +61,7 @@ export const blindsProducts: BlindProduct[] = [
       { name: "Blue", image: "/images/blinds/colors/cb-43-blue.jpg" },
       { name: "Other Color", image: "/images/blinds/colors/cb-43-other.jpg" },
     ],
-    imageUrls: ["/images/blinds/cherry-blossom-1.jpg"],
+    imageUrls: ["/best seller pic/cherry blossom.png"],
   },
   {
     id: "C-101",
@@ -82,7 +82,7 @@ export const blindsProducts: BlindProduct[] = [
       { name: "Violet", image: "/images/blinds/colors/c-101-violet.jpg" },
       { name: "Wine", image: "/images/blinds/colors/c-101-wine.jpg" },
     ],
-    imageUrls: ["/images/blinds/cube-1.jpg"],
+    imageUrls: ["/best seller pic/cube blinds.png"],
   },
   {
     id: "EG-001",

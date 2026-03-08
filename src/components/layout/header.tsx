@@ -1,30 +1,33 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import { Home, Info, Menu, Phone, Search, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
-import { Menu, Search, Home, ShoppingBag, Info, Phone } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Button } from '../ui/button';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '../ui/sheet';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
     isVisible: boolean;
+    isFixed?: boolean;
 }
 
-const Header = ({ isVisible }: HeaderProps) => {
-    // Moved the navItems here so it can be managed globally
+const Header = ({ isVisible, isFixed }: HeaderProps) => {
     const navItems = [
-        { label: 'Home', href: '#', icon: Home },
-        { label: 'Shop', href: '#shop', icon: ShoppingBag },
-        { label: 'About', href: '#about', icon: Info },
-        { label: 'Contact', href: '#contact', icon: Phone },
+        { label: 'Home', href: '/', icon: Home },
+        { label: 'Shop', href: '/shop', icon: ShoppingBag },
+        { label: 'About', href: '/about', icon: Info },
+        { label: 'Contact', href: '/contact', icon: Phone },
     ];
 
     return (
         <header
             className={cn(
-                'fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)]',
-                isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none',
-                'bg-background/80 backdrop-blur-md border-b border-border/10'
+                isFixed
+                    ? 'sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border shadow-sm'
+                    : cn(
+                        'fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)]',
+                        isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none',
+                        'bg-background/80 backdrop-blur-md border-b border-border/10'
+                    )
             )}
         >
             <div className="container mx-auto px-6 max-w-7xl">
@@ -56,9 +59,6 @@ const Header = ({ isVisible }: HeaderProps) => {
 
                     {/* 3. Actions (Desktop) */}
                     <div className="hidden lg:flex items-center gap-4 shrink-0">
-                        <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted rounded-full">
-                            <Search className="w-5 h-5" />
-                        </Button>
                         <Button className="rounded-none bg-foreground text-background hover:bg-foreground/90 font-bold tracking-widest uppercase text-xs px-8 h-[46px]">
                             Get Quote
                         </Button>

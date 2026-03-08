@@ -38,9 +38,6 @@ export const BlindsReveal = () => {
           A New Vision <br />
           <span className="text-white/90 italic font-light text-3xl md:text-4xl">for your space.</span>
         </h2>
-        <button className="flex items-center gap-2 text-white bg-primary hover:bg-primary/90 px-6 py-3 rounded-none text-xs uppercase tracking-widest font-bold transition-colors">
-          Discover More <ArrowRight className="w-4 h-4" />
-        </button>
       </div>
 
       {/* 3. The 3D Blinds Slats */}

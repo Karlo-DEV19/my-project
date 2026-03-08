@@ -4,7 +4,6 @@ import HeroSection from '@/components/layout/hero-section';
 import BestSeller from '@/components/layout/sections/best-seller';
 import OurCustomerSays from '@/components/layout/sections/our-customer-says';
 import WelcomeSection from '@/components/layout/sections/welcome-section';
-import React from 'react';
 
 const HomePage = () => {
     return (

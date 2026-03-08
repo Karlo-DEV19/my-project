@@ -1,54 +1,104 @@
-// components/layouts/DashboardLayout.tsx
 'use client';
 
-import Footer from '@/components/layout/footer';
-import Header from '@/components/layout/header';
 import React, { Suspense, useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/providers/auth-provider';
+import Header from '@/components/layout/header';
+import Footer from '@/components/layout/footer';
+import AdminSidebar from '@/components/pages/admin/admin-sidebar';
+import EmployeeSidebar from '@/components/pages/admin/employee/employee-sider';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
 }
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+    const pathname = usePathname() || '';
+    const router = useRouter();
+
+    const { isAuthenticated, user } = useAuth();
     const [showHeader, setShowHeader] = useState(false);
 
+    const isAdminRoute = pathname.startsWith('/admin');
+    const isHomeRoute = pathname === '/';
+
+    // =======================================================================
+    // ROUTE PROTECTION
+    // =======================================================================
     useEffect(() => {
-        const handleScroll = () => {
-            // Show header after scrolling past the hero section (e.g., 100vh)
-            const scrollThreshold = window.innerHeight * 0.8; // 80% of viewport height
-            setShowHeader(window.scrollY > scrollThreshold);
-        };
+        if (isAdminRoute && !isAuthenticated) {
+            router.push('/');
+        }
+    }, [isAdminRoute, isAuthenticated, router]);
+
+    // =======================================================================
+    // HEADER SCROLL LOGIC
+    // =======================================================================
+    useEffect(() => {
+        if (isAdminRoute) return;
+
+        if (!isHomeRoute) {
+            setShowHeader(true);
+            return;
+        }
+
+        const handleScroll = () => setShowHeader(window.scrollY > 17);
+        handleScroll();
 
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [pathname, isAdminRoute, isHomeRoute]);
+
+    const LoadingFallback = () => (
+        <div className="flex flex-col flex-1 items-center justify-center w-full min-h-[50vh]">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+            <span className="text-muted-foreground text-sm font-medium tracking-wide">
+                Loading application...
+            </span>
+        </div>
+    );
 
     return (
-        <div className="relative min-h-screen min-h-[100dvh] bg-background text-foreground antialiased">
-            {/* Sticky Header - appears on scroll */}
-            <Header isVisible={showHeader} />
+        <div className="flex flex-col min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+            {!isAdminRoute && (
+                <Header isVisible={showHeader} isFixed={!isHomeRoute} />
+            )}
 
-            {/* Main Content Area */}
-            <main
-                className="flex-1 flex flex-col w-full"
-                role="main"
-                aria-label="Main content"
-            >
-                <Suspense
-                    fallback={
-                        <div className="flex items-center justify-center min-h-screen">
-                            <div className="flex flex-col items-center gap-4">
-                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                                <span className="text-muted-foreground text-sm">Loading...</span>
-                            </div>
-                        </div>
-                    }
-                >
-                    {children}
-                </Suspense>
-            </main>
+            {isAdminRoute ? (
+                // ADMIN LAYOUT
+                <SidebarProvider>
+                    <div className="flex h-screen w-full overflow-hidden">
+                        {user?.role === 'admin' ? <AdminSidebar /> : <EmployeeSidebar />}
 
-            <Footer />
+                        <SidebarInset className="flex-1 overflow-auto bg-background">
+                            <header className="sticky top-0 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 z-40">
+                                <div className="flex items-center gap-2">
+                                    <SidebarTrigger className="-ml-1" />
+                                    <div className="font-semibold text-sm">
+                                        {user?.role === 'admin' ? 'Admin Panel' : 'Staff Panel'}
+                                    </div>
+                                </div>
+                            </header>
+                            <main className="flex-1 w-full p-6 relative" role="main">
+                                <Suspense fallback={<LoadingFallback />}>
+                                    {children}
+                                </Suspense>
+                            </main>
+                        </SidebarInset>
+                    </div>
+                </SidebarProvider>
+            ) : (
+                // PUBLIC LAYOUT
+                <main className="flex flex-col flex-1 w-full relative" role="main">
+                    <Suspense fallback={<LoadingFallback />}>
+                        {children}
+                    </Suspense>
+                </main>
+            )}
+
+            {!isAdminRoute && <Footer />}
         </div>
     );
 };

@@ -1,76 +1,8 @@
 import React from 'react';
 import Image from 'next/image';
 import { ImageIcon, ShoppingCart } from 'lucide-react';
+import { blindsProducts } from '@/lib/utils';
 
-export const blindsProducts = [
-    {
-        id: "CB-43",
-        name: "Cherry Blossom",
-        code: "CB 43",
-        type: "Combi Shades",
-        composition: "Polyester 100%",
-        fabricWidth: "250cm",
-        packing: "50m/Roll",
-        thickness: "0.3mm",
-        characteristic: "With flower design",
-        availableColors: ["Red", "Green", "Blue", "Other"],
-        imageUrls: [
-            "/images/blinds/cherry-blossom-1.jpg",
-            "/images/blinds/cherry-blossom-2.jpg",
-            "/images/blinds/cherry-blossom-3.jpg"
-        ]
-    },
-    {
-        id: "C-101",
-        name: "CUBE",
-        code: "C 101 - C 105",
-        type: "Combi Shades",
-        composition: "Polyester 100%",
-        fabricWidth: "280cm",
-        packing: "50m/Roll",
-        thickness: "0.54mm",
-        characteristic: "",
-        availableColors: ["Beige", "Brown", "Choco", "Violet", "Wine"],
-        imageUrls: [
-            "/images/blinds/cube-1.jpg",
-            "/images/blinds/cube-2.jpg",
-            "/images/blinds/cube-3.jpg"
-        ]
-    },
-    {
-        id: "LN-201",
-        name: "Linen Touch",
-        code: "LN 201",
-        type: "Combi Shades",
-        composition: "Polyester 100%",
-        fabricWidth: "300cm",
-        packing: "50m/Roll",
-        thickness: "0.45mm",
-        characteristic: "Soft woven texture",
-        availableColors: ["White", "Light Gray", "Cream", "Sand"],
-        imageUrls: [
-            "/images/blinds/linen-touch-1.jpg",
-            "/images/blinds/linen-touch-2.jpg"
-        ]
-    },
-    {
-        id: "MD-301",
-        name: "Modern Stripe",
-        code: "MD 301",
-        type: "Combi Shades",
-        composition: "Polyester 100%",
-        fabricWidth: "280cm",
-        packing: "50m/Roll",
-        thickness: "0.4mm",
-        characteristic: "Horizontal stripe design",
-        availableColors: ["Gray", "Black", "Beige", "Brown"],
-        imageUrls: [
-            "/images/blinds/modern-stripe-1.jpg",
-            "/images/blinds/modern-stripe-2.jpg",
-            "/images/blinds/modern-stripe-3.jpg"
-        ]
-    }
-];
 
 const BestSeller = () => {
     return (

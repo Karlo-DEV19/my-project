@@ -29,13 +29,13 @@ const Footer = () => {
               Mastering Light & Space. Premium Korean window solutions designed to elevate your living environment.
             </p>
             <div className="flex items-center gap-4">
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full border border-background/20 flex items-center justify-center text-background/80 hover:bg-background hover:text-foreground hover:border-background transition-all">
+              <a href="https://www.facebook.com/MJDECOR888INC" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full border border-background/20 flex items-center justify-center text-background/80 hover:bg-background hover:text-foreground hover:border-background transition-all">
                 <Facebook className="w-4 h-4" />
               </a>
               <a href="https://instagram.com" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full border border-background/20 flex items-center justify-center text-background/80 hover:bg-background hover:text-foreground hover:border-background transition-all">
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="https://tiktok.com" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full border border-background/20 flex items-center justify-center text-background/80 hover:bg-background hover:text-foreground hover:border-background transition-all">
+              <a href="https://www.tiktok.com/@mjdecor888" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full border border-background/20 flex items-center justify-center text-background/80 hover:bg-background hover:text-foreground hover:border-background transition-all">
                 <TikTokIcon className="w-4 h-4" />
               </a>
             </div>
@@ -45,7 +45,7 @@ const Footer = () => {
           <div className="flex flex-col">
             <h4 className="text-sm font-bold tracking-widest uppercase mb-6 text-background/90 font-serif">Quick Links</h4>
             <div className="flex flex-col gap-4">
-              {['Home', 'Shop Collections', 'About Us', 'Contact'].map((link) => (
+              {['Home', 'Shop Collections', 'About Us',].map((link) => (
                 <Link key={link} href="#" className="text-background/60 hover:text-background text-sm flex items-center gap-2 group transition-colors">
                   <ChevronRight className="w-3 h-3 opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all text-background/60" />
                   {link}

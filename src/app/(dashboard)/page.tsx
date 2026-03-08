@@ -1,8 +1,13 @@
 'use client';
 // app/page.tsx
 import HeroSection from '@/components/layout/hero-section';
+import AboutSection from '@/components/layout/sections/about';
 import BestSeller from '@/components/layout/sections/best-seller';
+import ChatSection from '@/components/layout/sections/chat-section';
+import NewArrival from '@/components/layout/sections/new-arrival';
 import OurCustomerSays from '@/components/layout/sections/our-customer-says';
+import OurSystemWorks from '@/components/layout/sections/our-system-works';
+import RecentInstallation from '@/components/layout/sections/recent-installation';
 import WelcomeSection from '@/components/layout/sections/welcome-section';
 
 const HomePage = () => {
@@ -29,7 +34,23 @@ const HomePage = () => {
             {/* <div className="w-full max-w-5xl mx-auto h-px bg-zinc-100 my-12" /> */}
             <BestSeller />
 
+            {/* 4. RECENT INSTALLATIONS */}
+            <RecentInstallation />
+
+            {/* 5. NEW ARRIVALS */}
+            <NewArrival />
+
+            {/* 6. ABOUT SECTION */}
+            <AboutSection />
+
+            {/* 7. CUSTOMER STORIES */}
             <OurCustomerSays />
+
+            {/* 8. HOW OUR SYSTEM WORKS */}
+            <OurSystemWorks />
+
+            {/* 9. CHAT SECTION */}
+            <ChatSection />
         </div>
     );
 };

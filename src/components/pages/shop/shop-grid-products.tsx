@@ -4,6 +4,11 @@ import React, { useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
+export interface BlindColor {
+    name: string;
+    image: string;
+}
+
 // ✅ UPDATED INTERFACE: Added 'description'
 export interface BlindProduct {
     id: string;
@@ -16,28 +21,13 @@ export interface BlindProduct {
     thickness: string;
     characteristic: string;
     description: string;
-    availableColors: string[];
+    availableColors: BlindColor[];
     imageUrls: string[];
 }
 
 interface ProductGridProps {
     products: BlindProduct[];
 }
-
-// Enhanced color mapper to handle catalog specific colors
-const getColorHex = (colorName: string) => {
-    const normalize = colorName.toLowerCase().split('/')[0].split('-')[0].trim();
-    const colors: Record<string, string> = {
-        red: '#7f1d1d', green: '#14532d', blue: '#1e3a8a', beige: '#f5f5dc',
-        brown: '#5c4033', choco: '#3e2723', chocolate: '#3e2723', violet: '#4c1d95',
-        wine: '#722f37', white: '#ffffff', 'light gray': '#d1d5db', gray: '#6b7280',
-        cream: '#fef3c7', sand: '#e6dca8', sandy: '#e6dca8', black: '#000000',
-        ivory: '#fffff0', peach: '#ffcdab', lime: '#a3e635', mint: '#a7f3d0',
-        pine: '#064e3b', copper: '#b87333', scarlet: '#ff2400', olive: '#3f6212',
-        oak: '#8b5a2b', gold: '#d4af37', navy: '#1e3a8a', bronze: '#cd7f32'
-    };
-    return colors[normalize] || '#e5e5e5';
-};
 
 const ProductGrid = ({ products }: ProductGridProps) => {
     const router = useRouter();
@@ -118,10 +108,12 @@ const ProductGrid = ({ products }: ProductGridProps) => {
                                 {product.availableColors.slice(0, 4).map((color, idx) => (
                                     <div
                                         key={idx}
-                                        title={color}
-                                        className="w-3.5 h-3.5 rounded-full border border-border/80 shadow-sm transition-transform group-hover:-translate-y-0.5"
-                                        style={{ backgroundColor: getColorHex(color), transitionDelay: `${idx * 50}ms` }}
-                                    ></div>
+                                        title={color.name}
+                                        className="relative w-6 h-6 rounded-full border border-border/80 shadow-sm transition-transform group-hover:-translate-y-0.5 overflow-hidden ring-1 ring-background"
+                                        style={{ transitionDelay: `${idx * 50}ms` }}
+                                    >
+                                        <Image src={color.image} alt={color.name} fill sizes="24px" className="object-cover" />
+                                    </div>
                                 ))}
                             </div>
                             <span className="text-xs text-muted-foreground font-medium pl-1">

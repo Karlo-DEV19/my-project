@@ -12,6 +12,7 @@ import QueryProvider from "@/lib/providers/query-provider"
 
 import "./globals.css"
 import { getUserSession } from "../../actions/auth"
+import Script from "next/script"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,10 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
       >
+        <Script
+          crossOrigin="anonymous"
+          src="//unpkg.com/react-scan/dist/auto.global.js"
+        />
         <QueryProvider>
           {/* Inject the server session into the Client AuthProvider */}
           <AuthProvider session={session}>

@@ -204,13 +204,9 @@ const CartSheet = () => {
                             </span>
                         </div>
 
-                        <p className="text-[10px] text-muted-foreground leading-relaxed">
-                            Estimate only. Final price confirmed after official measurement. 50% down payment upon conforme.
-                        </p>
-
                         {/* CTA */}
                         <button className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors">
-                            Request Quote
+                            Checkout Order
                             <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
                         </button>
                     </div>

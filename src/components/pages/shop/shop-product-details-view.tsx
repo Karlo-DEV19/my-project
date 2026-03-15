@@ -8,6 +8,7 @@ import {
     Package, Layers, Maximize2,
 } from 'lucide-react';
 import { BlindsProductDetailResponse } from '@/lib/types/product-blinds-type';
+import { useCartStore } from '@/lib/zustand/use-cart-store';
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface PriceBreakdown {
@@ -274,6 +275,8 @@ interface Props {
 }
 
 const ShopProductDetailsView = ({ product }: Props) => {
+    const addToCart = useCartStore(s => s.addToCart);
+
     // Derived lists
     const imageUrls = product.images.map(i => i.imageUrl);
     const colors = product.colors;
@@ -340,8 +343,8 @@ const ShopProductDetailsView = ({ product }: Props) => {
             branch: branch.id,
             priceBreakdown: price,
         };
-        console.log('ADD TO CART:', payload);
-        // TODO: dispatch to cart store
+        
+        addToCart(payload);
     };
 
     const maxFabricWidth = parseInt(product.fabricWidth ?? '280', 10) || 280;

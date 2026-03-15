@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Toaster } from "sonner"
+import CartSheet from "@/components/ui/cart-sheet"
 
 // Providers
 import { AuthProvider } from "@/lib/providers/auth-provider"
@@ -77,6 +78,7 @@ export default async function RootLayout({
             {children}
 
           </AuthProvider>
+          <CartSheet />
           <Toaster />
         </QueryProvider>
       </body>

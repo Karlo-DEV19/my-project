@@ -113,3 +113,91 @@ export interface BlindsColor {
     imageUrl: string;
     createdAt: string;
 }
+
+export interface NewArrivalProductColor {
+    name: string
+    imageUrl: string
+}
+
+export interface NewArrivalProductImage {
+    imageUrl: string
+}
+
+export interface NewArrivalProduct {
+    id: string
+    productCode: string
+    name: string
+    type: string
+    composition: string
+    fabricWidth: string
+    packing: string
+    thickness: string
+    status: string
+    unitPrice: number
+    collection: string
+    createdAt: string
+    colors: NewArrivalProductColor[]
+    images: NewArrivalProductImage[]
+}
+
+export interface Pagination {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+}
+
+/**
+ * Main API response type for fetching all New Arrival blinds products
+ */
+export interface GetAllNewArrivalProductBlinds {
+    success: boolean
+    blinds: NewArrivalProduct[]
+    pagination: Pagination
+}
+
+export interface BestSellerProductColor {
+    name: string
+    imageUrl: string
+}
+
+export interface BestSellerProductImage {
+    imageUrl: string
+}
+
+export interface BestSellerProduct {
+    id: string
+    productCode: string
+    name: string
+    type: string
+    composition: string
+    fabricWidth: string
+    packing: string
+    thickness: string
+    status: string
+    unitPrice: number
+    collection: string
+    createdAt: string
+    colors: BestSellerProductColor[]
+    images: BestSellerProductImage[]
+}
+
+export interface Pagination {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+}
+
+/**
+ * Main API response type for fetching all Best Seller blinds products
+ */
+export interface GetAllBestSellerProductBlinds {
+    success: boolean
+    blinds: BestSellerProduct[]
+    pagination: Pagination
+}

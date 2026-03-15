@@ -61,6 +61,7 @@ const createNewBlinds = async (ctx: Context) => {
                 thickness: parsedData.thickness,
                 packing: parsedData.packing,
                 characteristic: parsedData.characteristic,
+                collection: parsedData.collection, // ✅ added field
             })
             .returning();
 
@@ -273,8 +274,163 @@ const getDetailsBlindByProductId = async (ctx: Context) => {
         }, 500);
     }
 }
+
+
+
+const getAllBestSeller = async (c: Context) => {
+    try {
+        const page = Number(c.req.query("page") ?? 1);
+        const limit = Number(c.req.query("limit") ?? 10);
+        const offset = (page - 1) * limit;
+
+        const whereCondition = and(
+            eq(blindsProducts.status, "active"),
+            eq(blindsProducts.collection, "Best Seller")
+        );
+
+        const [totalResult] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(blindsProducts)
+            .where(whereCondition);
+
+        const total = Number(totalResult?.count ?? 0);
+        const totalPages = Math.ceil(total / limit);
+
+        const blinds = await db.query.blindsProducts.findMany({
+            where: whereCondition,
+            columns: {
+                id: true,
+                productCode: true,
+                name: true,
+                type: true,
+                composition: true,
+                fabricWidth: true,
+                packing: true,
+                thickness: true,
+                status: true,
+                unitPrice: true,
+                collection: true,
+                createdAt: true,
+            },
+            with: {
+                colors: {
+                    columns: {
+                        name: true,
+                        imageUrl: true
+                    }
+                },
+                images: {
+                    limit: 1,
+                    columns: {
+                        imageUrl: true
+                    }
+                }
+            },
+            orderBy: (fields, { desc }) => [desc(fields.createdAt)],
+            limit,
+            offset,
+        });
+
+        return c.json({
+            success: true,
+            blinds,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1,
+            }
+        });
+    } catch (error) {
+        console.error("Failed to get best sellers:", error);
+        return c.json(
+            { success: false, message: "Failed to fetch top seller products." },
+            500
+        );
+    }
+}
+
+const getAllNewArrival = async (c: Context) => {
+    try {
+        const page = Number(c.req.query("page") ?? 1);
+        const limit = Number(c.req.query("limit") ?? 10);
+        const offset = (page - 1) * limit;
+
+        const whereCondition = and(
+            eq(blindsProducts.status, "active"),
+            eq(blindsProducts.collection, "New Arrival")
+        );
+
+        const [totalResult] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(blindsProducts)
+            .where(whereCondition);
+
+        const total = Number(totalResult?.count ?? 0);
+        const totalPages = Math.ceil(total / limit);
+
+        const blinds = await db.query.blindsProducts.findMany({
+            where: whereCondition,
+            columns: {
+                id: true,
+                productCode: true,
+                name: true,
+                type: true,
+                composition: true,
+                fabricWidth: true,
+                packing: true,
+                thickness: true,
+                status: true,
+                unitPrice: true,
+                collection: true,
+                createdAt: true,
+            },
+            with: {
+                colors: {
+                    columns: {
+                        name: true,
+                        imageUrl: true
+                    }
+                },
+                images: {
+                    limit: 1,
+                    columns: {
+                        imageUrl: true
+                    }
+                }
+            },
+            orderBy: (fields, { desc }) => [desc(fields.createdAt)],
+            limit,
+            offset,
+        });
+
+        return c.json({
+            success: true,
+            blinds,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1,
+            }
+        });
+    } catch (error) {
+        console.error("Failed to get new arrivals:", error);
+        return c.json(
+            { success: false, message: "Failed to fetch new arrival products." },
+            500
+        );
+    }
+}
+
 export {
     createNewBlinds,
     getAllBlinds,
-    getDetailsBlindByProductId
+    getDetailsBlindByProductId,
+    getAllBestSeller,
+    getAllNewArrival
 }

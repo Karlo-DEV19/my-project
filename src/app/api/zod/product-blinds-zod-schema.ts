@@ -25,6 +25,11 @@ export const blindsProductSchema = z.object({
     availableColors: z
         .array(blindsColorSchema)
         .min(1, 'At least one color required'),
+    collection: z.enum(['Shop Only', 'New Arrival', 'Best Seller'], {
+        error: () => ({
+            message: 'Collection display type must be one of: Shop Only, New Arrival, Best Seller',
+        }),
+    }),
 });
 
 // Type for TypeScript

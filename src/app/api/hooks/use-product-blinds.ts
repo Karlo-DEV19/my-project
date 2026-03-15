@@ -1,7 +1,7 @@
 // src/lib/hooks/useCreateNewBlinds.ts
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosApiClient } from "../axiosApiClient";
-import { BlindsProduct, BlindsProductDetailResponse, CreateBlindsResponse, GetBlindsProductsResponse } from "@/lib/types/product-blinds-type";
+import { BestSellerProduct, BlindsProduct, BlindsProductDetailResponse, CreateBlindsResponse, GetAllBestSellerProductBlinds, GetAllNewArrivalProductBlinds, GetBlindsProductsResponse, NewArrivalProduct } from "@/lib/types/product-blinds-type";
 
 
 export function useCreateNewBlinds() {
@@ -113,6 +113,72 @@ export function useGetBlindsDetailsByProductId(productId: string | undefined | n
     return {
         // Safe access to the nested data
         product: query.data?.data,
+        ...query,
+    };
+}
+
+
+interface UseGetBlindsProductsProps {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    keepPreviousData?: any; // optional placeholder data
+}
+
+// -------------------- New Arrival Hook --------------------
+export function useGetAllNewArrival({
+    page = 1,
+    limit = 10,
+    search = "",
+    sortBy = "createdAt",
+    sortOrder = "desc",
+    keepPreviousData,
+}: UseGetBlindsProductsProps = {}) {
+    const query = useQuery({
+        queryKey: ["newArrivalBlinds", { page, limit, search, sortBy, sortOrder }],
+        queryFn: async (): Promise<GetAllNewArrivalProductBlinds> => {
+            const { data } = await axiosApiClient.get<GetAllNewArrivalProductBlinds>(
+                "/product-blinds/new-arrival",
+                { params: { page, limit, search, sortBy, sortOrder } }
+            );
+            return data;
+        },
+        placeholderData: keepPreviousData,
+    });
+
+    return {
+        blinds: query.data?.blinds ?? ([] as NewArrivalProduct[]),
+        pagination: query.data?.pagination,
+        ...query,
+    };
+}
+
+// -------------------- Best Seller Hook --------------------
+export function useGetAllBestSeller({
+    page = 1,
+    limit = 10,
+    search = "",
+    sortBy = "createdAt",
+    sortOrder = "desc",
+    keepPreviousData,
+}: UseGetBlindsProductsProps = {}) {
+    const query = useQuery({
+        queryKey: ["bestSellerBlinds", { page, limit, search, sortBy, sortOrder }],
+        queryFn: async (): Promise<GetAllBestSellerProductBlinds> => {
+            const { data } = await axiosApiClient.get<GetAllBestSellerProductBlinds>(
+                "/product-blinds/best-seller",
+                { params: { page, limit, search, sortBy, sortOrder } }
+            );
+            return data;
+        },
+        placeholderData: keepPreviousData,
+    });
+
+    return {
+        blinds: query.data?.blinds ?? ([] as BestSellerProduct[]),
+        pagination: query.data?.pagination,
         ...query,
     };
 }

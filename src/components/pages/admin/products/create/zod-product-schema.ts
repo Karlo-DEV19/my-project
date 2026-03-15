@@ -1,3 +1,4 @@
+import { error } from 'console';
 import { z } from 'zod';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -33,6 +34,8 @@ export const colorSchema = z.object({
     file: imageOrFileSchema,
 });
 
+export const PRODUCT_COLLECTIONS = ['Shop Only', 'New Arrival', 'Best Seller'] as const;
+
 export const productSchema = z.object({
     productCode: z.string().min(1, 'Product code required'),
     name: z.string().min(2, 'Minimum 2 characters'),
@@ -49,6 +52,11 @@ export const productSchema = z.object({
         .min(1, 'At least one image required')
         .max(6, 'Max 6 images'),
     availableColors: z.array(colorSchema).min(1, 'At least one color required'),
+    collection: z.enum(PRODUCT_COLLECTIONS, {
+        error: () => ({
+            message: 'Collection display type must be one of: Shop Only, New Arrival, Best Seller',
+        }),
+    }),
 });
 
 export type FormValues = z.infer<typeof productSchema>;
@@ -76,4 +84,6 @@ export const DEFAULT_VALUES: Partial<FormValues> = {
     characteristic: '',
     mainImages: [],
     availableColors: [{ name: '', file: undefined as unknown as File | string }],
+    collection: 'Shop Only',
+
 };

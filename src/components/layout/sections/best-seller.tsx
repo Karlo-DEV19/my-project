@@ -1,12 +1,54 @@
-import React from 'react';
-import Image from 'next/image';
-import { ShoppingCart } from 'lucide-react';
-import { blindsProducts } from '@/lib/utils';
-import Link from 'next/link';
+'use client';
 
-const BestSeller = () => {
-    // Only display the first 4 products as best sellers
-    const bestSellers = blindsProducts.slice(0, 4);
+import React, { useCallback } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { Flame } from 'lucide-react';
+import DataPagination from '@/components/ui/data-pagination'; // Adjust path
+import { BestSellerProduct } from '@/lib/types/product-blinds-type';
+import { cn } from '@/lib/utils';
+
+interface BestSellerProps {
+    products?: BestSellerProduct[];
+    pagination?: any;
+    isLoading?: boolean;
+    onPageChange?: (page: number) => void;
+}
+
+// Skeleton card for loading state
+const ProductSkeleton = () => (
+    <div className="flex flex-col gap-4">
+        <div className="aspect-[4/5] w-full bg-muted border border-border animate-pulse" />
+        <div className="flex flex-col gap-2">
+            <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+            <div className="h-5 w-36 bg-muted rounded animate-pulse" />
+            <div className="h-3 w-full bg-muted rounded animate-pulse" />
+            <div className="flex items-center gap-2 mt-1">
+                {[0, 1, 2].map((i) => (
+                    <div key={i} className="w-6 h-6 rounded-full bg-muted animate-pulse" />
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
+const BestSeller = ({ products = [], pagination, isLoading = false, onPageChange }: BestSellerProps) => {
+    const router = useRouter();
+    const limit = 4;
+
+    const handleQuickView = useCallback((id: string) => {
+        router.push(`/shop/${id}`);
+    }, [router]);
+
+    // Transform API pagination to match DataPagination expected types
+    const paginationData = {
+        currentPage: pagination?.page ?? 1,
+        totalPages: pagination?.totalPages ?? 1,
+        totalItems: pagination?.total ?? 0,
+        perPage: limit,
+        hasNextPage: pagination?.hasNextPage ?? false,
+        hasPrevPage: pagination?.hasPrevPage ?? false,
+    };
 
     return (
         <section className="py-24 bg-background text-foreground font-sans border-t border-border/40">
@@ -23,94 +65,145 @@ const BestSeller = () => {
                     <div className="w-12 h-px bg-foreground/30"></div>
                 </div>
 
-                {/* Product Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-                    {bestSellers.map((product) => (
-                        <div key={product.id} className="group flex flex-col h-full bg-card transition-all duration-500 rounded-none outline-none focus-visible:ring-1 focus-visible:ring-primary border border-transparent hover:border-border/60">
+                {/* Grid Content */}
+                {isLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
+                        {Array.from({ length: limit }).map((_, i) => (
+                            <ProductSkeleton key={i} />
+                        ))}
+                    </div>
+                ) : products.length === 0 ? (
+                    <div className="py-24 text-center border border-border">
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
+                            No best sellers found at the moment.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
+                        {products.map((product) => {
+                            const primaryImage = product.images?.[0]?.imageUrl ?? null;
+                            const colors = product.colors ?? [];
 
-                            {/* Main Image Container */}
-                            <Link href={`/shop/${product.id}`} className="relative w-full aspect-[4/5] mb-6 overflow-hidden bg-muted block">
-                                {product.imageUrls && product.imageUrls.length > 0 ? (
-                                    <Image
-                                        src={product.imageUrls[0]}
-                                        alt={product.name}
-                                        fill
-                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                                        className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:scale-105"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/40 font-serif text-sm bg-accent/20">
-                                        Image Unavailable
-                                    </div>
-                                )}
+                            return (
+                                <div
+                                    key={product.id}
+                                    onClick={() => handleQuickView(product.id)}
+                                    className="group flex flex-col gap-4 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-none"
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleQuickView(product.id);
+                                        }
+                                    }}
+                                >
+                                    {/* Image Container */}
+                                    <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted border border-border transition-colors duration-500 group-hover:border-foreground/50">
 
-                                {/* Quick View Overlay */}
-                                <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-background/90 via-background/60 to-transparent opacity-0 translate-y-2 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center">
-                                    <span className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-medium shadow-lg w-full text-center">
-                                        View Details
-                                    </span>
-                                </div>
-                            </Link>
-
-                            {/* Product Info */}
-                            <div className="flex flex-col flex-grow text-center items-center px-4 pb-6">
-                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium mb-2">
-                                    {product.code}
-                                </span>
-                                <h3 className="text-lg font-serif tracking-wide text-foreground mb-2 group-hover:text-primary transition-colors">
-                                    <Link href={`/shop/${product.id}`}>
-                                        {product.name}
-                                    </Link>
-                                </h3>
-
-                                <p className="text-xs text-muted-foreground line-clamp-2 max-w-[250px] leading-relaxed mb-6">
-                                    {product.description || `${product.type} • ${product.composition}`}
-                                </p>
-
-                                {/* Swatches & Cart Button Wrapper */}
-                                <div className="mt-auto flex flex-col items-center w-full gap-5">
-
-                                    {/* Color Swatches as Images */}
-                                    <div className="flex items-center justify-center gap-2">
-                                        {product.availableColors.slice(0, 4).map((color, idx) => (
-                                            <div
-                                                key={idx}
-                                                title={color.name}
-                                                className="relative w-7 h-7 rounded-full border border-border/80 shadow-sm transition-transform hover:-translate-y-1 overflow-hidden ring-1 ring-background cursor-pointer"
-                                            >
-                                                <Image
-                                                    src={color.image}
-                                                    alt={color.name}
-                                                    fill
-                                                    sizes="28px"
-                                                    className="object-cover"
-                                                />
-                                            </div>
-                                        ))}
-                                        {product.availableColors.length > 4 && (
-                                            <span className="text-[10px] text-muted-foreground font-medium ml-1">
-                                                +{product.availableColors.length - 4}
+                                        {/* COOL FEATURE: Best Seller Badge */}
+                                        <div className="absolute top-4 left-4 z-20 overflow-hidden">
+                                            <span className="flex items-center gap-1.5 bg-foreground text-background px-3 py-1.5 text-[9px] uppercase tracking-widest font-bold shadow-lg transform transition-transform duration-500 group-hover:scale-105">
+                                                <Flame className="w-3 h-3 text-orange-500 animate-pulse" />
+                                                Best Seller
                                             </span>
+                                        </div>
+
+                                        {primaryImage ? (
+                                            <Image
+                                                src={primaryImage}
+                                                alt={`${product.name} texture preview`}
+                                                fill
+                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                                                className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:scale-105"
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <div className="absolute inset-0 bg-accent/20 flex items-center justify-center text-muted-foreground/40 font-serif text-sm">
+                                                Image Unavailable
+                                            </div>
+                                        )}
+
+                                        {/* Hover CTA */}
+                                        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-background/90 via-background/60 to-transparent opacity-0 translate-y-2 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center z-10">
+                                            <span className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-medium shadow-lg w-full text-center hover:bg-foreground/90 transition-colors">
+                                                View Full Details
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Product Metadata */}
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium truncate pr-2">
+                                                {product.productCode} • {product.type}
+                                            </span>
+                                            {/* Price */}
+                                            {product.unitPrice != null && (
+                                                <span className="text-[11px] uppercase tracking-widest text-foreground font-bold shrink-0">
+                                                    ₱{product.unitPrice.toLocaleString()}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <h3 className="font-serif text-lg tracking-wide text-foreground transition-colors group-hover:text-primary/80">
+                                            {product.name}
+                                        </h3>
+
+                                        {/* Specs line */}
+                                        <p className="text-xs text-muted-foreground line-clamp-1 leading-relaxed mt-0.5">
+                                            {[product.composition, product.thickness, product.fabricWidth]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </p>
+
+                                        {/* Color swatches */}
+                                        {colors.length > 0 && (
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <div className="flex -space-x-1">
+                                                    {colors.slice(0, 4).map((color, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            title={color.name}
+                                                            className="relative w-6 h-6 rounded-full border border-border/80 shadow-sm transition-transform group-hover:-translate-y-0.5 overflow-hidden ring-1 ring-background bg-muted"
+                                                            style={{ transitionDelay: `${idx * 50}ms` }}
+                                                        >
+                                                            {color.imageUrl && (
+                                                                <Image
+                                                                    src={color.imageUrl}
+                                                                    alt={color.name}
+                                                                    fill
+                                                                    sizes="24px"
+                                                                    className="object-cover"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <span className="text-xs text-muted-foreground font-medium pl-1">
+                                                    {colors.length} {colors.length === 1 ? 'Color' : 'Colors'}
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
-
-                                    {/* Add to Cart Button */}
-                                    <button className="flex items-center justify-center gap-2 w-full max-w-[200px] px-6 py-3 bg-transparent border border-foreground text-foreground text-[10px] font-medium tracking-widest uppercase hover:bg-foreground hover:text-background transition-colors duration-300">
-                                        <ShoppingCart className="w-3.5 h-3.5" />
-                                        Add to Cart
-                                    </button>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
-                {/* View All Button */}
-                <div className="mt-16 text-center">
-                    <Link href="/shop" className="inline-block px-10 py-3.5 border border-foreground text-foreground text-[10px] font-medium tracking-widest uppercase hover:bg-foreground hover:text-background transition-colors duration-300">
-                        View All Products
-                    </Link>
+                {/* Pagination */}
+                <div className="mt-16 flex justify-center">
+                    {onPageChange && products.length > 0 && (
+                        <DataPagination
+                            pagination={paginationData}
+                            onPageChange={(newPage) => onPageChange(newPage)}
+                            showPerPageSelector={false}
+                            showFirstLast={false}
+                            showResultsInfo={true}
+                            isLoading={isLoading}
+                        />
+                    )}
                 </div>
 
             </div>

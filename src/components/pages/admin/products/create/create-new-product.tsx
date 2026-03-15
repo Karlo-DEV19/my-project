@@ -40,7 +40,7 @@ import {
 import { ColorRow } from './color-row';
 import { PricePreviewTable } from './price-preview-table';
 import { MainDropZone } from './product-main-drop-zone';
-import { DEFAULT_VALUES, FormValues, PRODUCT_TYPES, productSchema } from './zod-product-schema';
+import { DEFAULT_VALUES, FormValues, PRODUCT_COLLECTIONS, PRODUCT_TYPES, productSchema } from './zod-product-schema';
 import { useCreateNewBlinds } from '@/app/api/hooks/use-product-blinds';
 
 export default function CreateNewProductPage() {
@@ -97,8 +97,9 @@ export default function CreateNewProductPage() {
                 characteristic: data.characteristic ?? '',
                 mainImages: mainResults.successful.map((r) => r.url!),
                 availableColors,
+                collection: data.collection,
             };
-
+            console.log(payload);
             // 4. Final API call via your custom hook
             await createNewBlinds(payload);
 
@@ -298,6 +299,31 @@ export default function CreateNewProductPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )} />
+
+                                    <FormField control={control} name="collection" render={({ field }) => (
+                                        <FormItem className="sm:col-span-2">
+                                            <FormLabel>Collection Display <span className="text-destructive">*</span></FormLabel>
+                                            <FormControl>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {PRODUCT_COLLECTIONS.map((c) => (
+                                                        <button
+                                                            key={c}
+                                                            type="button"
+                                                            onClick={() => field.onChange(c)}
+                                                            className={`rounded-md border px-4 py-2 text-sm transition-colors ${field.value === c
+                                                                ? 'bg-primary border-primary text-primary-foreground font-medium shadow-sm'
+                                                                : 'bg-background hover:bg-muted text-foreground'
+                                                                }`}
+                                                        >
+                                                            {c === 'Shop Only' ? 'Shop Only (Default)' : c}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
+
                                 </CardContent>
                             </Card>
 

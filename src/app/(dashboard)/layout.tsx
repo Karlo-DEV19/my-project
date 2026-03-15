@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/providers/auth-provider';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
+import ScrollToTop from '@/components/ui/scroll-to-top';
 import AdminSidebar from '@/components/pages/admin/admin-sidebar';
 import EmployeeSidebar from '@/components/pages/admin/employee/employee-sider';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
@@ -95,6 +96,8 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                     <Suspense fallback={<LoadingFallback />}>
                         {children}
                     </Suspense>
+                    {/* Scroll to top button (fixed, above chat box) */}
+                    <ScrollToTop />
                 </main>
             )}
 

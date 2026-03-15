@@ -1,15 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Environment variables for sensitive information
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+
+export const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+export const MAX_BYTES = 10 * 1024 * 1024;
 
 // Configuration constants
 const CONFIG = {
     STORAGE_BUCKET: 'images',
-    DEFAULT_FOLDER: 'images',
-    MAX_FILE_SIZE_MB: 10,
-    ALLOWED_FILE_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'], // Updated to reflect allowed types
+    DEFAULT_FOLDER: 'blinds',
+    MAX_FILE_SIZE_MB: MAX_BYTES,
+    ALLOWED_FILE_TYPES: ALLOWED_MIME,
     CACHE_CONTROL: '3600',
     RETRY_ATTEMPTS: 3,
     RETRY_DELAY: 1000, // 1 second
@@ -130,7 +134,7 @@ export const uploadImage = async ({
         const filePath = `${folder}/${finalFileName}`;
 
         // Upload to Supabase Storage with retry logic
-        const uploadResult = await retryOperation(async () => {
+        await retryOperation(async () => {
             const { error, data } = await supabase.storage
                 .from(CONFIG.STORAGE_BUCKET)
                 .upload(filePath, file, {

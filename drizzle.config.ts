@@ -9,7 +9,10 @@ config({ path: path.resolve(__dirname, ".env.local") });
 export default defineConfig({
     schema: [
         "./src/schema/admin/admins.ts",
-
+        "./src/schema/products/blinds/blinds-product.ts",
+        "./src/schema/products/blinds/blinds-product-image.ts",
+        "./src/schema/products/blinds/blinds-product-colors.ts",
+        "./src/schema/products/blinds/blinds-product-relations.ts",
     ],
     out: "./drizzle/migrations",
     dialect: "postgresql",

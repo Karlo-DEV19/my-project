@@ -171,12 +171,6 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                         )}
 
                         <CartButton />
-
-                        <Button
-                            className="rounded-none bg-foreground text-background hover:bg-foreground/90 font-semibold tracking-widest uppercase text-[11px] px-7 h-10 ml-2"
-                        >
-                            Get Quote
-                        </Button>
                     </div>
 
                     {/* ── Mobile right actions ── */}
@@ -245,13 +239,6 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                                                 </Link>
                                             ))}
                                         </nav>
-
-                                        {/* Mobile footer */}
-                                        <div className="px-6 py-5 border-t border-border">
-                                            <Button className="w-full rounded-none bg-foreground text-background hover:bg-foreground/90 font-semibold tracking-widest uppercase text-[11px] h-11">
-                                                Get Quote
-                                            </Button>
-                                        </div>
                                     </SheetContent>
                                 </Sheet>
                             </>

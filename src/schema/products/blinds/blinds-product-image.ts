@@ -9,4 +9,4 @@ export const blindsProductImages = pgTable("blinds_product_images", {
 });
 
 export type BlindsProductImage = typeof blindsProductImages.$inferSelect;
-export type NewBlindsProductImage = typeof blindsProductImages.$inferInsert;
+export type NewBlindsProductImage = typeof blindsProductImages.$inferInsert;    

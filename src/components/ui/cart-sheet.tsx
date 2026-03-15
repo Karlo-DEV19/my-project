@@ -9,6 +9,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { CartItem, useCartStore } from '@/lib/zustand/use-cart-store';
+import Link from 'next/link';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -20,19 +21,35 @@ function php(n: number) {
 
 // ─── Single cart line ─────────────────────────────────────────────────────────
 
+const RelativeImage = ({ url, name }: { url: string; name: string }) => (
+    <span className="relative w-3.5 h-3.5 overflow-hidden rounded-full border border-border/50 shrink-0">
+        <Image src={url} alt={name} fill className="object-cover" sizes="14px" />
+    </span>
+);
+
 const CartLineItem = React.memo(({ item }: { item: CartItem }) => {
     const { removeFromCart, updateQuantity } = useCartStore();
 
     const { order, quantity, cartItemId } = item;
     const lineTotal = order.priceBreakdown.total;
-
+    console.log("order", order)
     return (
         <div className="flex gap-4 py-5 border-b border-border last:border-0 group">
-            {/* Product image placeholder */}
+            {/* Product image */}
             <div className="relative w-16 h-20 shrink-0 bg-muted border border-border overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
-                    <ShoppingBag className="w-5 h-5" strokeWidth={1} />
-                </div>
+                {order.productImage ? (
+                    <Image
+                        src={order.productImage}
+                        alt={order.productName}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                    />
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
+                        <ShoppingBag className="w-5 h-5" strokeWidth={1} />
+                    </div>
+                )}
             </div>
 
             {/* Info */}
@@ -59,14 +76,24 @@ const CartLineItem = React.memo(({ item }: { item: CartItem }) => {
                 <div className="flex flex-wrap gap-1.5 mt-0.5">
                     {[
                         `${order.widthCm} × ${order.heightCm} cm`,
-                        order.selectedColor,
+                        order.selectedColor ? (
+                            <span className="flex items-center gap-1.5">
+                                <RelativeImage url={order.selectedColor.imageUrl} name={order.selectedColor.name} />
+                                {order.selectedColor.name}
+                            </span>
+                        ) : null,
                         order.mountingType,
                         order.controlType,
-                    ].filter(Boolean).map((tag, i) => (
-                        <span key={i} className="text-[9px] uppercase tracking-widest text-muted-foreground border border-border/60 px-1.5 py-0.5 leading-none">
-                            {tag}
-                        </span>
-                    ))}
+                    ]
+                        .filter(Boolean)
+                        .map((tag, i) => (
+                            <span
+                                key={i}
+                                className="text-[9px] uppercase tracking-widest text-muted-foreground border border-border/60 px-1.5 py-0.5 leading-none flex items-center"
+                            >
+                                {tag}
+                            </span>
+                        ))}
                 </div>
 
                 {/* Quantity + Price row */}
@@ -205,10 +232,10 @@ const CartSheet = () => {
                         </div>
 
                         {/* CTA */}
-                        <button className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors">
+                        <Link href="/shop/checkout" className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors">
                             Checkout Order
                             <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        </button>
+                        </Link>
                     </div>
                 )}
             </SheetContent>

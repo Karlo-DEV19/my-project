@@ -71,10 +71,10 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans min-h-screen bg-background text-foreground`}
       >
-        <Script
+        {/*       <Script
           crossOrigin="anonymous"
           src="//unpkg.com/react-scan/dist/auto.global.js"
-        />
+        /> */}
         <QueryProvider>
           {/* Inject the server session into the Client AuthProvider */}
           <AuthProvider session={session}>

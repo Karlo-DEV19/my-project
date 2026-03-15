@@ -41,7 +41,7 @@ type CartStore = CartState & CartActions;
 function buildCartKey(order: BlindOrderFields): string {
     return [
         order.productId,
-        order.selectedColor,
+        order.selectedColor?.name ?? '',
         order.widthCm,
         order.heightCm,
         order.panels,

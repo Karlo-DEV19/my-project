@@ -27,7 +27,9 @@ export interface BlindOrderFields {
     productId: string;
     productName: string;
     productCode: string;
-    selectedColor: string;
+    productImage: string; // added
+    colors: BlindsProductDetailResponse['data']['colors']; // added
+    selectedColor: { name: string; imageUrl: string } | null; // modified to store object
     widthCm: number;
     heightCm: number;
     panels: number;
@@ -332,7 +334,9 @@ const ShopProductDetailsView = ({ product }: Props) => {
             productId: product.id,
             productName: product.name,
             productCode: product.productCode,
-            selectedColor: selectedColor?.name ?? '',
+            productImage: imageUrls[0] ?? '',
+            colors: product.colors,
+            selectedColor: selectedColor ? { name: selectedColor.name, imageUrl: selectedColor.imageUrl } : null,
             widthCm: Number(widthCm),
             heightCm: Number(heightCm),
             panels,
@@ -343,7 +347,7 @@ const ShopProductDetailsView = ({ product }: Props) => {
             branch: branch.id,
             priceBreakdown: price,
         };
-        
+
         addToCart(payload);
     };
 

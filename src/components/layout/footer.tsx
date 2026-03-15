@@ -45,12 +45,18 @@ const Footer = () => {
           <div className="flex flex-col">
             <h4 className="text-sm font-bold tracking-widest uppercase mb-6 text-background/90 font-serif">Quick Links</h4>
             <div className="flex flex-col gap-4">
-              {['Home', 'Shop Collections', 'About Us',].map((link) => (
-                <Link key={link} href="#" className="text-background/60 hover:text-background text-sm flex items-center gap-2 group transition-colors">
-                  <ChevronRight className="w-3 h-3 opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all text-background/60" />
-                  {link}
-                </Link>
-              ))}
+              <Link href="/" className="text-background/60 hover:text-background text-sm flex items-center gap-2 group transition-colors">
+                <ChevronRight className="w-3 h-3 opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all text-background/60" />
+                Home
+              </Link>
+              <Link href="/shop" className="text-background/60 hover:text-background text-sm flex items-center gap-2 group transition-colors">
+                <ChevronRight className="w-3 h-3 opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all text-background/60" />
+                Shop Collections
+              </Link>
+              <Link href="/#about" className="text-background/60 hover:text-background text-sm flex items-center gap-2 group transition-colors">
+                <ChevronRight className="w-3 h-3 opacity-0 -ml-5 group-hover:opacity-100 group-hover:ml-0 transition-all text-background/60" />
+                About Us
+              </Link>
             </div>
           </div>
 
@@ -60,7 +66,15 @@ const Footer = () => {
             <div className="flex flex-col gap-4 text-sm text-background/60 leading-relaxed">
               <p>Email: mjdecor888@gmail.com</p>
               <p>Phone: 0917 694 8888</p>
-              <p>Address: <br />35 20th Avenue, Murphy Cubao,<br /> Quezon City, Philippines, 1109</p>
+              <p>
+                Address: <br />
+                <Link
+                  href="/location"
+                  className="hover:text-background transition-colors underline-offset-2 hover:underline"
+                >
+                  35 20th Avenue, Murphy Cubao,<br /> Quezon City, Philippines, 1109
+                </Link>
+              </p>
             </div>
           </div>
 
@@ -91,9 +105,10 @@ const Footer = () => {
         {/* Bottom Bar: Copyright */}
         <div className="pt-8 border-t border-background/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium tracking-widest text-background/40 uppercase">
           <p>© 2026 MJ DECORS. All rights reserved.</p>
-          <div className="flex gap-6">
-            <Link href="#" className="hover:text-background transition-colors">Privacy Policy</Link>
-            <Link href="#" className="hover:text-background transition-colors">Terms of Service</Link>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <Link href="/privacy-policy" className="hover:text-background transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-service" className="hover:text-background transition-colors">Terms of Service</Link>
+            <Link href="/shipping-policy" className="hover:text-background transition-colors">Shipping Policy</Link>
           </div>
         </div>
       </div>

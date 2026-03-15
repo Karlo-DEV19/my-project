@@ -21,7 +21,7 @@ interface HeaderProps {
 const NAV_ITEMS = [
     { label: 'Home', href: '/', icon: Home },
     { label: 'Shop', href: '/shop', icon: ShoppingBag },
-    { label: 'About', href: '/about', icon: Info },
+    { label: 'About', href: '/#about', icon: Info },
     { label: 'Contact', href: '/contact', icon: Mail },
 ] as const;
 
@@ -176,6 +176,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                                     <Link
                                         key={item.label}
                                         href={item.href}
+                                        onClick={item.label === 'About' ? handleAboutClick : undefined}
                                         className="px-5 py-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:bg-background hover:text-foreground hover:shadow-sm transition-all rounded-full border border-transparent hover:border-border/60"
                                     >
                                         {item.label}
@@ -253,7 +254,10 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                                                 <Link
                                                     key={item.label}
                                                     href={item.href}
-                                                    onClick={() => setMobileMenuOpen(false)}
+                                                    onClick={(e) => {
+                                                        if (item.label === 'About') handleAboutClick(e);
+                                                        setMobileMenuOpen(false);
+                                                    }}
                                                     className="flex items-center gap-4 px-3 py-3.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-all group"
                                                 >
                                                     <item.icon

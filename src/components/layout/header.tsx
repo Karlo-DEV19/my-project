@@ -2,11 +2,12 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Home, Info, ShoppingBag, Search, X, Menu, ShoppingCart } from 'lucide-react';
+import { Home, Info, ShoppingBag, Search, X, Menu, ShoppingCart, Mail } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/lib/zustand/use-cart-store';
+import { usePathname } from 'next/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
     { label: 'Home', href: '/', icon: Home },
     { label: 'Shop', href: '/shop', icon: ShoppingBag },
     { label: 'About', href: '/about', icon: Info },
+    { label: 'Contact', href: '/contact', icon: Mail },
 ] as const;
 
 // ─── Cart Button ──────────────────────────────────────────────────────────────
@@ -92,11 +94,36 @@ const SearchBar = ({
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 const Header = ({ isVisible, isFixed }: HeaderProps) => {
+    const pathname = usePathname();
     const [searchOpen, setSearchOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const openSearch = useCallback(() => setSearchOpen(true), []);
     const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+    const handleAboutClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+        if (pathname === '/') {
+            event.preventDefault();
+            const aboutSection = document.getElementById('about');
+            if (aboutSection) {
+                const headerOffset = 96; // approx header height
+                const elementPosition = aboutSection.getBoundingClientRect().top + window.scrollY;
+                const offsetPosition = elementPosition - headerOffset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth',
+                });
+            }
+        }
+    };
+
+    const handleHomeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+        if (pathname === '/') {
+            event.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
 
     return (
         <header

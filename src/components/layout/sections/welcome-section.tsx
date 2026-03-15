@@ -1,9 +1,12 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 
 const WelcomeSection = () => {
+    const [activeImage, setActiveImage] = useState<"tall" | "top" | "bottom" | null>(null);
+
     const features = [
         "Premium Combi Shades",
         "Custom Fit & Installation",
@@ -34,34 +37,62 @@ const WelcomeSection = () => {
                     <div className="relative grid grid-cols-2 gap-4 h-[500px] lg:h-[600px] group">
 
                         {/* Tall Image */}
-                        <div className="col-span-1 row-span-2 relative overflow-hidden bg-muted mt-8 border border-border/50 hover:border-foreground transition-colors duration-300">
+                        <div
+                            className={`col-span-1 row-span-2 relative overflow-hidden bg-muted mt-8 border border-border/50 hover:border-foreground transition-colors duration-300 cursor-pointer transform duration-500 ease-out
+                                ${activeImage === "tall" ? "scale-[1.04] shadow-2xl shadow-black/30" : activeImage ? "scale-[0.97] opacity-70" : "scale-100"}`}
+                            onClick={() => setActiveImage(prev => prev === "tall" ? null : "tall")}
+                        >
                             <Image
-                                src="/images/welcome/blinds-detail-1.jpg"
-                                alt="Close up of combi blinds texture"
+                                src="/welcome-section-pic/elegant.png"
+                                alt="Elegant window treatment from MJ Decor"
                                 fill
                                 className="object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
+                            {activeImage === "tall" && (
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-4 pb-4 pt-8 text-left">
+                                    <p className="text-xs font-medium tracking-[0.2em] text-background/80 uppercase">
+                                        Signature Look
+                                    </p>
+                                    <p className="text-sm text-background">
+                                        Tap any photo to spotlight your favorite style.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Top Right Image */}
-                        <div className="col-span-1 border border-border/50 hover:border-foreground transition-colors duration-300 relative overflow-hidden bg-muted">
+                        <div
+                            className={`col-span-1 border border-border/50 hover:border-foreground transition-colors duration-300 relative overflow-hidden bg-muted cursor-pointer transform duration-500 ease-out
+                                ${activeImage === "top" ? "scale-[1.04] shadow-xl shadow-black/25" : activeImage ? "scale-[0.97] opacity-70" : "scale-100"}`}
+                            onClick={() => setActiveImage(prev => prev === "top" ? null : "top")}
+                        >
                             <Image
-                                src="/images/welcome/blinds-room-1.jpg"
-                                alt="Modern living room with Korean blinds"
+                                src="/welcome-section-pic/close up.png"
+                                alt="Modern living room with MJ Decor blinds"
                                 fill
                                 className="object-cover transition-transform duration-700 ease-in-out delay-100 group-hover:scale-105"
                             />
+                            {activeImage === "top" && (
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-black/50 via-black/10 to-transparent" />
+                            )}
                         </div>
 
                         {/* Bottom Right Image */}
-                        <div className="col-span-1 relative overflow-hidden bg-muted border border-border/50 hover:border-foreground transition-colors duration-300">
+                        <div
+                            className={`col-span-1 relative overflow-hidden bg-muted border border-border/50 hover:border-foreground transition-colors duration-300 cursor-pointer transform duration-500 ease-out
+                                ${activeImage === "bottom" ? "scale-[1.04] shadow-xl shadow-black/25" : activeImage ? "scale-[0.97] opacity-70" : "scale-100"}`}
+                            onClick={() => setActiveImage(prev => prev === "bottom" ? null : "bottom")}
+                        >
                             <Image
-                                src="/images/welcome/blinds-room-2.jpg"
-                                alt="Elegant bedroom window treatment"
+                                src="/welcome-section-pic/modern.png"
+                                alt="Close-up of premium combi blinds texture"
                                 fill
                                 className="object-cover transition-transform duration-700 ease-in-out delay-200 group-hover:scale-105"
                             />
+                            {activeImage === "bottom" && (
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/45 via-transparent to-transparent" />
+                            )}
                         </div>
                     </div>
 
@@ -93,10 +124,13 @@ const WelcomeSection = () => {
 
                         {/* CTA */}
                         <div>
-                            <button className="flex items-center justify-center gap-2 px-8 py-3.5 border border-foreground text-foreground text-sm font-medium tracking-wide uppercase hover:bg-foreground hover:text-background transition-all duration-300 w-max">
+                            <Link
+                                href="/shop"
+                                className="flex items-center justify-center gap-2 px-8 py-3.5 border border-foreground text-foreground text-sm font-medium tracking-wide uppercase hover:bg-foreground hover:text-background transition-all duration-300 w-max"
+                            >
                                 Explore Collection
                                 <ArrowRight className="w-4 h-4 ml-1" />
-                            </button>
+                            </Link>
                         </div>
                     </div>
                 </div>

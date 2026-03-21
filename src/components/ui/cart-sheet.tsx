@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/sheet';
 import { CartItem, useCartStore } from '@/lib/zustand/use-cart-store';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -29,10 +30,11 @@ const RelativeImage = ({ url, name }: { url: string; name: string }) => (
 
 const CartLineItem = React.memo(({ item }: { item: CartItem }) => {
     const { removeFromCart, updateQuantity } = useCartStore();
-
+    const router = useRouter();
     const { order, quantity, cartItemId } = item;
     const lineTotal = order.priceBreakdown.total;
     console.log("order", order)
+
     return (
         <div className="flex gap-4 py-5 border-b border-border last:border-0 group">
             {/* Product image */}
@@ -232,7 +234,7 @@ const CartSheet = () => {
                         </div>
 
                         {/* CTA */}
-                        <Link href="/shop/checkout" className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors">
+                        <Link href="/shop/checkout" onClick={closeCartSheet} className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors">
                             Checkout Order
                             <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
                         </Link>

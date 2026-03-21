@@ -1,1 +1,0 @@
-ALTER TABLE "blinds_products" ADD COLUMN "collection" varchar(50) DEFAULT 'Shop Only' NOT NULL;

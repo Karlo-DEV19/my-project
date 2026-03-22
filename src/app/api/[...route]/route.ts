@@ -5,12 +5,14 @@ import { handle } from "hono/vercel";
 import productBlindsRoute from "./routes/product-blinds-route";
 import geocodeRoute from "./routes/geocodeRoute";
 import webhooksRoute from "./routes/payment-webhook";
+import orderRoute from "./routes/order-controller";
 const app = new Hono().basePath("/api/v1");
 
 // Mount routers
 app.route("/product-blinds", productBlindsRoute);
 app.route("/geocode", geocodeRoute);
 app.route("/webhooks", webhooksRoute);
+app.route("/orders", orderRoute);
 app.get('/hello', (c) => {
     return c.json({
         message: 'Hello from Hono!'

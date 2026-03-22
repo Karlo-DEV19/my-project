@@ -59,7 +59,7 @@ export const checkoutSchema = z.object({
         .optional(),
 
     // ── Payment ──────────────────────────────────────────────
-    paymentMethod: z.enum(["gcash", "maya"], {
+    paymentMethod: z.enum(["gcash", "paymaya"], {
         error: "Please select a payment method.",
     }),
 

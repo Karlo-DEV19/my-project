@@ -7,6 +7,7 @@ import { blindsProductColors } from "@/schema/products/blinds/blinds-product-col
 import { orderItems, orders } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
 import { createOrderPaymentSession } from "../services/nodemailer/paymongo/order-checkout-payment"
+
 // ==================== UTILS ====================
 
 function generateTrackingNumber(): string {
@@ -27,7 +28,9 @@ const CheckoutSchema = z.object({
     email: z.string().email("Valid email is required"),
     phone: z.string().min(10, "Valid phone is required"),
     phoneSecondary: z.string().optional(),
-    paymentMethod: z.enum(["gcash", "paymaya"]),
+    paymentMethod: z.enum(["gcash", "paymaya"], {
+        error: () => ({ message: "Payment method must be gcash or paymaya" }),
+    }),
     agreeTerms: z.literal(true, {
         error: () => ({ message: "You must agree to the terms" }),
     }),
@@ -54,6 +57,10 @@ const CheckoutSchema = z.object({
             })
         )
         .min(1, "At least one item is required"),
+    // Cart totals computed client-side — must match OrderSummary exactly
+    subtotal: z.number().positive("subtotal must be positive"),
+    vat: z.number().min(0, "vat must be non-negative"),
+    totalAmount: z.number().positive("totalAmount must be positive"),
 })
 
 type CheckoutInput = z.infer<typeof CheckoutSchema>
@@ -79,7 +86,7 @@ export const checkoutOrder = async (ctx: Context) => {
 
         const input: CheckoutInput = parsed.data
 
-        // 2. Fetch products — validate existence and active status
+        // 2. Validate products exist and are active
         const productIds = input.items.map((i) => i.productId)
 
         const fetchedProducts = await db
@@ -105,34 +112,24 @@ export const checkoutOrder = async (ctx: Context) => {
             }
             if (product.status !== "active") {
                 return ctx.json(
-                    {
-                        success: false,
-                        message: `Product "${product.name}" is no longer available`,
-                    },
+                    { success: false, message: `Product "${product.name}" is no longer available` },
                     400
                 )
             }
         }
 
-        // 3. Fetch and validate color IDs (only those provided)
-        const colorIds = input.items
-            .filter((i) => i.colorId)
-            .map((i) => i.colorId!)
-
+        // 3. Validate color IDs
+        const colorIds = input.items.filter((i) => i.colorId).map((i) => i.colorId!)
         const colorMap = new Map<string, { id: string; name: string }>()
 
         if (colorIds.length > 0) {
             const fetchedColors = await db
-                .select({
-                    id: blindsProductColors.id,
-                    name: blindsProductColors.name,
-                })
+                .select({ id: blindsProductColors.id, name: blindsProductColors.name })
                 .from(blindsProductColors)
                 .where(inArray(blindsProductColors.id, colorIds))
 
             fetchedColors.forEach((c) => colorMap.set(c.id, c))
 
-            // Validate all provided color IDs actually exist
             for (const item of input.items) {
                 if (item.colorId && !colorMap.has(item.colorId)) {
                     return ctx.json(
@@ -143,19 +140,16 @@ export const checkoutOrder = async (ctx: Context) => {
             }
         }
 
-        // 4. Compute line items and financials
-        //    unitPrice in blinds_products is stored as integer whole PHP (e.g. 1500 = ₱1,500)
-        //    Adjust the division below if you store centavos instead
-        const PROCESSING_FEE = 10   // ₱10 fixed online payment fee
-        const DELIVERY_FEE = 150    // ₱150 flat delivery — adjust as needed
+        // 4. Use client-computed totals (matches OrderSummary exactly)
+        const { subtotal, vat, totalAmount } = input
 
-        let subtotal = 0
-
+        // Build order items snapshot for DB
+        // unitPrice × quantity is for record-keeping only —
+        // the actual charge comes from subtotal/vat/totalAmount sent by the client
         const computedItems = input.items.map((item) => {
             const product = productMap.get(item.productId)!
-            const unitPrice = product.unitPrice  // whole PHP integer
+            const unitPrice = product.unitPrice
             const itemSubtotal = unitPrice * item.quantity
-            subtotal += itemSubtotal
 
             return {
                 productId: product.id,
@@ -169,20 +163,27 @@ export const checkoutOrder = async (ctx: Context) => {
             }
         })
 
-        const deliveryFee = DELIVERY_FEE
-        const processingFee = PROCESSING_FEE
-        const totalAmount = subtotal + deliveryFee + processingFee
+        // 5. Distribute client subtotal proportionally across PayMongo line items
+        //    so the PayMongo receipt adds up to exactly what the customer sees
+        const rawSubtotalSum = computedItems.reduce((sum, i) => sum + i.subtotal, 0)
 
-        // 5. Generate identifiers
+        const paymongoItems = computedItems.map((item) => ({
+            name: item.productName,
+            quantity: 1,  // always 1 — full line total is already in amount
+            amount: rawSubtotalSum > 0
+                ? (item.subtotal / rawSubtotalSum) * subtotal
+                : subtotal / computedItems.length,
+        }))
+
+        // 6. Generate identifiers
         const trackingNumber = generateTrackingNumber()
         const referenceNumber = generateReferenceNumber()
 
-        // 6. Persist order + items + payment history in one transaction
-        //    Always write to DB first — if PayMongo fails we still have a record
         let newOrderId!: string
 
+        // 7. Persist order + items + payment history in one transaction
+        //    Always write to DB first — PayMongo failure still leaves an audit record
         await db.transaction(async (tx) => {
-            // Insert order
             const [newOrder] = await tx
                 .insert(orders)
                 .values({
@@ -211,15 +212,14 @@ export const checkoutOrder = async (ctx: Context) => {
                     deliveryNotes: input.deliveryNotes ?? null,
 
                     subtotal: subtotal.toFixed(2),
-                    deliveryFee: deliveryFee.toFixed(2),
-                    processingFee: processingFee.toFixed(2),
+                    deliveryFee: "0.00",
+                    vat: vat.toFixed(2),         // ← renamed from processingFee
                     totalAmount: totalAmount.toFixed(2),
                 })
                 .returning({ id: orders.id })
 
             newOrderId = newOrder.id
 
-            // Insert order items (product snapshot at time of order)
             await tx.insert(orderItems).values(
                 computedItems.map((item) => ({
                     orderId: newOrderId,
@@ -234,18 +234,15 @@ export const checkoutOrder = async (ctx: Context) => {
                 }))
             )
 
-            // Insert payment_history in pending state
-            // sessionId + paymentIntentId + expiresAt are filled after PayMongo responds
             await tx.insert(paymentHistory).values({
                 orderId: newOrderId,
                 status: "pending",
                 paymentMethod: input.paymentMethod,
                 referenceNumber,
-                // processingFee, amountPaid, netAmount, paidAt set by webhook on success
             })
         })
 
-        // 7. Call PayMongo to create the checkout session
+        // 8. Create PayMongo checkout session
         const paymentSession = await createOrderPaymentSession({
             orderId: newOrderId,
             trackingNumber,
@@ -257,18 +254,13 @@ export const checkoutOrder = async (ctx: Context) => {
             customerPhoneSecondary: input.phoneSecondary,
             amount: totalAmount,
             subtotal,
-            deliveryFee,
-            processingFee,
+            vat,
             orderType: "delivery",
             paymentMethod: input.paymentMethod,
-            items: computedItems.map((item) => ({
-                name: item.productName,
-                quantity: item.quantity,
-                price: item.unitPrice,
-            })),
+            items: paymongoItems,
         })
 
-        // 8. If PayMongo fails, mark order cancelled + record reason
+        // 9. PayMongo failed — cancel order and log reason
         if (!paymentSession.success) {
             console.error("❌ PayMongo session failed:", paymentSession.error)
 
@@ -307,7 +299,7 @@ export const checkoutOrder = async (ctx: Context) => {
             )
         }
 
-        // 9. Backfill session details into payment_history now that PayMongo responded
+        // 10. Backfill PayMongo session details into payment_history
         await db
             .update(paymentHistory)
             .set({
@@ -318,7 +310,7 @@ export const checkoutOrder = async (ctx: Context) => {
             })
             .where(eq(paymentHistory.orderId, newOrderId))
 
-        // 10. Return checkout URL to the frontend
+        // 11. Return checkout URL to frontend
         return ctx.json(
             {
                 success: true,
@@ -332,8 +324,7 @@ export const checkoutOrder = async (ctx: Context) => {
                     expiresAt: paymentSession.expiresAt,
                     summary: {
                         subtotal,
-                        deliveryFee,
-                        processingFee,
+                        vat,
                         totalAmount,
                         itemCount: computedItems.length,
                     },

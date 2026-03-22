@@ -15,7 +15,6 @@ export const paymentHistory = pgTable("payment_history", {
         .notNull()
         .references(() => orders.id, { onDelete: "cascade" }),
 
-    // Payment status lifecycle
     status: varchar("status", { length: 50 }).notNull().default("pending"),
     // pending | paid | failed | refunded
 
@@ -27,21 +26,20 @@ export const paymentHistory = pgTable("payment_history", {
     sessionId: varchar("session_id", { length: 100 }),
     referenceNumber: varchar("reference_number", { length: 100 }),
 
-    // Financials — matches handlePaymentSuccess breakdown exactly
+    // Financials recorded at time of payment confirmation
     amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }),
-    // Gross amount customer paid
+    // Gross amount the customer paid (centavos → PHP)
 
-    processingFee: decimal("processing_fee", { precision: 10, scale: 2 }),
-    // YOUR ₱10 processing fee (not PayMongo's platform fee)
+    vat: decimal("vat", { precision: 10, scale: 2 }),
+    // 12% VAT recorded from PayMongo metadata at webhook time
 
     netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
     // What you receive after PayMongo deducts their platform fee
 
-    // Timestamps
     paidAt: timestamp("paid_at", { mode: "date" }),
     expiresAt: timestamp("expires_at", { mode: "date" }),
 
-    // Full PayMongo webhook/response payload for auditability
+    // Full PayMongo webhook payload for auditability
     rawResponse: jsonb("raw_response"),
 
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

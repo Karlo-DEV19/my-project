@@ -15,32 +15,28 @@ const getAuthHeader = (): string => {
 export interface PaymentLineItem {
     name: string
     quantity: number
-    price: number // in PHP (not centavos)
+    // amount = the full line price in PHP (already includes panels, sq ft calc, etc.)
+    // PayMongo will display: amount × quantity on the receipt
+    // Since we already computed the total per set, quantity should always be 1 here
+    amount: number
 }
 
 export interface PaymentSessionData {
     orderId: string
     trackingNumber: string
     referenceNumber: string
-
-    // Customer — split fields to match checkout payload
     customerFirstName: string
     customerLastName: string
     customerEmail: string
     customerPhone: string
     customerPhoneSecondary?: string
-
-    // Financials
-    amount: number       // total (subtotal + deliveryFee + processingFee)
-    subtotal: number
-    deliveryFee: number
-    processingFee: number
-
+    // These three must match exactly: amount = subtotal + vat
+    amount: number      // grand total charged to customer
+    subtotal: number    // sum of all line totals before VAT
+    vat: number         // 12% of subtotal
     orderType: "delivery" | "pickup"
     items: PaymentLineItem[]
     paymentMethod: "gcash" | "paymaya"
-
-    // Extra metadata to forward to PayMongo
     metadata?: Record<string, string>
 }
 
@@ -64,34 +60,43 @@ export interface PaymentVerificationResult {
 
 // ==================== HELPERS ====================
 
-function mapPaymentMethod(paymentMethod: string): string[] {
-    const map: Record<string, string[]> = {
-        gcash: ["gcash"],
-        paymaya: ["paymaya"],
+function getFrontendUrl(): string {
+    const url = process.env.FRONTEND_URL
+    if (!url) {
+        throw new Error(
+            "FRONTEND_URL is not configured. Add FRONTEND_URL=https://yourdomain.com to your .env file."
+        )
     }
-    return map[paymentMethod.toLowerCase()] ?? ["gcash"]
+    return url.replace(/\/$/, "")
+}
+
+function mapPaymentMethod(paymentMethod: "gcash" | "paymaya"): string[] {
+    return { gcash: ["gcash"], paymaya: ["paymaya"] }[paymentMethod] ?? ["gcash"]
 }
 
 function buildLineItems(
     items: PaymentLineItem[],
-    deliveryFee: number,
-    processingFee: number,
-    orderType: string,
+    vat: number,
     currency: string
 ) {
+    // Each item.amount is already the full line total in PHP (priceBreakdown.total × quantity)
+    // quantity is always 1 because the total is already computed
+    // PayMongo receipt shows: item.name  ×1  ₱item.amount
     const lineItems = items.map((item) => ({
         name: item.name,
-        amount: Math.round(item.price * 100),
+        amount: Math.round(item.amount * 100), // PHP → centavos
         currency,
-        quantity: item.quantity,
+        quantity: 1,                            // always 1 — full price already in amount
     }))
 
-    if (deliveryFee > 0 && orderType === "delivery") {
-        lineItems.push({ name: "Delivery Fee", amount: Math.round(deliveryFee * 100), currency, quantity: 1 })
-    }
-
-    if (processingFee > 0) {
-        lineItems.push({ name: "Processing Fee", amount: Math.round(processingFee * 100), currency, quantity: 1 })
+    // VAT as a separate line so the PayMongo receipt shows it clearly
+    if (vat > 0) {
+        lineItems.push({
+            name: "VAT (12%)",
+            amount: Math.round(vat * 100),
+            currency,
+            quantity: 1,
+        })
     }
 
     return lineItems
@@ -104,10 +109,23 @@ function validatePaymentSessionData(data: PaymentSessionData): string[] {
     if (!data.customerFirstName?.trim()) errors.push("customerFirstName is required")
     if (!data.customerLastName?.trim()) errors.push("customerLastName is required")
     if (!data.customerEmail?.trim()) errors.push("customerEmail is required")
-    if (!data.customerPhone || data.customerPhone.trim().length < 10) errors.push("Valid customerPhone is required")
+    if (!data.customerPhone?.trim() || data.customerPhone.trim().length < 10)
+        errors.push("Valid customerPhone is required")
     if (!data.amount || data.amount <= 0) errors.push("amount must be greater than 0")
     if (!data.items?.length) errors.push("At least one item is required")
-    if (!["gcash", "paymaya"].includes(data.paymentMethod)) errors.push("paymentMethod must be gcash or paymaya")
+    if (!["gcash", "paymaya"].includes(data.paymentMethod))
+        errors.push("paymentMethod must be gcash or paymaya")
+
+    // Sanity check: line items + vat should equal the total amount
+    const lineSum = data.items.reduce((sum, i) => sum + i.amount, 0)
+    const expectedTotal = lineSum + data.vat
+    const diff = Math.abs(expectedTotal - data.amount)
+    if (diff > 0.02) { // allow ₱0.02 rounding tolerance
+        errors.push(
+            `Amount mismatch: items(${lineSum.toFixed(2)}) + vat(${data.vat.toFixed(2)}) = ${expectedTotal.toFixed(2)}, but amount=${data.amount.toFixed(2)}`
+        )
+    }
+
     return errors
 }
 
@@ -118,13 +136,20 @@ export async function createOrderPaymentSession(
 ): Promise<PaymentSessionResult> {
     try {
         console.log("=== PayMongo: Creating Checkout Session ===")
-        console.log("Order ID:", paymentData.orderId)
-        console.log("Tracking:", paymentData.trackingNumber)
-        console.log("Method:", paymentData.paymentMethod)
-        console.log("Total:", paymentData.amount)
+        console.log("Order ID:  ", paymentData.orderId)
+        console.log("Tracking:  ", paymentData.trackingNumber)
+        console.log("Method:    ", paymentData.paymentMethod)
+        console.log("Subtotal:  ₱", paymentData.subtotal.toFixed(2))
+        console.log("VAT (12%): ₱", paymentData.vat.toFixed(2))
+        console.log("Total:     ₱", paymentData.amount.toFixed(2))
+        console.log("Line items:")
+        paymentData.items.forEach(i =>
+            console.log(`  - ${i.name}: ₱${i.amount.toFixed(2)}`)
+        )
 
         const errors = validatePaymentSessionData(paymentData)
         if (errors.length > 0) {
+            console.error("❌ Validation errors:", errors)
             return {
                 success: false,
                 paymentIntentId: null,
@@ -136,17 +161,27 @@ export async function createOrderPaymentSession(
             }
         }
 
+        // Resolve FRONTEND_URL before calling PayMongo — fail fast
+        let frontendUrl: string
+        try {
+            frontendUrl = getFrontendUrl()
+        } catch (envError: any) {
+            console.error("❌ FRONTEND_URL not configured:", envError.message)
+            return {
+                success: false,
+                paymentIntentId: null,
+                sessionId: null,
+                checkoutUrl: null,
+                referenceNumber: paymentData.referenceNumber,
+                expiresAt: null,
+                error: envError.message,
+            }
+        }
+
         const currency = "PHP"
-        const frontendUrl = process.env.FRONTEND_URL
         const fullName = `${paymentData.customerFirstName} ${paymentData.customerLastName}`.trim()
         const paymentMethodTypes = mapPaymentMethod(paymentData.paymentMethod)
-        const lineItems = buildLineItems(
-            paymentData.items,
-            paymentData.deliveryFee,
-            paymentData.processingFee,
-            paymentData.orderType,
-            currency
-        )
+        const lineItems = buildLineItems(paymentData.items, paymentData.vat, currency)
 
         const metadata: Record<string, string> = {
             order_id: paymentData.orderId,
@@ -157,15 +192,20 @@ export async function createOrderPaymentSession(
             customer_email: paymentData.customerEmail,
             customer_phone: paymentData.customerPhone,
             payment_method: paymentData.paymentMethod,
-            subtotal: paymentData.subtotal.toString(),
-            delivery_fee: paymentData.deliveryFee.toString(),
-            processing_fee: paymentData.processingFee.toString(),
-            total_amount: paymentData.amount.toString(),
+            subtotal: paymentData.subtotal.toFixed(2),
+            vat: paymentData.vat.toFixed(2),
+            total_amount: paymentData.amount.toFixed(2),
             ...paymentData.metadata,
         }
 
         const orderTypeLabel =
             paymentData.orderType.charAt(0).toUpperCase() + paymentData.orderType.slice(1)
+
+        const successUrl = `${frontendUrl}/orders/success?tracking=${encodeURIComponent(paymentData.trackingNumber)}&reference=${encodeURIComponent(paymentData.referenceNumber)}`
+        const cancelUrl = `${frontendUrl}/orders/cancelled?tracking=${encodeURIComponent(paymentData.trackingNumber)}&reference=${encodeURIComponent(paymentData.referenceNumber)}`
+
+        console.log("✅ Success URL:", successUrl)
+        console.log("❌ Cancel URL:", cancelUrl)
 
         const response = await axios.post(
             `${PAYMONGO_API_URL}/checkout_sessions`,
@@ -179,8 +219,8 @@ export async function createOrderPaymentSession(
                             description: `Order ${paymentData.trackingNumber} - ${orderTypeLabel}`,
                             metadata,
                         },
-                        success_url: `${frontendUrl}/orders/success?tracking=${paymentData.trackingNumber}&reference=${paymentData.referenceNumber}`,
-                        cancel_url: `${frontendUrl}/orders/cancelled?tracking=${paymentData.trackingNumber}&reference=${paymentData.referenceNumber}`,
+                        success_url: successUrl,
+                        cancel_url: cancelUrl,
                         reference_number: paymentData.referenceNumber,
                         description: `Order ${paymentData.trackingNumber} - ${fullName}`,
                         billing: {
@@ -207,7 +247,7 @@ export async function createOrderPaymentSession(
         const paymentIntent = sessionAttrs.payment_intent
 
         console.log("✅ Session created:", session.id)
-        console.log("Checkout URL:", sessionAttrs.checkout_url)
+        console.log("✅ Checkout URL:  ", sessionAttrs.checkout_url)
 
         return {
             success: true,
@@ -215,7 +255,9 @@ export async function createOrderPaymentSession(
             sessionId: session.id,
             checkoutUrl: sessionAttrs.checkout_url,
             referenceNumber: paymentData.referenceNumber,
-            expiresAt: sessionAttrs.expires_at ? new Date(sessionAttrs.expires_at * 1000) : null,
+            expiresAt: sessionAttrs.expires_at
+                ? new Date(sessionAttrs.expires_at * 1000)
+                : null,
         }
     } catch (error: any) {
         console.error("=== PayMongo: Session Creation Error ===")

@@ -40,10 +40,7 @@ export interface PayMongoWebhookEvent {
                         net_amount: number
                         status: string
                         paid_at: number
-                        source?: {
-                            id: string
-                            type: string
-                        }
+                        source?: { id: string; type: string }
                         metadata?: Record<string, any>
                     }
                 }>
@@ -88,7 +85,6 @@ export function verifyWebhookSignature(
     }
 
     if (!signatureHeader) {
-        console.error("❌ Missing signature header")
         return { valid: false, error: "Missing signature header" }
     }
 
@@ -101,26 +97,21 @@ export function verifyWebhookSignature(
             }
         })
 
-        console.log("🔐 Parsed parts:", {
+        console.log("🔐 Parsed:", {
             t: parts["t"] ? "present" : "missing",
             te: parts["te"] ? `${parts["te"].length} chars` : "empty",
             li: parts["li"] ? `${parts["li"].length} chars` : "empty",
         })
 
         const timestamp = parts["t"]
-        const signature =
-            parts["te"]?.length > 0
-                ? parts["te"]
-                : parts["li"]?.length > 0
-                    ? parts["li"]
-                    : null
+        const signature = parts["te"]?.length > 0
+            ? parts["te"]
+            : parts["li"]?.length > 0
+                ? parts["li"]
+                : null
 
-        if (!timestamp) {
-            return { valid: false, error: "Missing timestamp" }
-        }
-        if (!signature) {
-            return { valid: false, error: "Missing signature" }
-        }
+        if (!timestamp) return { valid: false, error: "Missing timestamp" }
+        if (!signature) return { valid: false, error: "Missing signature" }
 
         console.log("🔐 Mode:", parts["te"]?.length > 0 ? "test (te)" : "live (li)")
 
@@ -179,7 +170,6 @@ function extractMetadata(data: PayMongoWebhookEvent["attributes"]["data"]): {
         attrs.payment_intent?.id ?? attrs.payment_intent_id ?? null
 
     console.log("📋 Resolved — orderId:", orderId, "| tracking:", trackingNumber)
-
     return { orderId, trackingNumber, paymentIntentId }
 }
 
@@ -207,15 +197,13 @@ async function handlePaymentSuccess(
     }
 
     const existingOrder = await getOrder(orderId)
-
     if (!existingOrder) {
         console.error("❌ Order not found:", orderId)
         return { success: false, message: `Order not found: ${orderId}` }
     }
 
-    console.log("   Current status:", existingOrder.status, "/", existingOrder.paymentStatus)
+    console.log("   Status:", existingOrder.status, "/", existingOrder.paymentStatus)
 
-    // Idempotency guard — webhook may fire more than once
     if (existingOrder.paymentStatus === "paid") {
         console.log("   ⏭️ Already paid, skipping")
         return {
@@ -231,17 +219,21 @@ async function handlePaymentSuccess(
     const attrs = data.attributes
     const payment = attrs.payments?.[0]?.attributes
 
-    // Gross amount the customer paid (convert centavos → PHP)
+    // Gross amount the customer paid (centavos → PHP)
     const amountPaid = (payment?.amount ?? attrs.amount) / 100
 
-    // PayMongo's own platform cut (stored for audit only — not your fee)
+    // PayMongo's own platform cut — stored for audit only
     const paymongoFee = (payment?.fee ?? attrs.fee ?? 0) / 100
 
-    // What actually lands in your account after PayMongo deducts their fee
+    // What lands in your account after PayMongo deducts their fee
     const netAmount = (payment?.net_amount ?? attrs.net_amount ?? attrs.amount) / 100
 
-    // Your ₱10 processing fee that was set on the order at checkout time
-    const yourProcessingFee = parseFloat(existingOrder.processingFee ?? "0")
+    // VAT stored in metadata (set at checkout time)
+    const vatFromMeta = parseFloat(
+        (attrs.metadata ?? {}).vat ??
+        (attrs.payment_intent?.attributes?.metadata ?? {}).vat ??
+        "0"
+    )
 
     const paidAt = payment?.paid_at
         ? new Date(payment.paid_at * 1000)
@@ -249,14 +241,13 @@ async function handlePaymentSuccess(
             ? new Date(attrs.paid_at * 1000)
             : new Date()
 
-    console.log("   Amount paid:       ₱", amountPaid)
-    console.log("   Your processing fee: ₱", yourProcessingFee)
-    console.log("   PayMongo fee:       ₱", paymongoFee)
-    console.log("   Net amount:         ₱", netAmount)
+    console.log("   Amount paid:  ₱", amountPaid)
+    console.log("   VAT (12%):    ₱", vatFromMeta)
+    console.log("   PayMongo fee: ₱", paymongoFee)
+    console.log("   Net amount:   ₱", netAmount)
 
     try {
         await db.transaction(async (tx) => {
-            // Update order to confirmed
             await tx
                 .update(orders)
                 .set({
@@ -267,22 +258,22 @@ async function handlePaymentSuccess(
                 })
                 .where(eq(orders.id, orderId))
 
-            // Update payment_history row that was created at checkout time
             await tx
                 .update(paymentHistory)
                 .set({
                     status: "paid",
                     paymentIntentId: paymentIntentId ?? data.id,
                     amountPaid: amountPaid.toFixed(2),
-                    processingFee: yourProcessingFee.toFixed(2),  // your ₱10 fee
+                    // processingFee column repurposed to store VAT for this business model
+                    processingFee: vatFromMeta.toFixed(2),
                     netAmount: netAmount.toFixed(2),
                     paidAt,
                     updatedAt: new Date(),
                     rawResponse: {
                         event_id: data.id,
                         amount_paid: amountPaid,
-                        your_processing_fee: yourProcessingFee,
-                        paymongo_fee: paymongoFee,        // kept for audit trail
+                        vat: vatFromMeta,
+                        paymongo_fee: paymongoFee,
                         net_amount: netAmount,
                         currency: attrs.currency,
                         paid_at: paidAt.toISOString(),
@@ -290,7 +281,6 @@ async function handlePaymentSuccess(
                 })
                 .where(eq(paymentHistory.orderId, orderId))
         })
-
         console.log("   ✅ Transaction committed")
     } catch (dbError) {
         console.error("   ❌ Transaction failed:", dbError)
@@ -316,19 +306,13 @@ async function handlePaymentFailed(
 
     console.log("❌ Payment Failed — order:", orderId)
 
-    if (!orderId) {
-        return { success: false, message: "Missing order_id in metadata" }
-    }
+    if (!orderId) return { success: false, message: "Missing order_id in metadata" }
 
     const existingOrder = await getOrder(orderId)
+    if (!existingOrder) return { success: false, message: `Order not found: ${orderId}` }
 
-    if (!existingOrder) {
-        return { success: false, message: `Order not found: ${orderId}` }
-    }
-
-    // If somehow already paid (race condition), do not overwrite
     if (existingOrder.paymentStatus === "paid") {
-        console.log("   ⏭️ Already paid, ignoring failure event")
+        console.log("   ⏭️ Already paid, ignoring failure")
         return {
             success: true,
             message: "Order already paid, ignoring failure",
@@ -342,10 +326,7 @@ async function handlePaymentFailed(
     await db.transaction(async (tx) => {
         await tx
             .update(orders)
-            .set({
-                paymentStatus: "failed",
-                updatedAt: new Date(),
-            })
+            .set({ paymentStatus: "failed", updatedAt: new Date() })
             .where(eq(orders.id, orderId))
 
         await tx
@@ -363,7 +344,6 @@ async function handlePaymentFailed(
     })
 
     console.log("   ⚠️ Failure recorded")
-
     return {
         success: true,
         message: "Payment failure recorded",
@@ -383,15 +363,10 @@ async function handleCheckoutExpired(
 
     console.log("⏰ Checkout Expired — order:", orderId)
 
-    if (!orderId) {
-        return { success: false, message: "Missing order_id in metadata" }
-    }
+    if (!orderId) return { success: false, message: "Missing order_id in metadata" }
 
     const existingOrder = await getOrder(orderId)
-
-    if (!existingOrder) {
-        return { success: false, message: `Order not found: ${orderId}` }
-    }
+    if (!existingOrder) return { success: false, message: `Order not found: ${orderId}` }
 
     if (existingOrder.paymentStatus === "paid") {
         console.log("   ⏭️ Already paid, ignoring expiration")
@@ -445,7 +420,6 @@ async function handleCheckoutExpired(
     })
 
     console.log("   ⚠️ Order cancelled — session expired")
-
     return {
         success: true,
         message: "Order cancelled - payment expired",
@@ -461,7 +435,6 @@ async function handleCheckoutExpired(
 export async function processWebhookEvent(
     payload: PayMongoWebhookPayload | PayMongoWebhookEvent
 ): Promise<WebhookResult> {
-    // Support both { data: event } and the raw event object
     const event: PayMongoWebhookEvent =
         "data" in payload && (payload as PayMongoWebhookPayload).data?.attributes
             ? (payload as PayMongoWebhookPayload).data

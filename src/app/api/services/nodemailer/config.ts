@@ -1,5 +1,9 @@
 // src/lib/email/config.ts
 import nodemailer from "nodemailer"
+import dns from "dns"
+
+// ✅ Force IPv4 (fix ECONNREFUSED IPv6 issue)
+dns.setDefaultResultOrder("ipv4first")
 
 // Use standard environment variables
 const email = process.env.SMTP_EMAIL
@@ -14,6 +18,9 @@ export const transporter = nodemailer.createTransport({
     auth: {
         user: email,
         pass: pass,
+    },
+    tls: {
+        rejectUnauthorized: false, // ✅ fix self-signed certificate error
     },
 })
 

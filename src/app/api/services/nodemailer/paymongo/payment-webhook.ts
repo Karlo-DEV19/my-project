@@ -265,7 +265,7 @@ async function handlePaymentSuccess(
                     paymentIntentId: paymentIntentId ?? data.id,
                     amountPaid: amountPaid.toFixed(2),
                     // processingFee column repurposed to store VAT for this business model
-                    processingFee: vatFromMeta.toFixed(2),
+                    vat: vatFromMeta.toFixed(2),
                     netAmount: netAmount.toFixed(2),
                     paidAt,
                     updatedAt: new Date(),

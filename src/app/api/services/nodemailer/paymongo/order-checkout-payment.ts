@@ -61,10 +61,10 @@ export interface PaymentVerificationResult {
 // ==================== HELPERS ====================
 
 function getFrontendUrl(): string {
-    const url = process.env.FRONTEND_URL
+    const url = process.env.NEXT_PUBLIC_API_URL
     if (!url) {
         throw new Error(
-            "FRONTEND_URL is not configured. Add FRONTEND_URL=https://yourdomain.com to your .env file."
+            "NEXT_PUBLIC_API_URL is not configured. Add NEXT_PUBLIC_API_URL=https://yourdomain.com to your .env file."
         )
     }
     return url.replace(/\/$/, "")
@@ -161,12 +161,12 @@ export async function createOrderPaymentSession(
             }
         }
 
-        // Resolve FRONTEND_URL before calling PayMongo — fail fast
+        // Resolve NEXT_PUBLIC_API_URL before calling PayMongo — fail fast
         let frontendUrl: string
         try {
             frontendUrl = getFrontendUrl()
         } catch (envError: any) {
-            console.error("❌ FRONTEND_URL not configured:", envError.message)
+            console.error("❌ NEXT_PUBLIC_API_URL not configured:", envError.message)
             return {
                 success: false,
                 paymentIntentId: null,

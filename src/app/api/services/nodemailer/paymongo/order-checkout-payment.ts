@@ -183,6 +183,13 @@ export async function createOrderPaymentSession(
         const paymentMethodTypes = mapPaymentMethod(paymentData.paymentMethod)
         const lineItems = buildLineItems(paymentData.items, paymentData.vat, currency)
 
+        let formattedPhone = paymentData.customerPhone
+        if (formattedPhone.startsWith("+63")) {
+            formattedPhone = "0" + formattedPhone.substring(3)
+        } else if (formattedPhone.startsWith("63")) {
+            formattedPhone = "0" + formattedPhone.substring(2)
+        }
+
         const metadata: Record<string, string> = {
             order_id: paymentData.orderId,
             tracking_number: paymentData.trackingNumber,
@@ -190,7 +197,7 @@ export async function createOrderPaymentSession(
             order_type: paymentData.orderType,
             customer_name: fullName,
             customer_email: paymentData.customerEmail,
-            customer_phone: paymentData.customerPhone,
+            customer_phone: formattedPhone,
             payment_method: paymentData.paymentMethod,
             subtotal: paymentData.subtotal.toFixed(2),
             vat: paymentData.vat.toFixed(2),
@@ -226,7 +233,7 @@ export async function createOrderPaymentSession(
                         billing: {
                             name: fullName,
                             email: paymentData.customerEmail,
-                            phone: paymentData.customerPhone,
+                            phone: formattedPhone,
                         },
                         metadata,
                     },

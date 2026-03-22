@@ -1,16 +1,30 @@
+CREATE TABLE "admins" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"email" varchar(255) NOT NULL,
+	"role" varchar(50) NOT NULL,
+	"first_name" varchar(100) NOT NULL,
+	"last_name" varchar(100) NOT NULL,
+	"phone" varchar(20),
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "admins_email_unique" UNIQUE("email")
+);
+--> statement-breakpoint
 CREATE TABLE "blinds_products" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"product_code" varchar(120) NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"description" text,
-	"code" varchar(50),
 	"type" varchar(100),
 	"characteristic" varchar(150),
 	"composition" varchar(150),
 	"fabric_width" varchar(50),
 	"packing" varchar(50),
 	"thickness" varchar(50),
+	"status" varchar(50) DEFAULT 'active' NOT NULL,
 	"unit_price" integer NOT NULL,
+	"collection" varchar(50) DEFAULT 'Shop Only' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );

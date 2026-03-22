@@ -123,9 +123,9 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
             className={cn(
                 'font-sans',
                 isFixed
-                    ? 'sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border'
+                    ? 'sticky top-0 z-[99] bg-background/95 backdrop-blur-md border-b border-border'
                     : cn(
-                        'fixed top-0 left-0 right-0 z-40 transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)]',
+                        'fixed top-0 left-0 right-0 z-[99] transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)]',
                         isVisible
                             ? 'translate-y-0 opacity-100'
                             : '-translate-y-full opacity-0 pointer-events-none',

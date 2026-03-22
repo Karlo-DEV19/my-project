@@ -1,1 +1,0 @@
-ALTER TABLE "blinds_products" ADD COLUMN "status" varchar(50) DEFAULT 'active' NOT NULL;

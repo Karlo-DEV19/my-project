@@ -509,7 +509,6 @@ const ShopProductDetailsView = ({ product }: Props) => {
                         </div>
                     </div>
 
-
                     {/* 3 · Color ───────────────────────────────────── */}
                     {colors.length > 0 && (
                         <div className="py-7 border-b border-border">

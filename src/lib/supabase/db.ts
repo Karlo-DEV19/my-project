@@ -1,35 +1,54 @@
 // src/lib/supabase/db.ts
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { createClient } from "@supabase/supabase-js";
+import { drizzle } from "drizzle-orm/postgres-js"
+import postgres from "postgres"
+import { createClient } from "@supabase/supabase-js"
 
-// Import all your blinds schema tables using @ alias
-//products/blinds
-import { blindsProducts } from "@/schema/products/blinds/blinds-product";
-import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image";
-import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors";
-import * as blindsRelations from "@/schema/products/blinds/blinds-product-relations";
-//admin/admins
-import { admins } from "@/schema/admin/admins";
+// ── Products ──────────────────────────────────────────────────
+import { blindsProducts } from "@/schema/products/blinds/blinds-product"
+import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image"
+import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
+import * as blindsRelations from "@/schema/products/blinds/blinds-product-relations"
 
-// Create Postgres client
-const client = postgres(process.env.DATABASE_URL!, { ssl: "require" });
+// ── Auth / Staff ──────────────────────────────────────────────
+import { admins } from "@/schema/admin/admins"
+import { employees } from "@/schema/employees/employees"
+import { employeesRelations } from "@/schema/employees/employees"
+import { otpCodes } from "@/schema/otp/otp-code"
 
-// Export Drizzle DB client
-// Including schema allows you to use the relations queries: db.query.blindsProducts.findMany({ with: { images: true, colors: true } })
+// ─────────────────────────────────────────────────────────────
+// Postgres client
+// ssl: "require" is needed for Supabase's pooled connection.
+// ─────────────────────────────────────────────────────────────
+const client = postgres(process.env.DATABASE_URL!, { ssl: "require" })
+
+// ─────────────────────────────────────────────────────────────
+// Drizzle DB instance
+// Every table that you want to query with db.query.* MUST be
+// listed here. Missing entries cause "relation not found" errors.
+// ─────────────────────────────────────────────────────────────
 export const db = drizzle(client, {
   schema: {
-    //products/blinds
+    // Products / Blinds
     blindsProducts,
     blindsProductImages,
     blindsProductColors,
     ...blindsRelations,
-    //admins
-    admins
-  },
-});
 
-// Supabase client for admin operations
+    // Staff
+    admins,
+    employees,
+    employeesRelations,
+
+    // OTP
+    otpCodes,
+  },
+})
+
+// ─────────────────────────────────────────────────────────────
+// Supabase Admin client
+// Only used for privileged server-side operations (e.g. creating
+// auth users from an admin panel). Never expose to the client.
+// ─────────────────────────────────────────────────────────────
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -39,4 +58,4 @@ export const supabaseAdmin = createClient(
       persistSession: false,
     },
   }
-);
+)

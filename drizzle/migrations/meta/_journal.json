@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1772847068230,
-      "tag": "0000_clean_captain_stacy",
+      "when": 1774098519080,
+      "tag": "0000_tricky_kid_colt",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1773227808402,
-      "tag": "0001_normal_avengers",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1773229505971,
-      "tag": "0002_glorious_sumo",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773237071543,
-      "tag": "0003_abandoned_justice",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773554780789,
-      "tag": "0004_happy_kinsey_walden",
+      "when": 1774098523378,
+      "tag": "0001_plain_hulk",
       "breakpoints": true
     }
   ]

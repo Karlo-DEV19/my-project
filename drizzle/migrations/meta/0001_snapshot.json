@@ -1,6 +1,6 @@
 {
-  "id": "0393cefb-8883-49b6-b5b7-ecfa1969332b",
-  "prevId": "499296da-1a59-4382-8e2c-471c1e9e86c5",
+  "id": "93015b3c-ed0b-44c6-9634-dcffa0f72db6",
+  "prevId": "b711772d-1d45-4b7b-95a7-3a2afabcb596",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -111,12 +111,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "code": {
-          "name": "code",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "type": {
           "name": "type",
           "type": "varchar(100)",
@@ -153,11 +147,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "status": {
+          "name": "status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
         "unit_price": {
           "name": "unit_price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "collection": {
+          "name": "collection",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Shop Only'"
         },
         "created_at": {
           "name": "created_at",
@@ -304,6 +312,74 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.otp_codes": {
+      "name": "otp_codes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exp   ires_at": {
+          "name": "exp   ires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_used": {
+          "name": "is_used",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "otp_email_idx": {
+          "name": "otp_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

@@ -1,1 +1,0 @@
-ALTER TABLE "blinds_products" DROP COLUMN "code";

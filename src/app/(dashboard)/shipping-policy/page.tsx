@@ -24,9 +24,13 @@ export default function ShippingPolicyPage() {
                 Delivery Coverage
               </h2>
               <p className="text-muted-foreground">
-                We primarily serve Metro Manila and nearby provinces. For locations outside our
-                standard service area, additional lead time or fees may apply and will be
-                communicated before confirming your order.
+              We primarily serve Metro Manila, including Quezon City, Manila, Makati, Taguig, Pasig, Mandaluyong, and 
+              nearby areas such as Rizal (Antipolo, Cainta), Bulacan (San Jose del Monte), and Cavite (Bacoor, Imus). 
+              For locations outside our standard service areas, additional lead time, delivery charges, or coordination 
+              may be required. These will be clearly communicated and agreed upon before confirming your order. Please note 
+              that deliveries may be affected during holidays, peak seasons, or due to unforeseen circumstances 
+              (e.g., weather conditions, traffic restrictions). In such cases, adjusted delivery schedules will be coordinated 
+              in advance.
               </p>
             </section>
 

@@ -8,6 +8,7 @@ import { MapPin, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import LocationMapWrapper from '../location/LocationMapWrapper';
 import {
     Form,
     FormControl,
@@ -67,6 +68,12 @@ const ContactPage = () => {
     const onSubmit = (data: ContactFormValues) => {
         // TODO: send to API or email service
         console.log('Contact form submitted:', data);
+    };
+
+    const handleOpenGoogleMaps = () => {
+        const url =
+            'https://www.google.com/maps?q=35+20th+Avenue+Murphy+Cubao+Quezon+City';
+        window.open(url, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -277,6 +284,41 @@ const ContactPage = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Our Location */}
+                <section id="location" className="mt-12 md:mt-16">
+                    <div className="mb-5 md:mb-6 text-center">
+                        <p className="text-xs md:text-sm tracking-[0.25em] uppercase text-muted-foreground mb-2">
+                            Our Location
+                        </p>
+                        <h2 className="text-2xl md:text-3xl font-serif tracking-wide">
+                            Find us on the map
+                        </h2>
+                    </div>
+
+                    <div className="overflow-hidden rounded-2xl border border-border bg-card/80 shadow-sm">
+                        <div className="relative h-[300px] w-full md:h-[450px]">
+                            <LocationMapWrapper />
+
+                            <div className="absolute right-3 top-3 z-10">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleOpenGoogleMaps}
+                                    className="h-9 rounded-none border-border bg-background/80 text-xs font-semibold uppercase tracking-[0.18em] backdrop-blur hover:bg-background"
+                                >
+                                    Open in Google Maps
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-border bg-muted/30 px-4 py-3">
+                            <p className="text-xs text-muted-foreground">
+                                Tip: Use two fingers to move the map on mobile. Click “Open in Google Maps” for directions.
+                            </p>
+                        </div>
+                    </div>
+                </section>
             </div>
         </section>
     );

@@ -19,6 +19,12 @@ export const OrderSummary = () => {
         0
     );
 
+    // Pricing breakdown (placeholder-friendly)
+    const subtotal = grandTotal;
+    const tax = subtotal * 0.12;
+    const deliveryFee = 0; // placeholder only
+    const finalTotal = subtotal + tax + deliveryFee;
+
     if (items.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-8 bg-muted/30 border border-border text-center">
@@ -106,25 +112,42 @@ export const OrderSummary = () => {
             </div>
 
             <div className="px-6 py-5 bg-accent/5 border-t border-border flex flex-col gap-4">
-                <div className="flex flex-col gap-2.5">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="uppercase tracking-widest font-medium">Subtotal</span>
-                        <span className="font-medium text-foreground">{php(grandTotal)}</span>
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="uppercase tracking-widest font-medium text-muted-foreground">
+                            Subtotal
+                        </span>
+                        <span className="font-medium text-foreground">{php(subtotal)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="uppercase tracking-widest font-medium">Installation & Delivery</span>
-                        <span>To be quoted</span>
+
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="uppercase tracking-widest font-medium text-muted-foreground">
+                            VAT (12%)
+                        </span>
+                        <span className="font-medium text-foreground">{php(tax)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="uppercase tracking-widest font-medium text-muted-foreground">
+                            Delivery / Installation
+                        </span>
+                        <span className="text-muted-foreground">To be quoted</span>
                     </div>
                 </div>
 
-                <div className="h-px bg-border my-1" />
+                <div className="h-px bg-border/80" />
 
-                <div className="flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-widest font-semibold text-foreground">
-                        Total Estimate
-                    </span>
-                    <span className="font-serif text-2xl font-medium text-foreground">
-                        {php(grandTotal)}
+                <div className="flex items-end justify-between gap-4">
+                    <div className="flex flex-col">
+                        <span className="text-xs uppercase tracking-widest font-semibold text-foreground">
+                            Total Estimate
+                        </span>
+                        <span className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
+                            Includes VAT
+                        </span>
+                    </div>
+                    <span className="font-serif text-3xl font-medium leading-none text-foreground">
+                        {php(finalTotal)}
                     </span>
                 </div>
             </div>

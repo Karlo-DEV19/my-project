@@ -26,7 +26,6 @@ export default function LocationMap() {
       zoom={16}
       scrollWheelZoom
       className="h-full w-full rounded-xl z-0"
-      style={{ minHeight: 500 }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

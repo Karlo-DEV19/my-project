@@ -4,10 +4,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Home, Info, ShoppingBag, Search, X, Menu, ShoppingCart, Mail } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/lib/zustand/use-cart-store';
 import { usePathname } from 'next/navigation';
+import ThemeToggle from '@/components/theme-toggle';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,13 +118,6 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
         }
     };
 
-    const handleHomeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-        if (pathname === '/') {
-            event.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    };
-
     return (
         <header
             className={cn(
@@ -198,6 +191,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                             </button>
                         )}
 
+                        <ThemeToggle />
                         <CartButton />
                     </div>
 
@@ -218,6 +212,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                                     <Search className="w-[17px] h-[17px]" strokeWidth={1.5} />
                                 </button>
 
+                                <ThemeToggle className="w-9 h-9" />
                                 <CartButton />
 
                                 {/* Mobile sheet menu */}

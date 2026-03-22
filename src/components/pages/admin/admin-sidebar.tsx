@@ -10,7 +10,11 @@ import {
     Users,
     Settings,
     LogOut,
-    Home
+    Home,
+    ClipboardList,
+    ShieldCheck,
+    Boxes,
+    TrendingUp
 } from 'lucide-react';
 import {
     Sidebar,
@@ -18,6 +22,7 @@ import {
     SidebarFooter,
     SidebarHeader,
     SidebarGroup,
+    SidebarGroupLabel,
     SidebarGroupContent,
     SidebarMenu,
     SidebarMenuItem,
@@ -28,12 +33,38 @@ import {
 import { LogoutDialog } from '@/components/ui/logout-alert-dialog'; // Check your exact path
 import { useAuth } from '@/lib/providers/auth-provider';
 
-const sidebarLinks = [
-    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
-    { name: 'Products', href: '/admin/products', icon: Package },
-    { name: 'Customers', href: '/admin/customers', icon: Users },
-    { name: 'Settings', href: '/admin/settings', icon: Settings },
+type SidebarLink = {
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+};
+
+const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
+    {
+        label: 'Overview',
+        links: [{ name: 'Dashboard', href: '/admin', icon: LayoutDashboard }],
+    },
+    {
+        label: 'Operations',
+        links: [
+            { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
+            { name: 'Products', href: '/admin/products', icon: Package },
+            { name: 'Customers', href: '/admin/customers', icon: Users },
+            { name: 'Inventory', href: '/admin/inventory', icon: Boxes },
+        ],
+    },
+    {
+        label: 'Analytics',
+        links: [
+            { name: 'Sales', href: '/admin/sales', icon: TrendingUp },
+            { name: 'Logs', href: '/admin/logs', icon: ClipboardList },
+            { name: 'Audit Trail', href: '/admin/audit-trail', icon: ShieldCheck },
+        ],
+    },
+    {
+        label: 'Preferences',
+        links: [{ name: 'Settings', href: '/admin/settings', icon: Settings }],
+    },
 ];
 
 const AdminSidebar = () => {
@@ -42,29 +73,42 @@ const AdminSidebar = () => {
     // ✅ Grab the user session instantly from your provider!
     const { user } = useAuth();
 
-    // ✅ OPTIMIZATION: Memoize the links to prevent React from rebuilding the list on every keystroke/render
-    const renderedLinks = useMemo(() => {
-        return sidebarLinks.map((link) => {
-            const isActive = pathname === link.href;
-
+    // ✅ OPTIMIZATION: Memoize rendering to avoid rebuilding on rerender
+    const renderedGroups = useMemo(() => {
+        return sidebarGroups.map((group) => {
             return (
-                <SidebarMenuItem key={link.href}>
-                    <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        tooltip={link.name}
-                        // ✅ THEME FIX: Semantic colors (primary, accent) instead of hardcoded opacity
-                        className={`h-11 rounded-none transition-all duration-300 ${isActive
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
-                            : 'text-muted-foreground hover:text-accent-foreground hover:bg-accent'
-                            }`}
-                    >
-                        <Link href={link.href} className="flex items-center gap-4 px-2">
-                            <link.icon className="h-4 w-4 shrink-0" strokeWidth={isActive ? 2 : 1.5} />
-                            <span className="tracking-wide font-medium text-sm">{link.name}</span>
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarGroup key={group.label} className="px-0">
+                    <SidebarGroupLabel className="px-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {group.label}
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu className="space-y-2">
+                            {group.links.map((link) => {
+                                const isActive = pathname === link.href;
+
+                                return (
+                                    <SidebarMenuItem key={link.href}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={isActive}
+                                            tooltip={link.name}
+                                            // ✅ THEME FIX: Semantic colors (primary, accent) instead of hardcoded opacity
+                                            className={`h-11 rounded-none transition-all duration-300 ${isActive
+                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+                                                : 'text-muted-foreground hover:text-accent-foreground hover:bg-accent'
+                                                }`}
+                                        >
+                                            <Link href={link.href} className="flex items-center gap-4 px-2">
+                                                <link.icon className="h-4 w-4 shrink-0" strokeWidth={isActive ? 2 : 1.5} />
+                                                <span className="tracking-wide font-medium text-sm">{link.name}</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                );
+                            })}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
             );
         });
     }, [pathname]);
@@ -86,14 +130,9 @@ const AdminSidebar = () => {
             </SidebarHeader>
 
             <SidebarContent className="pt-6 px-4">
-                <SidebarGroup>
-                    <SidebarGroupContent>
-                        <SidebarMenu className="space-y-2">
-                            {/* Render the optimized list */}
-                            {renderedLinks}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+                <div className="space-y-3">
+                    {renderedGroups}
+                </div>
             </SidebarContent>
 
             <SidebarFooter className="p-6 border-t border-border space-y-4">

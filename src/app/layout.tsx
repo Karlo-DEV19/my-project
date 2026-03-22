@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Toaster } from "sonner"
 import CartSheet from "@/components/ui/cart-sheet"
+import ThemeProvider from "@/components/theme-provider"
 
 // Providers
 import { AuthProvider } from "@/lib/providers/auth-provider"
@@ -75,17 +76,17 @@ export default async function RootLayout({
           crossOrigin="anonymous"
           src="//unpkg.com/react-scan/dist/auto.global.js"
         /> */}
-        <QueryProvider>
-          {/* Inject the server session into the Client AuthProvider */}
-          <AuthProvider session={session}>
-
-            {/* ✅ FIX: Just render children. No SidebarProvider here! */}
-            {children}
-
-          </AuthProvider>
-          <CartSheet />
-          <Toaster />
-        </QueryProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            {/* Inject the server session into the Client AuthProvider */}
+            <AuthProvider session={session}>
+              {/* ✅ FIX: Just render children. No SidebarProvider here! */}
+              {children}
+            </AuthProvider>
+            <CartSheet />
+            <Toaster />
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -15,7 +15,7 @@ const WelcomeSection = () => {
     ];
 
     return (
-        <section className="py-24 bg-background text-foreground font-sans">
+        <section className="py-24 bg-background text-foreground font-sans transition-colors duration-300">
             <div className="container mx-auto px-4 md:px-6 max-w-7xl">
 
                 {/* Header - Aligned with BestSeller & OurCustomerSays */}

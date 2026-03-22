@@ -69,7 +69,7 @@ const Footer = () => {
               <p>
                 Address: <br />
                 <Link
-                  href="/location"
+                  href="/contact#location"
                   className="hover:text-background transition-colors underline-offset-2 hover:underline"
                 >
                   35 20th Avenue, Murphy Cubao,<br /> Quezon City, Philippines, 1109

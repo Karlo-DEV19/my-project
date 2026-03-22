@@ -509,48 +509,6 @@ const ShopProductDetailsView = ({ product }: Props) => {
                         </div>
                     </div>
 
-                    {/* 2 · Branch ──────────────────────────────────── */}
-                    <div className="py-7 border-b border-border">
-                        <SectionLabel>Select Branch</SectionLabel>
-                        <div className="flex flex-col gap-3">
-                            {BRANCHES.map(b => {
-                                const active = branch.id === b.id;
-                                return (
-                                    <button
-                                        key={b.id}
-                                        onClick={() => setBranch(b)}
-                                        className={`w-full flex flex-col gap-2 p-4 border text-left transition-all duration-200 ${active
-                                            ? 'border-foreground bg-foreground/[0.03]'
-                                            : 'border-border hover:border-foreground/40'
-                                            }`}
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <span className="text-sm font-medium text-foreground">{b.name}</span>
-                                            {active && (
-                                                <span className="shrink-0 text-[9px] uppercase tracking-widest bg-foreground text-background px-2 py-0.5 font-semibold">
-                                                    Selected
-                                                </span>
-                                            )}
-                                        </div>
-                                        <span className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                            <MapPin className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.5} />
-                                            {b.address}
-                                        </span>
-                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
-                                            <span className="flex items-center gap-1.5">
-                                                <Phone className="w-3 h-3 shrink-0" strokeWidth={1.5} />
-                                                {b.phone} / {b.mobile}
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <Mail className="w-3 h-3 shrink-0" strokeWidth={1.5} />
-                                                {b.email}
-                                            </span>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
 
                     {/* 3 · Color ───────────────────────────────────── */}
                     {colors.length > 0 && (

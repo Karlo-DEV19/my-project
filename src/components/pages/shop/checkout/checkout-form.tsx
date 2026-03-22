@@ -244,12 +244,12 @@ export function CheckoutForm() {
         setIsSubmitting(true)
         try {
             // TODO: replace with your actual server action
-            await new Promise((r) => setTimeout(r, 1500))
+            /*     await new Promise((r) => setTimeout(r, 1500)) */
             console.log("[CHECKOUT] Submitted:", data)
-            setIsSubmitted(true)
-            toast.success("Order placed successfully!", {
-                description: `Confirmation will be sent to ${data.email}`,
-            })
+            /*   setIsSubmitted(true)
+              toast.success("Order placed successfully!", {
+                  description: `Confirmation will be sent to ${data.email}`,
+              }) */
         } catch {
             toast.error("Something went wrong. Please try again.")
         } finally {

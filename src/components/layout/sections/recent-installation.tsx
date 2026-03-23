@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import Image from "next/image";
 
 const installations = [
@@ -47,6 +49,18 @@ const installations = [
 ];
 
 const RecentInstallation = () => {
+    const [selectedInstallation, setSelectedInstallation] = useState<
+        typeof installations[0] | null
+    >(null);
+
+    const openModal = (item: typeof installations[0]) => {
+        setSelectedInstallation(item);
+    };
+
+    const closeModal = () => {
+        setSelectedInstallation(null);
+    };
+
     return (
         <section className="py-24 bg-background text-foreground font-sans">
             <div className="container mx-auto px-4 md:px-6 max-w-7xl">
@@ -67,7 +81,8 @@ const RecentInstallation = () => {
                     {installations.map((item) => (
                         <article
                             key={item.id}
-                            className="group relative overflow-hidden border border-border/60 bg-card text-card-foreground"
+                            onClick={() => openModal(item)}
+                            className="group relative overflow-hidden border border-border/60 bg-card text-card-foreground cursor-pointer"
                         >
                             <div className="relative aspect-[4/3] overflow-hidden bg-muted">
                                 <Image
@@ -91,6 +106,51 @@ const RecentInstallation = () => {
                     ))}
                 </div>
             </div>
+
+           {/* Modal */}
+{selectedInstallation && (
+    <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 md:p-8"
+        onClick={closeModal}
+    >
+        <div
+            className="bg-white rounded-xl max-w-4xl w-full p-6 relative shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <button
+                onClick={closeModal}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold"
+            >
+                ✕
+            </button>
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                    <Image
+                        src={selectedInstallation.image}
+                        alt={selectedInstallation.title}
+                        width={800}
+                        height={600}
+                        className="rounded-md object-cover w-full h-full"
+                    />
+                </div>
+                <div className="flex-1 flex flex-col justify-center">
+                    <h2 className="text-2xl md:text-3xl font-serif mb-4">
+                        {selectedInstallation.title}
+                    </h2>
+                    <p className="text-gray-700 mb-2">
+                        <strong>Location:</strong> {selectedInstallation.location}
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                        <strong>Blinds Type:</strong> {selectedInstallation.blinds}
+                    </p>
+                    <p className="text-gray-700">
+                        <strong>Details:</strong> This installation features premium blinds customized to the space for optimal light control and aesthetic appeal. Perfect for modern living.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
         </section>
     );
 };

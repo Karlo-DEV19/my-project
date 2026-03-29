@@ -205,9 +205,12 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
                 toast.success("Redirecting to payment...", {
                     description: `Order ${response.data.trackingNumber} · ₱${totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
                 })
+
                 clearCart()
+
                 await new Promise((r) => setTimeout(r, 800))
-                window.location.href = response.data.checkoutUrl
+
+                window.location.assign(response.data.checkoutUrl)
             }
         } catch (error: any) {
             const message =

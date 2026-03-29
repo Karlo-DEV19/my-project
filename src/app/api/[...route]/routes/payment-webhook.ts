@@ -32,38 +32,33 @@ webhooksRoute.post("/paymongo", async (c) => {
     const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
     console.log("═══════════════════════════════════════════════════")
-    console.log(`🔔 [${requestId}] Webhook POST received: ${new Date().toISOString()}`)
+    console.log(`🔔 [${requestId}] POST /paymongo received at ${new Date().toISOString()}`)
     console.log(`🔔 [${requestId}] URL: ${c.req.url}`)
-    console.log(`🔔 [${requestId}] Method: ${c.req.method}`)
 
-    // Log all headers for diagnostics
+    // Log all request headers so we can confirm paymongo-signature is arriving
     const allHeaders: Record<string, string> = {}
     c.req.raw.headers.forEach((value, key) => { allHeaders[key] = value })
     console.log(`🔔 [${requestId}] Headers:`, JSON.stringify(allHeaders, null, 2))
 
-    // Read raw body FIRST
+    // !! Read raw body FIRST before any other c.req calls !!
     const rawBody = await c.req.text()
     const signatureHeader = c.req.header("paymongo-signature") ?? ""
 
     console.log(`📦 [${requestId}] Body length: ${rawBody.length}`)
-    console.log(`📦 [${requestId}] Body preview (first 500 chars): ${rawBody.slice(0, 500)}`)
-    console.log(`🔑 [${requestId}] paymongo-signature header: ${signatureHeader ? signatureHeader.slice(0, 60) + "..." : "❌ MISSING"}`)
+    console.log(`📦 [${requestId}] Body preview (first 500): ${rawBody.slice(0, 500)}`)
+    console.log(`🔑 [${requestId}] paymongo-signature: ${signatureHeader ? signatureHeader.slice(0, 80) + "..." : "❌ MISSING"}`)
 
     if (!rawBody) {
-        console.error(`❌ [${requestId}] Empty body — returning 200 to stop retry`)
+        console.error(`❌ [${requestId}] Empty body`)
         return c.json({ success: false, message: "Empty request body" }, 200)
     }
 
-    // 1. Verify signature
-    console.log(`🔐 [${requestId}] Verifying signature...`)
+    // 1. Verify PayMongo HMAC signature
     const verification = verifyWebhookSignature(rawBody, signatureHeader)
     if (!verification.valid) {
-        console.error(`❌ [${requestId}] Signature INVALID: ${verification.error}`)
-        console.error(`❌ [${requestId}] Returning 401 — PayMongo will NOT retry 4xx`)
-        return c.json(
-            { success: false, message: "Invalid signature", error: verification.error },
-            401
-        )
+        console.error(`❌ [${requestId}] Signature invalid: ${verification.error}`)
+        // 401 intentional — bad signature should NOT be retried by PayMongo
+        return c.json({ success: false, message: "Invalid signature", error: verification.error }, 401)
     }
     console.log(`✅ [${requestId}] Signature verified`)
 
@@ -71,62 +66,51 @@ webhooksRoute.post("/paymongo", async (c) => {
     let payload: PayMongoWebhookPayload
     try {
         payload = JSON.parse(rawBody)
-        console.log(`✅ [${requestId}] JSON parsed OK`)
+        console.log(`✅ [${requestId}] JSON parsed`)
     } catch (parseErr) {
         console.error(`❌ [${requestId}] JSON parse failed:`, parseErr)
         return c.json({ success: false, message: "Invalid JSON payload" }, 200)
     }
 
-    // 3. Validate envelope
+    // 3. Validate envelope shape
     const event = payload.data
-    console.log(`📨 [${requestId}] Envelope check:`)
-    console.log(`   payload.data present:              ${!!payload.data}`)
-    console.log(`   payload.data.id:                   ${event?.id ?? "❌ MISSING"}`)
-    console.log(`   payload.data.attributes.type:      ${event?.attributes?.type ?? "❌ MISSING"}`)
-    console.log(`   payload.data.attributes.data:      ${event?.attributes?.data ? "present" : "❌ MISSING"}`)
-    console.log(`   payload.data.attributes.livemode:  ${event?.attributes?.livemode}`)
+    console.log(`📨 [${requestId}] Envelope:`)
+    console.log(`   payload.data:             ${!!payload.data}`)
+    console.log(`   payload.data.id:          ${event?.id ?? "❌ MISSING"}`)
+    console.log(`   .attributes.type:         ${event?.attributes?.type ?? "❌ MISSING"}`)
+    console.log(`   .attributes.data:         ${event?.attributes?.data ? "present" : "❌ MISSING"}`)
+    console.log(`   .attributes.livemode:     ${event?.attributes?.livemode}`)
 
     if (!event?.id || !event?.attributes?.type || !event?.attributes?.data) {
-        console.error(`❌ [${requestId}] Invalid event envelope — returning 200`)
+        console.error(`❌ [${requestId}] Invalid event envelope`)
         return c.json({ success: false, message: "Invalid event structure" }, 200)
     }
 
-    console.log(`📨 [${requestId}] Event type: ${event.attributes.type}`)
-    console.log(`📨 [${requestId}] Event ID:   ${event.id}`)
+    console.log(`📨 [${requestId}] eventType: ${event.attributes.type} | eventId: ${event.id}`)
 
-    // 4. Process
+    // 4. Process the event
     try {
         console.log(`⚙️  [${requestId}] Calling processWebhookEvent...`)
         const result = await processWebhookEvent(payload)
 
-        console.log(`✅ [${requestId}] processWebhookEvent returned:`, JSON.stringify(result))
+        console.log(`✅ [${requestId}] Result:`, JSON.stringify(result))
         console.log("═══════════════════════════════════════════════════")
-
         return c.json(result, 200)
     } catch (error) {
         if (isIdempotencyConflict(error)) {
-            console.warn(`⚠️  [${requestId}] Idempotency conflict — already processed concurrently`)
+            console.warn(`⚠️  [${requestId}] Idempotency conflict (23505) — already processed by concurrent request`)
             console.log("═══════════════════════════════════════════════════")
-            return c.json(
-                { success: true, message: "Event already processed (concurrent)" },
-                200
-            )
+            return c.json({ success: true, message: "Event already processed (concurrent)" }, 200)
         }
 
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ""
-        console.error(`❌ [${requestId}] processWebhookEvent threw unexpected error:`)
-        console.error(`   message: ${errMsg}`)
-        console.error(`   stack:   ${errStack}`)
+        console.error(`❌ [${requestId}] Unhandled error: ${errMsg}`)
+        console.error(`❌ [${requestId}] Stack: ${errStack}`)
         console.log("═══════════════════════════════════════════════════")
 
-        return c.json(
-            {
-                success: false,
-                message: "Webhook processing failed — logged for investigation",
-            },
-            200
-        )
+        // Return 200 intentionally — non-2xx causes PayMongo to retry, risking double-processing
+        return c.json({ success: false, message: "Webhook processing failed — logged for investigation" }, 200)
     }
 })
 

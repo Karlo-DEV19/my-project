@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { DollarSign, Package, ShoppingCart, Users } from 'lucide-react';
+import { DollarSign, Package, ShoppingCart, Users, TrendingUp, ArrowUpRight } from 'lucide-react';
 import AdminPageHeader from '@/components/pages/admin/components/admin-page-header';
 import StatCard from '@/components/pages/admin/components/stat-card';
 import OrderStatusBadge, {
@@ -14,26 +14,34 @@ const AdminDashboardPage = () => {
     {
       title: 'Total Products',
       value: 128,
-      icon: <Package className="h-5 w-5" />,
+      icon: <Package className="h-4 w-4" />,
       href: '/admin/products',
+      change: '+4 this week',
+      trend: 'up',
     },
     {
       title: 'Total Orders',
       value: 542,
-      icon: <ShoppingCart className="h-5 w-5" />,
+      icon: <ShoppingCart className="h-4 w-4" />,
       href: '/admin/orders',
+      change: '+21 this week',
+      trend: 'up',
     },
     {
       title: 'Total Customers',
       value: 312,
-      icon: <Users className="h-5 w-5" />,
+      icon: <Users className="h-4 w-4" />,
       href: '/admin/customers',
+      change: '+8 this week',
+      trend: 'up',
     },
     {
       title: 'Total Revenue',
       value: '₱1,284,900',
-      icon: <DollarSign className="h-5 w-5" />,
+      icon: <DollarSign className="h-4 w-4" />,
       href: '/admin/orders',
+      change: '+₱84,200 this week',
+      trend: 'up',
     },
   ];
 
@@ -55,6 +63,12 @@ const AdminDashboardPage = () => {
       name: 'Phantom Roller Shades',
       category: 'Roller Shades',
       createdAt: '2026-03-04',
+    },
+    {
+      id: 'P-1017',
+      name: 'Nordic Linen Drapes',
+      category: 'Curtains',
+      createdAt: '2026-03-03',
     },
   ];
 
@@ -80,154 +94,204 @@ const AdminDashboardPage = () => {
       status: 'Pending' as OrderStatus,
       createdAt: '2026-03-05',
     },
+    {
+      id: 'ORD-2040',
+      customer: 'Anna Cruz',
+      total: '₱9,750',
+      status: 'Completed' as OrderStatus,
+      createdAt: '2026-03-04',
+    },
   ];
 
-  return (
-    <div className="min-h-screen bg-background/60">
-      <div className="mx-auto w-full max-w-6xl space-y-8">
-        <AdminPageHeader
-          title="Dashboard"
-          description="Quick overview of your store performance, orders, customers, and activity."
-        />
+  const chartDays = [
+    { label: 'M', value: 8 },
+    { label: 'T', value: 12 },
+    { label: 'W', value: 6 },
+    { label: 'T', value: 14 },
+    { label: 'F', value: 10 },
+    { label: 'S', value: 4 },
+    { label: 'S', value: 9 },
+  ];
 
-        {/* Stat cards */}
-        <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+  const maxValue = Math.max(...chartDays.map((d) => d.value));
+
+  return (
+    <div className="w-full min-h-screen bg-background">
+      <div className="w-full max-w-[1400px] mx-auto px-6 py-8 space-y-8">
+
+        {/* ── Page Header ── */}
+        <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+          <AdminPageHeader
+            title="Dashboard"
+            description="Quick overview of your store performance, orders, customers, and activity."
+          />
+          <p className="text-xs text-muted-foreground pb-0.5">
+            Last updated: March 25, 2026
+          </p>
+        </div>
+
+        {/* ── Stat Cards ── */}
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
-            <StatCard
+            <Link
               key={stat.title}
-              title={stat.title}
-              value={stat.value}
-              icon={stat.icon}
               href={stat.href}
-            />
+              className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:border-border/80 hover:shadow-md hover:-translate-y-0.5"
+            >
+              {/* Top row */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground group-hover:text-foreground transition-colors">
+                  {stat.icon}
+                </div>
+                <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+              </div>
+
+              {/* Value */}
+              <p className="text-2xl font-semibold tracking-tight text-foreground">
+                {stat.value}
+              </p>
+              <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                {stat.title}
+              </p>
+
+              {/* Trend */}
+              <div className="mt-3 flex items-center gap-1.5">
+                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                  {stat.change}
+                </span>
+              </div>
+
+              {/* Subtle background accent */}
+              <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-primary/5 blur-2xl" />
+            </Link>
           ))}
         </section>
 
-        {/* Analytics + Recent sections */}
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          {/* Simple Orders Analytics (dummy data for now) */}
-          <div className="rounded-xl border border-border bg-card/80 p-5 shadow-sm xl:col-span-1">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Orders Overview (Last 7 Days)
-              </h2>
-              <span className="text-[11px] text-muted-foreground">
-                Sample analytics
+        {/* ── Analytics + Recent sections ── */}
+        <section className="grid gap-6 lg:grid-cols-5">
+
+          {/* Orders Chart — spans 2 cols */}
+          <div className="lg:col-span-2 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Orders Overview
+                </h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Last 7 days
+                </p>
+              </div>
+              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Sample
               </span>
             </div>
-            <div className="flex h-40 items-end gap-3 rounded-lg border border-border/60 bg-background/40 px-4 pb-4 pt-3">
-              {[
-                { label: "M", value: 8 },
-                { label: "T", value: 12 },
-                { label: "W", value: 6 },
-                { label: "T", value: 14 },
-                { label: "F", value: 10 },
-                { label: "S", value: 4 },
-                { label: "S", value: 9 },
-              ].map((day) => (
-                <div
-                  key={day.label + day.value}
-                  className="flex flex-1 flex-col items-center gap-1"
-                >
-                  <div className="flex h-full w-full items-end justify-center">
-                    <div
-                      className="w-5 rounded-full bg-primary/80 shadow-sm"
-                      style={{ height: `${(day.value / 16) * 100}%` }}
-                    />
+
+            <div className="px-5 pb-5 pt-4">
+              {/* Summary row */}
+              <div className="mb-5 flex items-end gap-2">
+                <span className="text-3xl font-bold tracking-tight text-foreground">63</span>
+                <span className="mb-1 text-xs text-muted-foreground">total orders this week</span>
+              </div>
+
+              {/* Bar chart */}
+              <div className="flex h-32 items-end gap-2">
+                {chartDays.map((day, idx) => (
+                  <div key={idx} className="flex flex-1 flex-col items-center gap-1.5">
+                    <div className="flex w-full items-end justify-center" style={{ height: '100px' }}>
+                      <div
+                        className="w-full max-w-[28px] rounded-t-md bg-primary/80 hover:bg-primary transition-colors duration-150"
+                        style={{ height: `${(day.value / maxValue) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                      {day.label}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                    {day.label}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+                Connect to real order data once your API is live.
+              </p>
             </div>
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Visual snapshot of daily order volume. Hook this up to real order data once your API is connected.
-            </p>
           </div>
 
-          {/* Recent Products */}
-          <div className="rounded-xl border border-border bg-card/80 p-5 shadow-sm xl:col-span-1">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Recent Products
-              </h2>
+          {/* Recent Products — spans 1.5 cols */}
+          <div className="lg:col-span-1 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="text-sm font-semibold text-foreground">Recent Products</h2>
               <Link
                 href="/admin/products"
-                className="text-xs font-medium text-primary hover:text-primary/80"
+                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/70 transition-colors"
               >
                 View all
+                <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>
-            <div className="overflow-hidden rounded-lg border border-border/60 bg-background/40">
-              <ul className="divide-y divide-border/70">
-                {recentProducts.map((product) => (
-                  <li
-                    key={product.id}
-                    className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-muted/60"
-                  >
-                    <div className="space-y-0.5">
-                      <p className="font-medium text-foreground">
-                        {product.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {product.category} · Added {product.createdAt}
-                      </p>
-                    </div>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {product.id}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+
+            <ul className="divide-y divide-border">
+              {recentProducts.map((product) => (
+                <li
+                  key={product.id}
+                  className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/50"
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {product.name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {product.category} · {product.createdAt}
+                    </p>
+                  </div>
+                  <span className="ml-3 flex-shrink-0 font-mono text-[11px] text-muted-foreground">
+                    {product.id}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {/* Recent Orders */}
-          <div className="rounded-xl border border-border bg-card/80 p-5 shadow-sm xl:col-span-1">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Recent Orders
-              </h2>
+          {/* Recent Orders — spans 1.5 cols */}
+          <div className="lg:col-span-2 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="text-sm font-semibold text-foreground">Recent Orders</h2>
               <Link
                 href="/admin/orders"
-                className="text-xs font-medium text-primary hover:text-primary/80"
+                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/70 transition-colors"
               >
                 View all
+                <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>
-            <div className="overflow-hidden rounded-lg border border-border/60 bg-background/40">
-              <ul className="divide-y divide-border/70">
-                {recentOrders.map((order) => (
-                  <li
-                    key={order.id}
-                    className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-muted/60"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-foreground">
-                          {order.customer}
-                        </p>
-                        <OrderStatusBadge status={order.status} />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {order.createdAt}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-foreground">
-                        {order.total}
-                      </p>
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        {order.id}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-border bg-muted/30 px-5 py-2">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Customer</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Status</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground text-right">Amount</span>
             </div>
+
+            <ul className="divide-y divide-border">
+              {recentOrders.map((order) => (
+                <li
+                  key={order.id}
+                  className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/50"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium text-foreground">{order.customer}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">{order.id} · {order.createdAt}</p>
+                  </div>
+                  <OrderStatusBadge status={order.status} />
+                  <p className="text-right text-sm font-semibold tabular-nums text-foreground">
+                    {order.total}
+                  </p>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
+
       </div>
     </div>
   );

@@ -19,14 +19,15 @@ export default function SettingsPage() {
   const [orderNotifications, setOrderNotifications] = useState(true);
 
   return (
-    <section className="min-h-screen bg-background/60">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+    <section className="flex min-h-screen w-full flex-col bg-background/60">
+      <div className="flex flex-1 flex-col gap-6 px-6 py-6 xl:px-10">
         <AdminPageHeader
           title="Settings"
           description="Configure store preferences, support details, and admin options."
         />
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Store Information */}
           <div className="rounded-xl border border-border bg-card/80 p-6 shadow-sm">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Store Information
@@ -77,6 +78,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Admin Preferences */}
           <div className="rounded-xl border border-border bg-card/80 p-6 shadow-sm">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Admin Preferences
@@ -113,7 +115,7 @@ export default function SettingsPage() {
                 >
                   Cancel
                 </Button>
-                <Button className="h-11 rounded-none bg-primary px-6 text-primary-foreground hover:bg-primary/90 text-xs font-semibold uppercase tracking-[0.18em]">
+                <Button className="h-11 rounded-none bg-primary px-6 text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90">
                   Save changes
                 </Button>
               </div>

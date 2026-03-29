@@ -119,14 +119,15 @@ export default function SalesPage() {
   const totalSales = totalRevenue;
 
   return (
-    <section className="min-h-screen bg-background/60">
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+    <section className="flex min-h-screen w-full flex-col bg-background/60">
+      <div className="flex flex-1 flex-col gap-8 px-6 py-6 xl:px-10">
         <AdminPageHeader
           title="Sales"
           description="Mock analytics for sales performance and recent transactions."
         />
 
-        <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        {/* Stat Cards */}
+        <section className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard
             title="Total Sales"
             value={formatCurrency(totalSales)}
@@ -150,8 +151,10 @@ export default function SalesPage() {
           />
         </section>
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-          <div className="rounded-xl border border-border bg-card/80 p-5 shadow-sm lg:col-span-3">
+        {/* Chart + Transactions */}
+        <section className="grid w-full flex-1 grid-cols-1 gap-4 lg:grid-cols-5">
+          {/* Area Chart */}
+          <div className="flex flex-col rounded-xl border border-border bg-card/80 p-5 shadow-sm lg:col-span-3">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Sales (Last 7 Days)
@@ -161,16 +164,34 @@ export default function SalesPage() {
               </span>
             </div>
 
-            <div className="h-[320px] w-full rounded-lg border border-border/60 bg-background/40 p-3">
+            <div
+              className="flex-1 rounded-lg border border-border/60 bg-background/40 p-3"
+              style={{ minHeight: 320 }}
+            >
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={MOCK_SALES} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                <AreaChart
+                  data={MOCK_SALES}
+                  margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
+                      <stop
+                        offset="5%"
+                        stopColor="hsl(var(--primary))"
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="hsl(var(--primary))"
+                        stopOpacity={0.05}
+                      />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    opacity={0.6}
+                  />
                   <XAxis
                     dataKey="date"
                     tickLine={false}
@@ -211,7 +232,8 @@ export default function SalesPage() {
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm lg:col-span-2">
+          {/* Recent Transactions */}
+          <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm lg:col-span-2">
             <div className="border-b border-border bg-muted/30 px-5 py-4">
               <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Recent Transactions
@@ -221,54 +243,55 @@ export default function SalesPage() {
               </p>
             </div>
 
-            <Table className="min-w-[650px]">
-              <TableHeader className="bg-muted/60">
-                <TableRow>
-                  <TableHead className="px-4">
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Transaction
-                    </span>
-                  </TableHead>
-                  <TableHead className="px-4">
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Amount
-                    </span>
-                  </TableHead>
-                  <TableHead className="px-4">
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Status
-                    </span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {MOCK_TX.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="px-4 py-3">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-medium text-foreground">
-                          {tx.customer}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-mono">{tx.id}</span> · {tx.date} ·{" "}
-                          {tx.method}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-sm font-semibold text-foreground">
-                      {formatCurrency(tx.amount)}
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <TxStatusBadge status={tx.status} />
-                    </TableCell>
+            <div className="w-full overflow-x-auto">
+              <Table className="w-full min-w-[480px]">
+                <TableHeader className="bg-muted/60">
+                  <TableRow>
+                    <TableHead className="px-5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Transaction
+                      </span>
+                    </TableHead>
+                    <TableHead className="px-5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Amount
+                      </span>
+                    </TableHead>
+                    <TableHead className="px-5">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Status
+                      </span>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {MOCK_TX.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell className="px-5 py-3">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium text-foreground">
+                            {tx.customer}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-mono">{tx.id}</span> · {tx.date} ·{" "}
+                            {tx.method}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-5 py-3 text-sm font-semibold text-foreground">
+                        {formatCurrency(tx.amount)}
+                      </TableCell>
+                      <TableCell className="px-5 py-3">
+                        <TxStatusBadge status={tx.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </section>
       </div>
     </section>
   );
 }
-

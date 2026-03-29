@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Search, Trash2, UserRound, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import {
+  Search,
+  Trash2,
+  UserRound,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react';
 import AdminPageHeader from '@/components/pages/admin/components/admin-page-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -53,18 +62,18 @@ type Pagination = {
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const MOCK_CUSTOMERS: Customer[] = [
-  { id: 'C-1001', name: 'Jane Doe',      email: 'jane.doe@email.com',    phone: '0917 694 8888', totalOrders: 5,  dateJoined: '2025-11-18' },
-  { id: 'C-1002', name: 'John Smith',    email: 'john.smith@email.com',  phone: '0999 123 4567', totalOrders: 2,  dateJoined: '2026-01-09' },
-  { id: 'C-1003', name: 'MJ Interiors',  email: 'orders@mjinteriors.com',phone: '0922 555 0000', totalOrders: 12, dateJoined: '2024-08-03' },
-  { id: 'C-1004', name: 'Andrea Cruz',   email: 'andrea.cruz@email.com', phone: '0918 222 3344', totalOrders: 1,  dateJoined: '2026-02-20' },
-  { id: 'C-1005', name: 'Mark Reyes',    email: 'mark.reyes@email.com',  phone: '0908 111 2233', totalOrders: 7,  dateJoined: '2025-06-14' },
-  { id: 'C-1006', name: 'Sofia Lim',     email: 'sofia.lim@email.com',   phone: '0917 333 4455', totalOrders: 3,  dateJoined: '2025-09-01' },
-  { id: 'C-1007', name: 'Carlos Tan',    email: 'carlos.tan@email.com',  phone: '0921 444 5566', totalOrders: 9,  dateJoined: '2024-12-20' },
-  { id: 'C-1008', name: 'Anna Villanueva',email: 'anna.v@email.com',     phone: '0933 666 7788', totalOrders: 4,  dateJoined: '2026-03-05' },
-  { id: 'C-1009', name: 'Rico Santos',   email: 'rico.s@email.com',      phone: '0945 777 8899', totalOrders: 6,  dateJoined: '2025-07-22' },
-  { id: 'C-1010', name: 'Pia Garcia',    email: 'pia.garcia@email.com',  phone: '0956 888 9900', totalOrders: 0,  dateJoined: '2026-02-01' },
-  { id: 'C-1011', name: 'Luis Mendoza',  email: 'luis.m@email.com',      phone: '0967 999 0011', totalOrders: 11, dateJoined: '2024-10-10' },
-  { id: 'C-1012', name: 'Karen Bautista',email: 'karen.b@email.com',     phone: '0978 000 1122', totalOrders: 2,  dateJoined: '2025-03-18' },
+  { id: 'C-1001', name: 'Jane Doe',        email: 'jane.doe@email.com',     phone: '0917 694 8888', totalOrders: 5,  dateJoined: '2025-11-18' },
+  { id: 'C-1002', name: 'John Smith',      email: 'john.smith@email.com',   phone: '0999 123 4567', totalOrders: 2,  dateJoined: '2026-01-09' },
+  { id: 'C-1003', name: 'MJ Interiors',    email: 'orders@mjinteriors.com', phone: '0922 555 0000', totalOrders: 12, dateJoined: '2024-08-03' },
+  { id: 'C-1004', name: 'Andrea Cruz',     email: 'andrea.cruz@email.com',  phone: '0918 222 3344', totalOrders: 1,  dateJoined: '2026-02-20' },
+  { id: 'C-1005', name: 'Mark Reyes',      email: 'mark.reyes@email.com',   phone: '0908 111 2233', totalOrders: 7,  dateJoined: '2025-06-14' },
+  { id: 'C-1006', name: 'Sofia Lim',       email: 'sofia.lim@email.com',    phone: '0917 333 4455', totalOrders: 3,  dateJoined: '2025-09-01' },
+  { id: 'C-1007', name: 'Carlos Tan',      email: 'carlos.tan@email.com',   phone: '0921 444 5566', totalOrders: 9,  dateJoined: '2024-12-20' },
+  { id: 'C-1008', name: 'Anna Villanueva', email: 'anna.v@email.com',       phone: '0933 666 7788', totalOrders: 4,  dateJoined: '2026-03-05' },
+  { id: 'C-1009', name: 'Rico Santos',     email: 'rico.s@email.com',       phone: '0945 777 8899', totalOrders: 6,  dateJoined: '2025-07-22' },
+  { id: 'C-1010', name: 'Pia Garcia',      email: 'pia.garcia@email.com',   phone: '0956 888 9900', totalOrders: 0,  dateJoined: '2026-02-01' },
+  { id: 'C-1011', name: 'Luis Mendoza',    email: 'luis.m@email.com',       phone: '0967 999 0011', totalOrders: 11, dateJoined: '2024-10-10' },
+  { id: 'C-1012', name: 'Karen Bautista',  email: 'karen.b@email.com',      phone: '0978 000 1122', totalOrders: 2,  dateJoined: '2025-03-18' },
 ];
 
 const PER_PAGE_OPTIONS = [5, 10, 20];
@@ -101,7 +110,7 @@ function CustomerActionsDropdown({ customer }: { customer: Customer }) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-44 rounded-none border-border">
-        <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {customer.name}
         </DropdownMenuLabel>
 
@@ -139,7 +148,6 @@ function TablePagination({
   const rangeStart = total === 0 ? 0 : (page - 1) * limit + 1;
   const rangeEnd   = Math.min(page * limit, total);
 
-  // Build page number pills — show at most 5 around current page
   const pageNumbers = useMemo(() => {
     const delta = 2;
     const range: number[] = [];
@@ -154,8 +162,8 @@ function TablePagination({
   }, [page, totalPages]);
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      {/* Left: showing range + per-page selector */}
+    <div className="flex flex-col gap-3 border-t border-border px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+      {/* Left: range + per-page */}
       <div className="flex items-center gap-3">
         <p className="text-xs text-muted-foreground">
           Showing{' '}
@@ -167,10 +175,7 @@ function TablePagination({
           customer{total === 1 ? '' : 's'}
         </p>
 
-        <Select
-          value={String(limit)}
-          onValueChange={(v) => onLimitChange(Number(v))}
-        >
+        <Select value={String(limit)} onValueChange={(v) => onLimitChange(Number(v))}>
           <SelectTrigger className="h-8 w-[90px] rounded-none border-border bg-transparent text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -186,29 +191,13 @@ function TablePagination({
 
       {/* Right: page controls */}
       <div className="flex items-center gap-1">
-        {/* First */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 rounded-none"
-          disabled={!hasPrevPage}
-          onClick={() => onPageChange(1)}
-        >
+        <Button variant="outline" size="icon" className="h-8 w-8 rounded-none" disabled={!hasPrevPage} onClick={() => onPageChange(1)}>
           <ChevronsLeft className="h-4 w-4" />
         </Button>
-
-        {/* Prev */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 rounded-none"
-          disabled={!hasPrevPage}
-          onClick={() => onPageChange(page - 1)}
-        >
+        <Button variant="outline" size="icon" className="h-8 w-8 rounded-none" disabled={!hasPrevPage} onClick={() => onPageChange(page - 1)}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-        {/* Leading ellipsis */}
         {pageNumbers[0] > 1 && (
           <>
             <button
@@ -218,14 +207,11 @@ function TablePagination({
               1
             </button>
             {pageNumbers[0] > 2 && (
-              <span className="flex h-8 w-6 items-end justify-center pb-1 text-xs text-muted-foreground">
-                …
-              </span>
+              <span className="flex h-8 w-6 items-end justify-center pb-1 text-xs text-muted-foreground">…</span>
             )}
           </>
         )}
 
-        {/* Page number pills */}
         {pageNumbers.map((p) => (
           <button
             key={p}
@@ -241,13 +227,10 @@ function TablePagination({
           </button>
         ))}
 
-        {/* Trailing ellipsis */}
         {pageNumbers[pageNumbers.length - 1] < totalPages && (
           <>
             {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
-              <span className="flex h-8 w-6 items-end justify-center pb-1 text-xs text-muted-foreground">
-                …
-              </span>
+              <span className="flex h-8 w-6 items-end justify-center pb-1 text-xs text-muted-foreground">…</span>
             )}
             <button
               onClick={() => onPageChange(totalPages)}
@@ -258,25 +241,10 @@ function TablePagination({
           </>
         )}
 
-        {/* Next */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 rounded-none"
-          disabled={!hasNextPage}
-          onClick={() => onPageChange(page + 1)}
-        >
+        <Button variant="outline" size="icon" className="h-8 w-8 rounded-none" disabled={!hasNextPage} onClick={() => onPageChange(page + 1)}>
           <ChevronRight className="h-4 w-4" />
         </Button>
-
-        {/* Last */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 rounded-none"
-          disabled={!hasNextPage}
-          onClick={() => onPageChange(totalPages)}
-        >
+        <Button variant="outline" size="icon" className="h-8 w-8 rounded-none" disabled={!hasNextPage} onClick={() => onPageChange(totalPages)}>
           <ChevronsRight className="h-4 w-4" />
         </Button>
       </div>
@@ -287,9 +255,9 @@ function TablePagination({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function CustomersPage() {
-  const [query, setQuery]   = useState('');
-  const [page, setPage]     = useState(1);
-  const [limit, setLimit]   = useState(5);
+  const [query, setQuery] = useState('');
+  const [page, setPage]   = useState(1);
+  const [limit, setLimit] = useState(5);
 
   // 1. Filter
   const filtered = useMemo(() => {
@@ -303,13 +271,13 @@ export default function CustomersPage() {
     );
   }, [query]);
 
-  // 2. Build pagination object (your exact format)
+  // 2. Pagination
   const pagination = useMemo<Pagination>(
     () => buildPagination(filtered.length, page, limit),
     [filtered.length, page, limit]
   );
 
-  // 3. Slice for current page
+  // 3. Slice
   const paged = useMemo(() => {
     const start = (pagination.page - 1) * pagination.limit;
     return filtered.slice(start, start + pagination.limit);
@@ -321,8 +289,11 @@ export default function CustomersPage() {
   }
 
   return (
-    <section className="min-h-screen bg-background/60">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+    // ── Full-width page wrapper ──────────────────────────────────────────
+    <div className="w-full min-h-screen bg-background">
+      <div className="w-full max-w-[1400px] mx-auto px-6 py-8 space-y-6">
+
+        {/* ── Page Header ── */}
         <AdminPageHeader
           title="Customers"
           description="View customer profiles and purchase activity."
@@ -330,13 +301,13 @@ export default function CustomersPage() {
 
         {/* ── Search + Count ── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-md">
+          <div className="relative w-full sm:w-80">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-              placeholder="Search customers…"
-              className="h-11 rounded-none pl-10"
+              placeholder="Search by name, email or phone…"
+              className="h-9 rounded-none pl-10 text-sm"
             />
           </div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -344,68 +315,94 @@ export default function CustomersPage() {
           </p>
         </div>
 
-        {/* ── Table ── */}
-        <div className="overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm">
-          <Table className="min-w-[950px]">
-            <TableHeader className="bg-muted/60">
-              <TableRow>
-                <TableHead className="px-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Customer Name</span>
-                </TableHead>
-                <TableHead className="px-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Email</span>
-                </TableHead>
-                <TableHead className="px-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Phone</span>
-                </TableHead>
-                <TableHead className="px-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Total Orders</span>
-                </TableHead>
-                <TableHead className="px-4">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Date Joined</span>
-                </TableHead>
-                <TableHead className="px-4 text-right">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
+        {/* ── Table card ── */}
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[800px] w-full">
 
-            <TableBody>
-              {paged.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="px-4 py-3">
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-medium text-foreground">{c.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{c.id}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground">{c.email}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground">{c.phone}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm font-semibold text-foreground">{c.totalOrders}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground">{c.dateJoined}</TableCell>
-                  <TableCell className="px-4 py-3 text-right">
-                    <CustomerActionsDropdown customer={c} />
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {paged.length === 0 && (
+              <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableCell colSpan={6} className="px-6 py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="mb-4 h-px w-12 bg-border" />
-                      <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                        No customers found
-                      </p>
-                      <p className="mt-2 text-xs text-muted-foreground/70">
-                        Try a different search query.
-                      </p>
-                    </div>
-                  </TableCell>
+                  {[
+                    'Customer',
+                    'Email',
+                    'Phone',
+                    'Total Orders',
+                    'Date Joined',
+                    'Actions',
+                  ].map((h, i) => (
+                    <TableHead
+                      key={h}
+                      className={cn('px-5 py-3', i === 5 && 'text-right')}
+                    >
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {h}
+                      </span>
+                    </TableHead>
+                  ))}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+
+              <TableBody>
+                {paged.map((c) => (
+                  <TableRow
+                    key={c.id}
+                    className="hover:bg-muted/40 transition-colors"
+                  >
+                    {/* Name + ID */}
+                    <TableCell className="px-5 py-3.5">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-foreground">
+                          {c.name}
+                        </p>
+                        <p className="font-mono text-[11px] text-muted-foreground">
+                          {c.id}
+                        </p>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="px-5 py-3.5 text-sm text-muted-foreground">
+                      {c.email}
+                    </TableCell>
+
+                    <TableCell className="px-5 py-3.5 text-sm text-muted-foreground">
+                      {c.phone}
+                    </TableCell>
+
+                    <TableCell className="px-5 py-3.5">
+                      <span className="text-sm font-semibold tabular-nums text-foreground">
+                        {c.totalOrders}
+                      </span>
+                    </TableCell>
+
+                    <TableCell className="px-5 py-3.5 text-sm text-muted-foreground">
+                      {c.dateJoined}
+                    </TableCell>
+
+                    <TableCell className="px-5 py-3.5 text-right">
+                      <CustomerActionsDropdown customer={c} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {paged.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="px-6 py-20">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <div className="mb-4 h-px w-10 bg-border" />
+                        <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                          No customers found
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground/60">
+                          Try a different search query.
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+
+            </Table>
+          </div>
 
           {/* ── Pagination ── */}
           <TablePagination
@@ -414,7 +411,8 @@ export default function CustomersPage() {
             onLimitChange={handleLimitChange}
           />
         </div>
+
       </div>
-    </section>
+    </div>
   );
 }

@@ -100,7 +100,6 @@ export default function AuditTrailPage() {
   const [userFilter, setUserFilter]         = useState("All");
   const [page, setPage]                     = useState(1);
 
-  // 1. Filter
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return MOCK_AUDIT.filter((event) => {
@@ -111,13 +110,11 @@ export default function AuditTrailPage() {
     });
   }, [query, severityFilter, userFilter]);
 
-  // 2. Build pagination object
   const pagination = useMemo<Pagination>(
     () => buildPagination(filtered.length, page, ITEMS_PER_PAGE),
     [filtered.length, page]
   );
 
-  // 3. Slice for current page
   const paginated = useMemo(() => {
     const start = (pagination.page - 1) * pagination.limit;
     return filtered.slice(start, start + pagination.limit);
@@ -139,8 +136,8 @@ export default function AuditTrailPage() {
   }
 
   return (
-    <section className="min-h-screen bg-background/60">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+    <section className="flex min-h-screen w-full flex-col bg-background/60">
+      <div className="flex flex-1 flex-col gap-6 px-6 py-6 xl:px-10">
         <AdminPageHeader
           title="Audit Trail"
           description="High-signal record of important admin actions. Mock data only for now."
@@ -191,7 +188,7 @@ export default function AuditTrailPage() {
         </div>
 
         {/* ── Timeline Card ── */}
-        <div className="rounded-xl border border-border bg-card/80 p-6 shadow-sm">
+        <div className="w-full rounded-xl border border-border bg-card/80 p-6 shadow-sm">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Activity Timeline
@@ -235,7 +232,7 @@ export default function AuditTrailPage() {
 
                         <div className="flex items-center gap-2">
                           <SeverityBadge severity={event.severity} />
-                          <span className="text-[11px] font-mono text-muted-foreground/70">
+                          <span className="font-mono text-[11px] text-muted-foreground/70">
                             {event.id}
                           </span>
                         </div>

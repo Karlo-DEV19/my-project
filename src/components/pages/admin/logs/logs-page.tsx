@@ -111,20 +111,19 @@ function PaginationBar({ pagination, onPageChange }: { pagination: Pagination; o
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to   = Math.min(page * limit, total);
 
-  // Build page numbers to show (max 5 slots)
   const pages: (number | "…")[] = [];
   if (totalPages <= 5) {
     for (let i = 1; i <= totalPages; i++) pages.push(i);
   } else {
     pages.push(1);
-    if (page > 3)           pages.push("…");
+    if (page > 3)              pages.push("…");
     for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
     if (page < totalPages - 2) pages.push("…");
     pages.push(totalPages);
   }
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-4 pt-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 px-5 pb-4 pt-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs text-muted-foreground">
         Showing <span className="font-medium text-foreground">{from}–{to}</span> of{" "}
         <span className="font-medium text-foreground">{total}</span> logs
@@ -144,7 +143,7 @@ function PaginationBar({ pagination, onPageChange }: { pagination: Pagination; o
 
         {pages.map((p, i) =>
           p === "…" ? (
-            <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground select-none">
+            <span key={`ellipsis-${i}`} className="select-none px-1 text-xs text-muted-foreground">
               …
             </span>
           ) : (
@@ -182,7 +181,6 @@ export default function LogsPage() {
   const [statusFilter, setStatusFilter] = useState<"All" | LogStatus>("All");
   const [page,         setPage]         = useState(1);
 
-  // Filter
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return ALL_LOGS.filter((log) => {
@@ -197,7 +195,6 @@ export default function LogsPage() {
     });
   }, [search, statusFilter]);
 
-  // Pagination
   const pagination = useMemo(
     () => buildPagination(page, PAGE_LIMIT, filtered.length),
     [page, filtered.length]
@@ -208,7 +205,6 @@ export default function LogsPage() {
     [filtered, page]
   );
 
-  // Reset to page 1 whenever filters change
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
     setPage(1);
@@ -220,8 +216,8 @@ export default function LogsPage() {
   }, []);
 
   return (
-    <section className="min-h-screen bg-background/60">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+    <section className="flex min-h-screen w-full flex-col bg-background/60">
+      <div className="flex flex-1 flex-col gap-6 px-6 py-6 xl:px-10">
         <AdminPageHeader
           title="Logs"
           description="System activity logs for quick troubleshooting and monitoring."
@@ -229,7 +225,6 @@ export default function LogsPage() {
 
         {/* ── Toolbar ── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Search */}
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -240,7 +235,6 @@ export default function LogsPage() {
             />
           </div>
 
-          {/* Status filter */}
           <Select value={statusFilter} onValueChange={handleStatusFilter}>
             <SelectTrigger className="w-full sm:w-36 text-sm">
               <SelectValue placeholder="All statuses" />
@@ -256,25 +250,25 @@ export default function LogsPage() {
         {/* ── Table ── */}
         <div className="overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm">
           <div className="overflow-x-auto">
-            <Table className="min-w-[700px]">
+            <Table className="w-full min-w-[700px]">
               <TableHeader className="bg-muted/60">
                 <TableRow>
-                  <TableHead className="px-4">
+                  <TableHead className="px-5">
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       Timestamp
                     </span>
                   </TableHead>
-                  <TableHead className="px-4">
+                  <TableHead className="px-5">
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       Action
                     </span>
                   </TableHead>
-                  <TableHead className="px-4">
+                  <TableHead className="px-5">
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       User
                     </span>
                   </TableHead>
-                  <TableHead className="px-4">
+                  <TableHead className="px-5">
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       Status
                     </span>
@@ -291,19 +285,19 @@ export default function LogsPage() {
                 ) : (
                   pageLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      <TableCell className="px-5 py-3 font-mono text-xs text-muted-foreground">
                         {log.timestamp}
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-sm font-medium text-foreground">
+                      <TableCell className="px-5 py-3 text-sm font-medium text-foreground">
                         {log.action}
                         <div className="mt-0.5 font-mono text-[11px] text-muted-foreground/70">
                           {log.id}
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-sm text-muted-foreground">
+                      <TableCell className="px-5 py-3 text-sm text-muted-foreground">
                         {log.user}
                       </TableCell>
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="px-5 py-3">
                         <LogStatusBadge status={log.status} />
                       </TableCell>
                     </TableRow>

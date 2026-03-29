@@ -120,7 +120,7 @@ function validatePaymentSessionData(data: PaymentSessionData): string[] {
     const lineSum = data.items.reduce((sum, i) => sum + i.amount, 0)
     const expectedTotal = lineSum + data.vat
     const diff = Math.abs(expectedTotal - data.amount)
-    if (diff > 0.02) { // allow ₱0.02 rounding tolerance
+    if (diff > 0.02) {
         errors.push(
             `Amount mismatch: items(${lineSum.toFixed(2)}) + vat(${data.vat.toFixed(2)}) = ${expectedTotal.toFixed(2)}, but amount=${data.amount.toFixed(2)}`
         )
@@ -143,7 +143,7 @@ export async function createOrderPaymentSession(
         console.log("VAT (12%): ₱", paymentData.vat.toFixed(2))
         console.log("Total:     ₱", paymentData.amount.toFixed(2))
         console.log("Line items:")
-        paymentData.items.forEach(i =>
+        paymentData.items.forEach((i) =>
             console.log(`  - ${i.name}: ₱${i.amount.toFixed(2)}`)
         )
 
@@ -214,6 +214,13 @@ export async function createOrderPaymentSession(
         console.log("✅ Success URL:", successUrl)
         console.log("❌ Cancel URL:", cancelUrl)
 
+        // ── Idempotency-Key ────────────────────────────────────────────────────
+        // Using orderId ensures that if the network times out and the client
+        // retries, PayMongo deduplicates the request and returns the same session
+        // instead of creating a second one.
+        const idempotencyKey = `checkout-${paymentData.orderId}`
+        // ──────────────────────────────────────────────────────────────────────
+
         const response = await axios.post(
             `${PAYMONGO_API_URL}/checkout_sessions`,
             {
@@ -224,6 +231,9 @@ export async function createOrderPaymentSession(
                         payment_intent_data: {
                             capture_type: "automatic",
                             description: `Order ${paymentData.trackingNumber} - ${orderTypeLabel}`,
+                            // metadata on payment_intent is what checkout_session.payment.paid
+                            // webhook delivers under data.attributes.payment_intent.attributes.metadata
+                            // This is the PRIMARY source read by extractMetadata() in the webhook handler.
                             metadata,
                         },
                         success_url: successUrl,
@@ -235,6 +245,7 @@ export async function createOrderPaymentSession(
                             email: paymentData.customerEmail,
                             phone: formattedPhone,
                         },
+                        // Also set on the session itself as a secondary source
                         metadata,
                     },
                 },
@@ -244,6 +255,8 @@ export async function createOrderPaymentSession(
                     Authorization: getAuthHeader(),
                     "Content-Type": "application/json",
                     Accept: "application/json",
+                    // Prevents duplicate sessions on network retry
+                    "Idempotency-Key": idempotencyKey,
                 },
                 timeout: 30000,
             }
@@ -255,6 +268,7 @@ export async function createOrderPaymentSession(
 
         console.log("✅ Session created:", session.id)
         console.log("✅ Checkout URL:  ", sessionAttrs.checkout_url)
+        console.log("✅ Idempotency-Key used:", idempotencyKey)
 
         return {
             success: true,

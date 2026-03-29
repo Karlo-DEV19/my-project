@@ -5,46 +5,59 @@ import {
     decimal,
     timestamp,
     jsonb,
+    uniqueIndex,
 } from "drizzle-orm/pg-core"
 import { orders } from "../orders"
 
-export const paymentHistory = pgTable("payment_history", {
-    id: uuid("id").defaultRandom().primaryKey(),
+export const paymentHistory = pgTable(
+    "payment_history",
+    {
+        id: uuid("id").defaultRandom().primaryKey(),
 
-    orderId: uuid("order_id")
-        .notNull()
-        .references(() => orders.id, { onDelete: "cascade" }),
+        orderId: uuid("order_id")
+            .notNull()
+            .references(() => orders.id, { onDelete: "cascade" }),
 
-    status: varchar("status", { length: 50 }).notNull().default("pending"),
-    // pending | paid | failed | refunded
+        status: varchar("status", { length: 50 }).notNull().default("pending"),
+        // pending | paid | failed | refunded
 
-    paymentMethod: varchar("payment_method", { length: 50 }),
-    // gcash | paymaya
+        paymentMethod: varchar("payment_method", { length: 50 }),
+        // gcash | paymaya
 
-    // PayMongo identifiers
-    paymentIntentId: varchar("payment_intent_id", { length: 100 }),
-    sessionId: varchar("session_id", { length: 100 }),
-    referenceNumber: varchar("reference_number", { length: 100 }),
+        // PayMongo identifiers
+        paymentIntentId: varchar("payment_intent_id", { length: 100 }),
+        sessionId: varchar("session_id", { length: 100 }),
+        referenceNumber: varchar("reference_number", { length: 100 }),
 
-    // Financials recorded at time of payment confirmation
-    amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }),
-    // Gross amount the customer paid (centavos → PHP)
+        // Idempotency — stores PayMongo event.id to prevent duplicate webhook processing
+        // Unique constraint ensures a given webhook event is only processed once
+        idempotencyKey: varchar("idempotency_key", { length: 255 }),
 
-    vat: decimal("vat", { precision: 10, scale: 2 }),
-    // 12% VAT recorded from PayMongo metadata at webhook time
+        // Financials recorded at time of payment confirmation
+        amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }),
+        // Gross amount the customer paid (centavos → PHP)
 
-    netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
-    // What you receive after PayMongo deducts their platform fee
+        vat: decimal("vat", { precision: 10, scale: 2 }),
+        // 12% VAT recorded from PayMongo metadata at webhook time
 
-    paidAt: timestamp("paid_at", { mode: "date" }),
-    expiresAt: timestamp("expires_at", { mode: "date" }),
+        netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
+        // What you receive after PayMongo deducts their platform fee
 
-    // Full PayMongo webhook payload for auditability
-    rawResponse: jsonb("raw_response"),
+        paidAt: timestamp("paid_at", { mode: "date" }),
+        expiresAt: timestamp("expires_at", { mode: "date" }),
 
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+        // Full PayMongo webhook payload for auditability
+        rawResponse: jsonb("raw_response"),
+
+        createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+        updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    },
+    (table) => ({
+        idempotencyKeyUnique: uniqueIndex("payment_history_idempotency_key_unique").on(
+            table.idempotencyKey
+        ),
+    })
+)
 
 export type PaymentHistory = typeof paymentHistory.$inferSelect
 export type NewPaymentHistory = typeof paymentHistory.$inferInsert

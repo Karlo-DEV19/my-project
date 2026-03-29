@@ -1,5 +1,5 @@
 {
-  "id": "bfcf917a-d445-438c-aabe-efef9a65a210",
+  "id": "d569bbea-8fc9-47b6-b7f2-9ba5d2f293f7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -798,6 +798,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "amount_paid": {
           "name": "amount_paid",
           "type": "numeric(10, 2)",
@@ -849,7 +855,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "payment_history_idempotency_key_unique": {
+          "name": "payment_history_idempotency_key_unique",
+          "columns": [
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "payment_history_order_id_orders_id_fk": {
           "name": "payment_history_order_id_orders_id_fk",

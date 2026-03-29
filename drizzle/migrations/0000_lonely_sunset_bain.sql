@@ -110,6 +110,7 @@ CREATE TABLE "payment_history" (
 	"payment_intent_id" varchar(100),
 	"session_id" varchar(100),
 	"reference_number" varchar(100),
+	"idempotency_key" varchar(255),
 	"amount_paid" numeric(10, 2),
 	"vat" numeric(10, 2),
 	"net_amount" numeric(10, 2),
@@ -129,4 +130,5 @@ ALTER TABLE "payment_history" ADD CONSTRAINT "payment_history_order_id_orders_id
 CREATE UNIQUE INDEX "blinds_products_product_code_unique" ON "blinds_products" USING btree ("product_code");--> statement-breakpoint
 CREATE INDEX "otp_email_idx" ON "otp_codes" USING btree ("email");--> statement-breakpoint
 CREATE UNIQUE INDEX "orders_tracking_number_unique" ON "orders" USING btree ("tracking_number");--> statement-breakpoint
-CREATE UNIQUE INDEX "orders_reference_number_unique" ON "orders" USING btree ("reference_number");
+CREATE UNIQUE INDEX "orders_reference_number_unique" ON "orders" USING btree ("reference_number");--> statement-breakpoint
+CREATE UNIQUE INDEX "payment_history_idempotency_key_unique" ON "payment_history" USING btree ("idempotency_key");

@@ -19,8 +19,7 @@ import { toast } from "sonner"
 import { checkoutSchema, type CheckoutFormValues } from "@/lib/zod-schema/checkout.schema"
 import type { LocationData } from "@/components/ui/location-picker"
 import { useCheckoutOrder, type PaymentMethodType } from "@/app/api/hooks/use-order"
-import type { CartItem } from "@/lib/zustand/use-cart-store"
-import type { computeCartTotals } from "@/lib/zustand/use-cart-store"
+import type { CartItem, computeCartTotals } from "@/lib/zustand/use-cart-store"
 import PaymentMethod from "./payment-method"
 
 const PhPhoneInput = dynamic(
@@ -94,6 +93,17 @@ interface CheckoutFormProps {
     totals: CartTotals
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const phpFormat = (n: number) =>
+    new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+    }).format(n)
+
+const r2 = (n: number) => Math.round(n * 100) / 100
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
@@ -101,12 +111,20 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
     const { checkoutOrderAsync, isPending, isError } = useCheckoutOrder()
 
     const {
+        fullSubtotal: subtotal,
+        fullVat: vat,
+        fullTotal,
         downpaymentSubtotal,
         downpaymentVat,
         downpaymentTotal,
-        fullTotal,
     } = totals
 
+    const balanceDue = fullTotal - downpaymentTotal
+
+    // ── Form setup ────────────────────────────────────────────────────────────
+    // Only fields that are actually rendered as <FormField> / <Controller>
+    // go into defaultValues. Items and financials are props — they never touch
+    // the form registry, so they must NOT be in the schema or defaultValues.
     const form = useForm<CheckoutFormValues>({
         resolver: zodResolver(checkoutSchema),
         defaultValues: {
@@ -116,7 +134,6 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
             phone: "",
             phoneSecondary: "",
             paymentMethod: "gcash",
-            agreeTerms: undefined as unknown as true,
             deliveryNotes: "",
             address: {
                 unitFloor: "",
@@ -126,9 +143,12 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                 province: "",
                 zipCode: "",
             },
+            // coordinates intentionally omitted — set via form.setValue in handleLocationSelect
+            // agreeTerms intentionally omitted — undefined until checkbox ticked
         },
     })
 
+    // ── Location picker ───────────────────────────────────────────────────────
     const handleLocationSelect = useCallback((location: LocationData) => {
         form.setValue("coordinates", {
             lat: location.lat,
@@ -149,11 +169,17 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
         if (c.building) form.setValue("address.unitFloor", c.building, { shouldValidate: true })
     }, [form])
 
+    // ── Submit ────────────────────────────────────────────────────────────────
+    // `data` here is the zod-validated form payload (contact, address, payment).
+    // Items and financials come from props and are assembled into the API payload here.
     const onSubmit = async (data: CheckoutFormValues) => {
+        // ── Guard: map must be pinned ─────────────────────────────────────────
         if (!data.coordinates?.lat || !data.coordinates?.lng) {
             toast.error("Please pin your delivery location on the map.")
             return
         }
+
+        // ── Guard: cart must not be empty ─────────────────────────────────────
         if (items.length === 0) {
             toast.error("Your cart is empty.", {
                 description: "Add items to your cart before checking out.",
@@ -161,56 +187,65 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
             return
         }
 
+        // ── Build items from cart prop (not from form state) ──────────────────
         const orderItems = items.map((cartItem) => ({
             productId: cartItem.order.productId,
             colorId: cartItem.order.selectedColor?.colorId ?? undefined,
             quantity: cartItem.quantity,
         }))
 
+        // ── Build final payload — financials from computeCartTotals prop ──────
+        const payload = {
+            // Zod-validated fields
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            phoneSecondary: data.phoneSecondary?.trim() || undefined,
+            paymentMethod: data.paymentMethod as PaymentMethodType,
+            agreeTerms: true as const,
+            deliveryNotes: data.deliveryNotes?.trim() || undefined,
+            address: {
+                unitFloor: data.address.unitFloor?.trim() || undefined,
+                street: data.address.street,
+                barangay: data.address.barangay,
+                city: data.address.city,
+                province: data.address.province,
+                zipCode: data.address.zipCode,
+            },
+            coordinates: {
+                lat: data.coordinates.lat,
+                lng: data.coordinates.lng,
+                formattedAddress: data.coordinates.formattedAddress ?? "",
+            },
+            // Derived from cart prop — never touched by RHF/zod
+            items: orderItems,
+            subtotal: r2(subtotal),
+            vat: r2(vat),
+            totalAmount: r2(fullTotal),
+            downpaymentSubtotal: r2(downpaymentSubtotal),
+            downpaymentVat: r2(downpaymentVat),
+            downpaymentAmount: r2(downpaymentTotal),
+        }
+
+        console.log("📦 [CheckoutForm] Final API payload:", JSON.stringify(payload, null, 2))
+
         try {
-            const response = await checkoutOrderAsync({
-                firstName: data.firstName,
-                lastName: data.lastName,
-                email: data.email,
-                phone: data.phone,
-                phoneSecondary: data.phoneSecondary?.trim() || undefined,
-                paymentMethod: data.paymentMethod as PaymentMethodType,
-                agreeTerms: true,
-                deliveryNotes: data.deliveryNotes?.trim() || undefined,
-                address: {
-                    unitFloor: data.address.unitFloor?.trim() || undefined,
-                    street: data.address.street,
-                    barangay: data.address.barangay,
-                    city: data.address.city,
-                    province: data.address.province,
-                    zipCode: data.address.zipCode,
-                },
-                coordinates: {
-                    lat: data.coordinates.lat,
-                    lng: data.coordinates.lng,
-                    formattedAddress: data.coordinates.formattedAddress ?? "",
-                },
-                items: orderItems,
-                // Send downpayment amounts — PayMongo charges the 50% only
-                subtotal: downpaymentSubtotal,
-                vat: downpaymentVat,
-                totalAmount: downpaymentTotal,
-            })
+            const response = await checkoutOrderAsync(payload)
+            console.log("✅ [CheckoutForm] API response:", response)
 
             if (response.data?.checkoutUrl) {
                 toast.success("Redirecting to payment...", {
-                    description: `Order ${response.data.trackingNumber} · ${new Intl.NumberFormat('en-PH', {
-                        style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
-                    }).format(downpaymentTotal)}`,
+                    description: `Order ${response.data.trackingNumber} · ${phpFormat(downpaymentTotal)}`,
                 })
-
                 clearCart()
-
                 await new Promise((r) => setTimeout(r, 800))
-
                 window.location.assign(response.data.checkoutUrl)
             }
         } catch (error: any) {
+            console.error("❌ [CheckoutForm] API error full object:", error)
+            console.error("❌ [CheckoutForm] API error response data:", error?.response?.data)
+
             const message =
                 error?.response?.data?.message ??
                 error?.message ??
@@ -218,6 +253,31 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
             toast.error("Order failed", { description: message })
         }
     }
+
+    // ── handleSubmit with zod error logger ────────────────────────────────────
+    const handleSubmit = form.handleSubmit(
+        onSubmit,
+        (errors) => {
+            // This fires when zodResolver blocks submission — log every field error
+            console.warn(
+                "🚫 [CheckoutForm] Zod validation errors (submit blocked):",
+                JSON.stringify(errors, null, 2)
+            )
+
+            // Toast the first error so it's visible without opening devtools
+            const firstMessage = Object.values(errors)
+                .flatMap((e: any) =>
+                    e?.message
+                        ? [e.message]
+                        : Object.values(e ?? {}).map((nested: any) => nested?.message)
+                )
+                .filter(Boolean)[0]
+
+            if (firstMessage) {
+                toast.error("Please fix the form errors", { description: String(firstMessage) })
+            }
+        }
+    )
 
     // ── Empty cart guard ──────────────────────────────────────────────────────
     if (items.length === 0) {
@@ -243,10 +303,7 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
         )
     }
 
-    const phpFormat = (n: number) => new Intl.NumberFormat('en-PH', {
-        style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
-    }).format(n)
-
+    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col border border-border bg-background">
             {/* Header */}
@@ -263,10 +320,8 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
             </div>
 
             <Form {...form}>
-                <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="flex flex-col divide-y divide-border/50"
-                >
+                <form onSubmit={handleSubmit} className="flex flex-col divide-y divide-border/50">
+
                     {/* ── 1. Contact ───────────────────────────────────── */}
                     <section className="p-6 sm:p-8">
                         <SectionHeader icon={Mail} step={1} title="Contact Information"
@@ -412,11 +467,15 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                                     <FormItem>
                                         <FieldLabel>Postal / Zip Code</FieldLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g. 1223" inputMode="numeric" maxLength={4}
+                                            <Input
+                                                placeholder="e.g. 1223"
+                                                inputMode="numeric"
+                                                maxLength={4}
                                                 autoComplete="postal-code"
                                                 className="h-11 bg-transparent text-sm rounded-none border-border/70"
                                                 {...field}
-                                                onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))} />
+                                                onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                                            />
                                         </FormControl>
                                         <FormMessage className="text-[10px]" />
                                     </FormItem>
@@ -454,7 +513,9 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                         <SectionHeader icon={CreditCard} step={5} title="Payment Method"
                             description="Select your preferred payment channel." />
                         <div className="space-y-4">
-                            <Controller control={form.control} name="paymentMethod"
+                            <Controller
+                                control={form.control}
+                                name="paymentMethod"
                                 render={({ field, fieldState }) => (
                                     <FormItem>
                                         <PaymentMethod
@@ -463,15 +524,40 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                                             error={fieldState.error?.message}
                                         />
                                     </FormItem>
-                                )} />
+                                )}
+                            />
+
+                            {/* Order breakdown */}
+                            <div className="border border-border/50 divide-y divide-border/50 text-xs">
+                                <div className="px-4 py-3 flex justify-between text-muted-foreground">
+                                    <span>Subtotal</span>
+                                    <span>{phpFormat(subtotal)}</span>
+                                </div>
+                                <div className="px-4 py-3 flex justify-between text-muted-foreground">
+                                    <span>VAT (12%)</span>
+                                    <span>{phpFormat(vat)}</span>
+                                </div>
+                                <div className="px-4 py-3 flex justify-between font-semibold text-foreground">
+                                    <span>Order Total</span>
+                                    <span>{phpFormat(fullTotal)}</span>
+                                </div>
+                                <div className="px-4 py-3 flex justify-between text-emerald-600 dark:text-emerald-400 font-medium">
+                                    <span>50% Due Now</span>
+                                    <span>{phpFormat(downpaymentTotal)}</span>
+                                </div>
+                                <div className="px-4 py-3 flex justify-between text-muted-foreground">
+                                    <span>Balance on Delivery</span>
+                                    <span>{phpFormat(balanceDue)}</span>
+                                </div>
+                            </div>
 
                             <div className="flex items-start gap-3 p-4 bg-accent/10 border border-border/50">
                                 <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    A <span className="font-semibold text-foreground">50% downpayment</span> is charged
-                                    now to confirm your order and schedule installation. The remaining{" "}
-                                    <span className="font-semibold text-foreground">{phpFormat(fullTotal - downpaymentTotal)}</span>{" "}
-                                    balance is due upon delivery. Our team will contact you with final details.
+                                    A <span className="font-semibold text-foreground">50% downpayment</span> is
+                                    charged now to confirm your order. The remaining{" "}
+                                    <span className="font-semibold text-foreground">{phpFormat(balanceDue)}</span>{" "}
+                                    balance is due upon delivery.
                                 </p>
                             </div>
 
@@ -484,7 +570,8 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                                                 onCheckedChange={(checked) =>
                                                     field.onChange(checked ? true : undefined)
                                                 }
-                                                className="mt-0.5" />
+                                                className="mt-0.5"
+                                            />
                                         </FormControl>
                                         <div className="space-y-1 leading-none">
                                             <FormLabel className="text-xs font-medium text-foreground cursor-pointer">
@@ -526,7 +613,9 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                                 Payment initialization failed. Please check your details and try again.
                             </div>
                         )}
-                        <button type="submit" disabled={isPending}
+                        <button
+                            type="submit"
+                            disabled={isPending}
                             className="w-full flex items-center justify-center gap-3 h-14 bg-foreground text-background uppercase tracking-[0.2em] text-xs font-semibold hover:bg-foreground/90 active:scale-[0.995] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {isPending ? (

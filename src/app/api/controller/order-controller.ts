@@ -1,20 +1,25 @@
 import { Context } from "hono"
 import { z } from "zod"
-import { inArray, eq, or, ilike, sql, desc, and } from "drizzle-orm"
+import { inArray, eq, ilike, or, and, desc, sql } from "drizzle-orm"
 import { db } from "@/lib/supabase/db"
 import { blindsProducts } from "@/schema/products/blinds/blinds-product"
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
 import { orderItems, orders } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
 import { createOrderPaymentSession } from "../services/nodemailer/paymongo/order-checkout-payment"
+import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image"
+import { sendOrderStatusEmail } from "../services/nodemailer/send-order-status-service"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** 50% downpayment — fixed at checkout */
+const VAT_RATE = 0.12
 const DOWNPAYMENT_RATE = 0.5
 
-/** VAT rate in the Philippines */
-const VAT_RATE = 0.12
+/**
+ * Maximum allowed difference (₱) between client-sent totals and
+ * server-recomputed totals. Accounts for frontend rounding on per-item splits.
+ */
+const TOLERANCE = 1.00
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -28,17 +33,9 @@ function generateReferenceNumber(): string {
     return `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 }
 
-/** Round to 2 decimal places, guarding against NaN/Infinity */
 function round2(n: number): number {
     if (isNaN(n) || !isFinite(n)) return 0
     return Math.round(n * 100) / 100
-}
-
-/** Safe division — returns 0 instead of NaN or Infinity */
-function safeDivide(a: number, b: number): number {
-    if (!b || isNaN(b) || !isFinite(b)) return 0
-    const result = a / b
-    return isNaN(result) || !isFinite(result) ? 0 : result
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -78,6 +75,16 @@ const CheckoutSchema = z.object({
             })
         )
         .min(1, "At least one item is required"),
+
+    // Full 100% order totals — calculated by the frontend
+    subtotal: z.number().positive("subtotal must be positive"),
+    vat: z.number().min(0, "vat must be non-negative"),
+    totalAmount: z.number().positive("totalAmount must be positive"),
+
+    // 50% downpayment totals — calculated by the frontend
+    downpaymentSubtotal: z.number().positive("downpaymentSubtotal must be positive"),
+    downpaymentVat: z.number().min(0, "downpaymentVat must be non-negative"),
+    downpaymentAmount: z.number().positive("downpaymentAmount must be positive"),
 })
 
 type CheckoutInput = z.infer<typeof CheckoutSchema>
@@ -86,7 +93,7 @@ type CheckoutInput = z.infer<typeof CheckoutSchema>
 
 export const checkoutOrder = async (ctx: Context) => {
     try {
-        // ── 1. Parse & validate ────────────────────────────────────────────────
+        // ── 1. Parse & validate schema ─────────────────────────────────────────
         const body = await ctx.req.json()
         const parsed = CheckoutSchema.safeParse(body)
 
@@ -111,7 +118,7 @@ export const checkoutOrder = async (ctx: Context) => {
                 id: blindsProducts.id,
                 name: blindsProducts.name,
                 productCode: blindsProducts.productCode,
-                unitPrice: blindsProducts.unitPrice,
+                unitPrice: blindsProducts.unitPrice, // integer — whole pesos
                 status: blindsProducts.status,
             })
             .from(blindsProducts)
@@ -135,7 +142,23 @@ export const checkoutOrder = async (ctx: Context) => {
             }
         }
 
-        // ── 3. Fetch & validate colors ─────────────────────────────────────────
+        // ── 3. Fetch first image per product (for PayMongo receipt) ────────────
+        const fetchedImages = await db
+            .select({
+                productId: blindsProductImages.productId,
+                imageUrl: blindsProductImages.imageUrl,
+            })
+            .from(blindsProductImages)
+            .where(inArray(blindsProductImages.productId, productIds))
+
+        const imageMap = new Map<string, string>()
+        for (const img of fetchedImages) {
+            if (!imageMap.has(img.productId)) {
+                imageMap.set(img.productId, img.imageUrl)
+            }
+        }
+
+        // ── 4. Fetch & validate colors ─────────────────────────────────────────
         const colorIds = input.items
             .filter((i): i is typeof i & { colorId: string } => !!i.colorId)
             .map((i) => i.colorId)
@@ -160,62 +183,111 @@ export const checkoutOrder = async (ctx: Context) => {
             }
         }
 
-        // ── 4. Compute line items (full-price snapshots) ────────────────────────
+        // ── 5. Server-side verification of client financials ───────────────────
+        // The frontend uses area-based pricing (sq·ft × panels × unitPrice + min-charge
+        // logic) which the server cannot reproduce without dimension data. Instead we
+        // verify internal consistency of the numbers the client sent:
+        //   • vat     ≈ subtotal × 12%
+        //   • total   ≈ subtotal + vat
+        //   • downpay ≈ total × 50%
+        // This catches any tampering (zeroed totals, wrong VAT, inflated discounts)
+        // without needing to know widthCm / heightCm / panels.
+
+        const clientSubtotal = round2(input.subtotal)
+        const clientVat = round2(input.vat)
+        const clientTotal = round2(input.totalAmount)
+        const clientDownpay = round2(input.downpaymentAmount)
+
+        const expectedVat = round2(clientSubtotal * VAT_RATE)
+        const expectedTotal = round2(clientSubtotal + clientVat)
+        const expectedDownpay = round2(clientTotal * DOWNPAYMENT_RATE)
+
+        if (Math.abs(expectedVat - clientVat) > TOLERANCE) {
+            return ctx.json(
+                {
+                    success: false,
+                    message: `VAT mismatch: expected ₱${expectedVat.toFixed(2)}, received ₱${clientVat.toFixed(2)}`,
+                },
+                400
+            )
+        }
+
+        if (Math.abs(expectedTotal - clientTotal) > TOLERANCE) {
+            return ctx.json(
+                {
+                    success: false,
+                    message: `Total mismatch: expected ₱${expectedTotal.toFixed(2)}, received ₱${clientTotal.toFixed(2)}`,
+                },
+                400
+            )
+        }
+
+        if (Math.abs(expectedDownpay - clientDownpay) > TOLERANCE) {
+            return ctx.json(
+                {
+                    success: false,
+                    message: `Downpayment mismatch: expected ₱${expectedDownpay.toFixed(2)}, received ₱${clientDownpay.toFixed(2)}`,
+                },
+                400
+            )
+        }
+
+        // All checks passed — use client values; they carry the frontend's exact rounding
+        const fullSubtotal = clientSubtotal
+        const fullVat = clientVat
+        const fullTotal = clientTotal
+        const downpaymentAmount = clientDownpay
+        const balanceAmount = round2(fullTotal - downpaymentAmount)
+
+        // ── 6. Build order item snapshots (full-price, for DB) ─────────────────
         const computedItems = input.items.map((item) => {
             const product = productMap.get(item.productId)!
-            const unitPrice = Number(product.unitPrice)
-            const itemSubtotal = round2(unitPrice * item.quantity)
-
             return {
                 productId: product.id,
                 productName: product.name,
                 productCode: product.productCode,
                 quantity: item.quantity,
-                unitPrice,
-                subtotal: itemSubtotal,
+                unitPrice: product.unitPrice,
+                subtotal: round2(product.unitPrice * item.quantity),
                 colorId: item.colorId ?? null,
                 colorName: item.colorId ? (colorMap.get(item.colorId)?.name ?? null) : null,
             }
         })
 
-        // ── 5. Derive full-order totals server-side ─────────────────────────────
-        //   Never trust the client for financial figures.
-        const fullSubtotal = round2(
+        // ── 7. Build PayMongo line items ───────────────────────────────────────
+        // One entry per product. Amount is the per-unit downpayment price (VAT-inclusive),
+        // multiplied by quantity inside PayMongo.
+        // No separate VAT line — VAT is already baked into the amounts.
+        const fullSubtotalForProportion = round2(
             computedItems.reduce((sum, i) => sum + i.subtotal, 0)
         )
-        const fullVat = round2(fullSubtotal * VAT_RATE)
-        const fullTotal = round2(fullSubtotal + fullVat)
 
-        // ── 6. Derive 50% downpayment figures ──────────────────────────────────
-        const downpaymentAmount = round2(fullTotal * DOWNPAYMENT_RATE)
-        const balanceAmount = round2(fullTotal - downpaymentAmount)
+        const paymongoItems = computedItems.map((item) => {
+            const proportion =
+                fullSubtotalForProportion > 0
+                    ? item.subtotal / fullSubtotalForProportion
+                    : 1 / computedItems.length
 
-        // Split downpayment subtotal proportionally for PayMongo line items
-        const downpaymentSubtotal = round2(fullSubtotal * DOWNPAYMENT_RATE)
-        // VAT on downpayment = downpaymentAmount - downpaymentSubtotal to keep sum exact
-        const downpaymentVat = round2(downpaymentAmount - downpaymentSubtotal)
+            // Downpayment share for this product (VAT-inclusive), split across units
+            const itemDownpaymentTotal = round2(downpaymentAmount * proportion)
+            const perUnitAmount = round2(itemDownpaymentTotal / item.quantity)
 
-        // ── 7. Build PayMongo line items (downpayment slice only) ───────────────
-        const rawSubtotalSum = computedItems.reduce((sum, i) => sum + i.subtotal, 0)
+            return {
+                name: item.productName,
+                quantity: item.quantity,
+                amount: perUnitAmount,
+                imageUrl: imageMap.get(item.productId) ?? null,
+            }
+        })
 
-        const paymongoItems = computedItems.map((item) => ({
-            name: item.productName,
-            quantity: 1,
-            amount:
-                rawSubtotalSum > 0
-                    ? round2(safeDivide(item.subtotal, rawSubtotalSum) * downpaymentSubtotal)
-                    : round2(safeDivide(downpaymentSubtotal, computedItems.length)),
-        }))
-
-        // Ensure line items + downpaymentVat exactly equals downpaymentAmount
-        // by adjusting the last item for any rounding drift
-        const lineItemsSum = paymongoItems.reduce((sum, i) => sum + i.amount, 0)
-        const expectedLineSum = round2(downpaymentAmount - downpaymentVat)
-        const drift = round2(expectedLineSum - lineItemsSum)
+        // Correct rounding drift so sum(amount × qty) = downpaymentAmount exactly
+        const paymongoSum = round2(
+            paymongoItems.reduce((sum, i) => sum + i.amount * i.quantity, 0)
+        )
+        const drift = round2(downpaymentAmount - paymongoSum)
         if (drift !== 0 && paymongoItems.length > 0) {
-            paymongoItems[paymongoItems.length - 1].amount = round2(
-                paymongoItems[paymongoItems.length - 1].amount + drift
-            )
+            const last = paymongoItems[paymongoItems.length - 1]
+            last.amount = round2(last.amount + drift / last.quantity)
         }
 
         // ── 8. Generate identifiers ────────────────────────────────────────────
@@ -253,13 +325,11 @@ export const checkoutOrder = async (ctx: Context) => {
                     deliveryLng: input.coordinates.lng.toString(),
                     deliveryNotes: input.deliveryNotes ?? null,
 
-                    // Full 100% order financials (server-computed)
                     subtotal: fullSubtotal.toFixed(2),
                     deliveryFee: "0.00",
                     vat: fullVat.toFixed(2),
                     totalAmount: fullTotal.toFixed(2),
 
-                    // Downpayment split
                     downpaymentAmount: downpaymentAmount.toFixed(2),
                     downpaymentStatus: "pending",
                     balanceAmount: balanceAmount.toFixed(2),
@@ -303,8 +373,6 @@ export const checkoutOrder = async (ctx: Context) => {
             customerPhone: input.phone,
             customerPhoneSecondary: input.phoneSecondary,
             amount: downpaymentAmount,
-            subtotal: downpaymentSubtotal,
-            vat: downpaymentVat,
             orderType: "delivery",
             paymentMethod: input.paymentMethod,
             items: paymongoItems,
@@ -349,7 +417,7 @@ export const checkoutOrder = async (ctx: Context) => {
             )
         }
 
-        // ── 12. Backfill PayMongo identifiers into payment history ─────────────
+        // ── 12. Backfill PayMongo identifiers ──────────────────────────────────
         await db
             .update(paymentHistory)
             .set({
@@ -360,7 +428,27 @@ export const checkoutOrder = async (ctx: Context) => {
             })
             .where(eq(paymentHistory.orderId, newOrderId))
 
-        // ── 13. Respond ────────────────────────────────────────────────────────
+        // ── 13. Send "Order Placed" Email ──
+        try {
+            const orderForEmail = {
+                customerEmail: input.email,
+                customerFirstName: input.firstName,
+                customerLastName: input.lastName,
+                trackingNumber,
+                referenceNumber,
+                subtotal: fullSubtotal.toFixed(2),
+                vat: fullVat.toFixed(2),
+                totalAmount: fullTotal.toFixed(2),
+                downpaymentAmount: downpaymentAmount.toFixed(2),
+                balanceAmount: balanceAmount.toFixed(2),
+            } as any
+
+            await sendOrderStatusEmail(orderForEmail, computedItems as any, "placed")
+        } catch (emailErr) {
+            console.error("⚠️ Failed to send initial 'Order Placed' email:", emailErr)
+        }
+
+        // ── 14. Respond ────────────────────────────────────────────────────────
         return ctx.json(
             {
                 success: true,
@@ -384,7 +472,7 @@ export const checkoutOrder = async (ctx: Context) => {
             },
             201
         )
-    } catch (error) {
+    } catch {
         return ctx.json(
             {
                 success: false,

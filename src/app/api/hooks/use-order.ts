@@ -1,6 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { axiosApiClient } from "../axiosApiClient"
 
+// ─── Request types ────────────────────────────────────────────────────────────
+
 export interface CheckoutOrderAddress {
     unitFloor?: string
     street: string
@@ -31,21 +33,29 @@ export interface CheckoutOrderPayload {
     phone: string
     phoneSecondary?: string
     paymentMethod: PaymentMethodType
-    agreeTerms: true
+    agreeTerms: true // literal true — matches z.literal(true) on backend
     deliveryNotes?: string
     address: CheckoutOrderAddress
     coordinates: CheckoutOrderCoordinates
     items: CheckoutOrderItem[]
-    // Cart totals computed client-side — must match what PayMongo charges
+    // Full 100% order totals (area-based, computed by computeCartTotals)
     subtotal: number
     vat: number
     totalAmount: number
+    // 50% downpayment totals — pre-computed by frontend, verified server-side
+    downpaymentSubtotal: number
+    downpaymentVat: number
+    downpaymentAmount: number
 }
+
+// ─── Response types ───────────────────────────────────────────────────────────
 
 export interface CheckoutOrderSummary {
     subtotal: number
     vat: number
     totalAmount: number
+    downpaymentAmount: number
+    balanceAmount: number
     itemCount: number
 }
 
@@ -64,6 +74,38 @@ export interface CheckoutOrderResponse {
     message: string
     data: CheckoutOrderResponseData
 }
+
+// ─── Request function ─────────────────────────────────────────────────────────
+
+const checkoutOrderRequest = async (
+    payload: CheckoutOrderPayload
+): Promise<CheckoutOrderResponse> => {
+    const response = await axiosApiClient.post<CheckoutOrderResponse>(
+        "/orders/checkout",
+        payload
+    )
+    return response.data
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export const useCheckoutOrder = () => {
+    const mutation = useMutation<CheckoutOrderResponse, Error, CheckoutOrderPayload>({
+        mutationFn: checkoutOrderRequest,
+    })
+
+    return {
+        checkoutOrder: mutation.mutate,
+        checkoutOrderAsync: mutation.mutateAsync,
+        isPending: mutation.isPending,
+        isSuccess: mutation.isSuccess,
+        isError: mutation.isError,
+        error: mutation.error,
+        data: mutation.data,
+        reset: mutation.reset,
+    }
+}
+
 
 // ── GET ORDER DETAILS STATUS ─────────────────────────────────────────
 
@@ -176,42 +218,6 @@ export interface GetAllOrdersResponse {
     pagination: PaginationDetails
 }
 
-const checkoutOrderRequest = async (
-    payload: CheckoutOrderPayload
-): Promise<CheckoutOrderResponse> => {
-    try {
-        console.log("[checkoutOrderRequest] Payload:", payload)
-        const response = await axiosApiClient.post<CheckoutOrderResponse>(
-            "/orders/checkout",
-            payload
-        )
-        console.log("[checkoutOrderRequest] Response:", response.data)
-        return response.data
-    } catch (error: any) {
-        console.error("[checkoutOrderRequest] Error:", error)
-        if (error.response) {
-            console.error("[checkoutOrderRequest] Status:", error.response.status)
-            console.error("[checkoutOrderRequest] Data:", error.response.data)
-        }
-        throw error
-    }
-}
-
-export const useCheckoutOrder = () => {
-    const mutation = useMutation<CheckoutOrderResponse, Error, CheckoutOrderPayload>({
-        mutationFn: checkoutOrderRequest,
-    })
-
-    return {
-        checkoutOrder: mutation.mutate,
-        checkoutOrderAsync: mutation.mutateAsync,
-        isPending: mutation.isPending,
-        isSuccess: mutation.isSuccess,
-        isError: mutation.isError,
-        error: mutation.error,
-        data: mutation.data,
-    }
-}
 
 export const useGetOrderDetailsStatus = (referenceNumber: string) => {
     const getOrderDetailsStatus = async (): Promise<GetOrderDetailsStatusResponse> => {

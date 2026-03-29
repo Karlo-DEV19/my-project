@@ -13,8 +13,11 @@ if (!email || !pass) {
     console.warn("⚠️ SMTP credentials are missing from environment variables.")
 }
 
+// ✅ Use explicit Gmail host/port (more reliable than 'service: gmail')
 export const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true, // Use SSL
     auth: {
         user: email,
         pass: pass,
@@ -22,6 +25,15 @@ export const transporter = nodemailer.createTransport({
     tls: {
         rejectUnauthorized: false, // ✅ fix self-signed certificate error
     },
+})
+
+// Verify transporter on initialization
+transporter.verify((error) => {
+    if (error) {
+        console.error("❌ SMTP Transporter Verification Failed:", error.message)
+    } else {
+        console.log("✅ SMTP Transporter is ready to send emails")
+    }
 })
 
 // Updated to match your Capstone project context

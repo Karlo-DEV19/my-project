@@ -1,8 +1,9 @@
 import crypto from "crypto"
 import { db } from "@/lib/supabase/db"
 import { and, eq, isNull, ne } from "drizzle-orm"
-import { orders } from "@/schema/orders/orders"
+import { orders, orderItems } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
+import { sendOrderStatusEmail } from "../send-order-status-service"
 
 const PAYMONGO_WEBHOOK_SECRET = process.env.PAYMONGO_WEBHOOK_SECRET ?? ""
 
@@ -195,6 +196,13 @@ function centavosToPhp(centavos: number | undefined | null): number {
     return val / 100
 }
 
+async function getOrderItems(orderId: string) {
+    return await db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, orderId))
+}
+
 // ==================== ALREADY PAID SENTINEL ====================
 
 class AlreadyPaidError extends Error {
@@ -324,6 +332,14 @@ async function handlePaymentSuccess(
         throw err
     }
 
+    // ── Send Confirmation Email ──
+    try {
+        const items = await getOrderItems(orderId)
+        await sendOrderStatusEmail(existingOrder, items, "paid")
+    } catch (emailErr) {
+        console.error("⚠️ Failed to send success email:", emailErr)
+    }
+
     return {
         success: true,
         message: "Downpayment processed successfully",
@@ -386,6 +402,14 @@ async function handlePaymentFailed(
                 )
             )
     })
+
+    // ── Send Failure Email ──
+    try {
+        const items = await getOrderItems(orderId)
+        await sendOrderStatusEmail(existingOrder, items, "failed")
+    } catch (emailErr) {
+        console.error("⚠️ Failed to send failure email:", emailErr)
+    }
 
     return {
         success: true,
@@ -464,6 +488,14 @@ async function handleCheckoutExpired(
                 )
             )
     })
+
+    // ── Send Cancellation Email ──
+    try {
+        const items = await getOrderItems(orderId)
+        await sendOrderStatusEmail(existingOrder, items, "cancelled")
+    } catch (emailErr) {
+        console.error("⚠️ Failed to send expiry email:", emailErr)
+    }
 
     return {
         success: true,

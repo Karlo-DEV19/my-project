@@ -115,7 +115,6 @@ webhooksRoute.post("/paymongo", async (c) => {
 })
 
 // ==================== STATUS ====================
-
 webhooksRoute.get("/paymongo/status", (c) => {
     return c.json({
         success: true,

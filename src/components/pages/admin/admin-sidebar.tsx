@@ -14,7 +14,8 @@ import {
     ClipboardList,
     ShieldCheck,
     Boxes,
-    TrendingUp
+    TrendingUp,
+    MessageSquare 
 } from 'lucide-react';
 import {
     Sidebar,
@@ -29,7 +30,7 @@ import {
     SidebarMenuButton,
 } from '@/components/ui/sidebar';
 
-// ✅ Imports for Auth and Logout
+
 import { LogoutDialog } from '@/components/ui/logout-alert-dialog'; // Check your exact path
 import { useAuth } from '@/lib/providers/auth-provider';
 
@@ -50,7 +51,8 @@ const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
             { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
             { name: 'Products', href: '/admin/products', icon: Package },
             { name: 'Customers', href: '/admin/customers', icon: Users },
-            { name: 'Inventory', href: '/admin/inventory', icon: Boxes },
+            { name: 'Inventory', href: '/admin/inventory', icon: Boxes },            
+            { name: 'Chat', href: '/admin/chat', icon: MessageSquare },
         ],
     },
     {
@@ -70,10 +72,10 @@ const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
 const AdminSidebar = () => {
     const pathname = usePathname();
 
-    // ✅ Grab the user session instantly from your provider!
+    
     const { user } = useAuth();
 
-    // ✅ OPTIMIZATION: Memoize rendering to avoid rebuilding on rerender
+    
     const renderedGroups = useMemo(() => {
         return sidebarGroups.map((group) => {
             return (
@@ -92,7 +94,6 @@ const AdminSidebar = () => {
                                             asChild
                                             isActive={isActive}
                                             tooltip={link.name}
-                                            // ✅ THEME FIX: Semantic colors (primary, accent) instead of hardcoded opacity
                                             className={`h-11 rounded-none transition-all duration-300 ${isActive
                                                 ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
                                                 : 'text-muted-foreground hover:text-accent-foreground hover:bg-accent'
@@ -120,10 +121,8 @@ const AdminSidebar = () => {
                     <span className="font-serif text-2xl tracking-wide text-foreground">
                         MJ Decors
                     </span>
-                    {/* ✅ THEME FIX: Semantic divider using bg-border */}
                     <div className="w-8 h-px bg-border"></div>
                     <span className="text-xs uppercase tracking-widest text-muted-foreground font-medium mt-2">
-                        {/* Dynamically show the role from your database if you want! */}
                         {user?.role === 'admin' ? 'Admin Portal' : 'Staff Portal'}
                     </span>
                 </div>
@@ -153,7 +152,6 @@ const AdminSidebar = () => {
                     </SidebarMenuItem>
 
                     <SidebarMenuItem>
-                        {/* ✅ The beautiful Logout Dialog wrapper */}
                         <LogoutDialog>
                             <SidebarMenuButton
                                 tooltip="Logout"

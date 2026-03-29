@@ -121,6 +121,16 @@ CREATE TABLE "payment_history" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "activity_logs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"action" varchar(50) NOT NULL,
+	"module" varchar(50) NOT NULL,
+	"reference_id" uuid,
+	"description" varchar(255),
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "blinds_product_images" ADD CONSTRAINT "blinds_product_images_product_id_blinds_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."blinds_products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "blinds_product_colors" ADD CONSTRAINT "blinds_product_colors_product_id_blinds_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."blinds_products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

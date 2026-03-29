@@ -15,7 +15,7 @@ import {
     ShieldCheck,
     Boxes,
     TrendingUp,
-    MessageSquare 
+    MessageSquare
 } from 'lucide-react';
 import {
     Sidebar,
@@ -51,7 +51,7 @@ const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
             { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
             { name: 'Products', href: '/admin/products', icon: Package },
             { name: 'Customers', href: '/admin/customers', icon: Users },
-            { name: 'Inventory', href: '/admin/inventory', icon: Boxes },            
+            { name: 'Inventory', href: '/admin/inventory', icon: Boxes },
             { name: 'Chat', href: '/admin/chat', icon: MessageSquare },
         ],
     },
@@ -59,7 +59,7 @@ const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
         label: 'Analytics',
         links: [
             { name: 'Sales', href: '/admin/sales', icon: TrendingUp },
-            { name: 'Logs', href: '/admin/logs', icon: ClipboardList },
+            { name: 'Activity Logs', href: '/admin/activity-logs', icon: ClipboardList },
             { name: 'Audit Trail', href: '/admin/audit-trail', icon: ShieldCheck },
         ],
     },
@@ -72,10 +72,10 @@ const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
 const AdminSidebar = () => {
     const pathname = usePathname();
 
-    
+
     const { user } = useAuth();
 
-    
+
     const renderedGroups = useMemo(() => {
         return sidebarGroups.map((group) => {
             return (

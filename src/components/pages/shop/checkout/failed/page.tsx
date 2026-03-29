@@ -3,11 +3,11 @@
 import { useRouter, useSearchParams } from "next/navigation"
 import { XCircle } from "lucide-react"
 
-export default function CheckoutFailedPage() {
+export default function FailedCheckout() {
   const router = useRouter()
   const params = useSearchParams()
 
-  const trackingNumber  = params.get("tracking")
+  const trackingNumber = params.get("tracking")
   const referenceNumber = params.get("reference")
 
   return (

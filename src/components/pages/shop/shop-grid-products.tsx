@@ -30,6 +30,7 @@ const ProductGrid = ({ products, isLoading = false }: ProductGridProps) => {
     const router = useRouter();
 
     const handleQuickView = useCallback((id: string) => {
+        console.log("id", id)
         router.push(`/shop/${id}`);
     }, [router]);
 

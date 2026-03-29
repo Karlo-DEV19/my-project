@@ -3,10 +3,18 @@
 import { CheckoutForm } from '@/components/pages/shop/checkout/checkout-form'
 import { OrderSummary } from '@/components/pages/shop/checkout/order-summary'
 import { useCartStore } from '@/lib/zustand/use-cart-store'
+import { useEffect, useState } from 'react'
 
 const CheckoutPage = () => {
     const items = useCartStore((s) => s.items)
     const clearCart = useCartStore((s) => s.clearCart)
+    const [isMounted, setIsMounted] = useState(false)
+
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
+    if (!isMounted) return null
 
     return (
         <div className="min-h-screen bg-accent/5">

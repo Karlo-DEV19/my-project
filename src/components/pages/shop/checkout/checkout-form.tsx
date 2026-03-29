@@ -20,6 +20,7 @@ import { checkoutSchema, type CheckoutFormValues } from "@/lib/zod-schema/checko
 import type { LocationData } from "@/components/ui/location-picker"
 import { useCheckoutOrder, type PaymentMethodType } from "@/app/api/hooks/use-order"
 import type { CartItem } from "@/lib/zustand/use-cart-store"
+import PaymentMethod from "./payment-method"
 
 const PhPhoneInput = dynamic(
     () => import("@/components/ui/phone-input").then((m) => m.PhPhoneInput),
@@ -82,32 +83,7 @@ function FieldLabel({ children, optional }: { children: React.ReactNode; optiona
     )
 }
 
-function PaymentCard({ selected, onSelect, label, sublabel, accentColor }: {
-    value: string; selected: boolean; onSelect: () => void
-    label: string; sublabel: string; accentColor: string
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onSelect}
-            className={`relative flex items-center gap-4 p-4 border text-left transition-all duration-200 ${selected ? "border-foreground bg-foreground/[0.03]" : "border-border/50 hover:border-border"
-                }`}
-        >
-            <div
-                className="absolute left-0 top-0 bottom-0 w-0.5 transition-opacity duration-200"
-                style={{ backgroundColor: accentColor, opacity: selected ? 1 : 0 }}
-            />
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold tracking-wide text-foreground">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{sublabel}</p>
-            </div>
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 shrink-0 ${selected ? "border-foreground bg-foreground" : "border-border"
-                }`}>
-                {selected && <div className="w-2 h-2 rounded-full bg-background" />}
-            </div>
-        </button>
-    )
-}
+
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -476,25 +452,11 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
                             <Controller control={form.control} name="paymentMethod"
                                 render={({ field, fieldState }) => (
                                     <FormItem>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <PaymentCard value="gcash"
-                                                selected={field.value === "gcash"}
-                                                onSelect={() => field.onChange("gcash")}
-                                                label="GCash"
-                                                sublabel="Instant mobile wallet payment"
-                                                accentColor="#0066cc" />
-                                            <PaymentCard value="paymaya"
-                                                selected={field.value === "paymaya"}
-                                                onSelect={() => field.onChange("paymaya")}
-                                                label="Maya"
-                                                sublabel="Formerly PayMaya"
-                                                accentColor="#00a86b" />
-                                        </div>
-                                        {fieldState.error && (
-                                            <p className="text-[10px] font-medium text-destructive mt-1">
-                                                {fieldState.error.message}
-                                            </p>
-                                        )}
+                                        <PaymentMethod
+                                            value={field.value as "gcash" | "paymaya" | null}
+                                            onChange={(val) => field.onChange(val)}
+                                            error={fieldState.error?.message}
+                                        />
                                     </FormItem>
                                 )} />
 

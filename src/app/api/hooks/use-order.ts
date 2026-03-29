@@ -75,10 +75,32 @@ export interface OrderDetails {
     paymentStatus: string
     paymentMethod: string
     orderType: string
+
+    customerFirstName: string
+    customerLastName: string
+    customerEmail: string
+    customerPhone: string
+    customerPhoneSecondary: string | null
+
+    deliveryUnitFloor: string | null
+    deliveryStreet: string | null
+    deliveryBarangay: string | null
+    deliveryCity: string | null
+    deliveryProvince: string | null
+    deliveryZipCode: string | null
+    deliveryFormattedAddress: string | null
+    deliveryNotes: string | null
+
     subtotal: string
     vat: string
     deliveryFee: string
     totalAmount: string
+    downpaymentAmount: string
+    downpaymentStatus: string
+    downpaymentPaidAt: string | null
+    balanceAmount: string
+    balancePaidAt: string | null
+
     confirmedAt: string | null
     cancelledAt: string | null
     cancellationReason: string | null
@@ -87,20 +109,24 @@ export interface OrderDetails {
 }
 
 export interface OrderPaymentDetails {
+    id: string
+    paymentType: string
     status: string
     paymentMethod: string
-    amountPaid: string
-    vat: string
-    netAmount: string
+    amountDue: string
+    amountPaid: string | null
+    vat: string | null
+    netAmount: string | null
     paidAt: string | null
     expiresAt: string | null
+    createdAt: string
 }
 
 export interface GetOrderDetailsStatusResponse {
     success: boolean
     data: {
         order: OrderDetails
-        payment: OrderPaymentDetails | null
+        payments: OrderPaymentDetails[]
     }
 }
 
@@ -108,7 +134,9 @@ export interface GetOrderDetailsStatusResponse {
 
 export interface OrderSummaryPayment {
     orderId: string
+    paymentType: string
     status: string
+    amountDue: string
     amountPaid: string | null
     paidAt: string | null
 }
@@ -126,9 +154,11 @@ export interface OrderSummary {
     customerEmail: string
     customerPhone: string
     totalAmount: string
+    downpaymentAmount: string
+    balanceAmount: string
     createdAt: string
     updatedAt: string
-    payment: OrderSummaryPayment | null
+    payments: OrderSummaryPayment[]
 }
 
 export interface PaginationDetails {

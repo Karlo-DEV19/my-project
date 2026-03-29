@@ -23,7 +23,12 @@ export const orders = pgTable(
         // pending | confirmed | processing | ready | out_for_delivery | delivered | cancelled
 
         paymentStatus: varchar("payment_status", { length: 50 }).notNull().default("unpaid"),
-        // unpaid | paid | failed | refunded
+        // unpaid | downpaid | paid | failed | refunded
+        // unpaid      → no payment yet
+        // downpaid    → 50% downpayment confirmed; balance still due
+        // paid        → full balance settled
+        // failed      → payment attempt failed
+        // refunded    → order was refunded
 
         paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
         // gcash | paymaya
@@ -31,12 +36,14 @@ export const orders = pgTable(
         orderType: varchar("order_type", { length: 50 }).notNull(),
         // pickup | delivery
 
+        // ── Customer ─────────────────────────────────────────────────────────
         customerFirstName: varchar("customer_first_name", { length: 100 }).notNull(),
         customerLastName: varchar("customer_last_name", { length: 100 }).notNull(),
         customerEmail: varchar("customer_email", { length: 255 }).notNull(),
         customerPhone: varchar("customer_phone", { length: 20 }).notNull(),
         customerPhoneSecondary: varchar("customer_phone_secondary", { length: 20 }),
 
+        // ── Delivery ─────────────────────────────────────────────────────────
         deliveryUnitFloor: varchar("delivery_unit_floor", { length: 50 }),
         deliveryStreet: varchar("delivery_street", { length: 255 }),
         deliveryBarangay: varchar("delivery_barangay", { length: 150 }),
@@ -44,15 +51,13 @@ export const orders = pgTable(
         deliveryProvince: varchar("delivery_province", { length: 100 }),
         deliveryZipCode: varchar("delivery_zip_code", { length: 10 }),
         deliveryFormattedAddress: text("delivery_formatted_address"),
-
         deliveryLat: decimal("delivery_lat", { precision: 10, scale: 8 }),
         deliveryLng: decimal("delivery_lng", { precision: 11, scale: 8 }),
-
         deliveryNotes: text("delivery_notes"),
 
-        // Financials
+        // ── Financials (full order totals — always the 100% figures) ─────────
         subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
-        // Sum of all line item totals before VAT
+        // Sum of all line item totals before VAT (100% of order)
 
         deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 })
             .notNull()
@@ -62,15 +67,36 @@ export const orders = pgTable(
         vat: decimal("vat", { precision: 10, scale: 2 })
             .notNull()
             .default("0.00"),
-        // 12% of subtotal
+        // 12% of subtotal (full order)
 
         totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-        // subtotal + vat (delivery excluded)
+        // subtotal + vat (full order, delivery excluded)
 
+        // ── Downpayment tracking (always 50% of totalAmount) ─────────────────
+        downpaymentAmount: decimal("downpayment_amount", { precision: 10, scale: 2 }).notNull(),
+        // The amount charged upfront (50% of totalAmount incl. VAT)
+
+        downpaymentStatus: varchar("downpayment_status", { length: 50 })
+            .notNull()
+            .default("pending"),
+        // pending | paid | failed
+
+        downpaymentPaidAt: timestamp("downpayment_paid_at", { mode: "date" }),
+        // Populated by webhook when downpayment is confirmed
+
+        balanceAmount: decimal("balance_amount", { precision: 10, scale: 2 }).notNull(),
+        // Remaining balance due on delivery (totalAmount - downpaymentAmount)
+
+        balancePaidAt: timestamp("balance_paid_at", { mode: "date" }),
+        // Populated when the balance is collected
+
+        // ── Cancellation ─────────────────────────────────────────────────────
         cancelledBy: varchar("cancelled_by", { length: 50 }),
         // system | customer | admin
+
         cancellationReason: text("cancellation_reason"),
 
+        // ── Timestamps ───────────────────────────────────────────────────────
         confirmedAt: timestamp("confirmed_at", { mode: "date" }),
         cancelledAt: timestamp("cancelled_at", { mode: "date" }),
         createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -88,6 +114,8 @@ export const orders = pgTable(
 
 export type Order = typeof orders.$inferSelect
 export type NewOrder = typeof orders.$inferInsert
+
+// ─── Order Items ──────────────────────────────────────────────────────────────
 
 export const orderItems = pgTable("order_items", {
     id: uuid("id").defaultRandom().primaryKey(),
@@ -107,7 +135,7 @@ export const orderItems = pgTable("order_items", {
     quantity: integer("quantity").notNull(),
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
     subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
-    // subtotal = unitPrice × quantity (DB snapshot — actual charge comes from orders.subtotal)
+    // subtotal = unitPrice × quantity (100% snapshot)
 
     colorId: uuid("color_id").references(() => blindsProductColors.id, {
         onDelete: "set null",

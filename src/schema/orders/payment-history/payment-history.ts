@@ -18,31 +18,42 @@ export const paymentHistory = pgTable(
             .notNull()
             .references(() => orders.id, { onDelete: "cascade" }),
 
+        // ── Payment classification ────────────────────────────────────────────
+        paymentType: varchar("payment_type", { length: 50 }).notNull().default("downpayment"),
+        // downpayment → the initial 50% charge at checkout
+        // balance     → the remaining 50% collected on delivery
+
         status: varchar("status", { length: 50 }).notNull().default("pending"),
         // pending | paid | failed | refunded
 
         paymentMethod: varchar("payment_method", { length: 50 }),
         // gcash | paymaya
 
-        // PayMongo identifiers
+        // ── PayMongo identifiers ──────────────────────────────────────────────
         paymentIntentId: varchar("payment_intent_id", { length: 100 }),
         sessionId: varchar("session_id", { length: 100 }),
         referenceNumber: varchar("reference_number", { length: 100 }),
 
         // Idempotency — stores PayMongo event.id to prevent duplicate webhook processing
-        // Unique constraint ensures a given webhook event is only processed once
         idempotencyKey: varchar("idempotency_key", { length: 255 }),
 
-        // Financials recorded at time of payment confirmation
+        // ── Financials ────────────────────────────────────────────────────────
+        amountDue: decimal("amount_due", { precision: 10, scale: 2 }),
+        // What was expected at the time this payment record was created.
+        // For downpayment rows: 50% of order totalAmount.
+        // For balance rows:     remaining 50% (orders.balanceAmount).
+
         amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }),
-        // Gross amount the customer paid (centavos → PHP)
+        // Actual gross amount confirmed by PayMongo webhook (centavos → PHP).
+        // Null until payment is confirmed.
 
         vat: decimal("vat", { precision: 10, scale: 2 }),
-        // 12% VAT recorded from PayMongo metadata at webhook time
+        // VAT portion of amountPaid, recorded from PayMongo metadata at webhook time.
 
         netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
-        // What you receive after PayMongo deducts their platform fee
+        // Amount received after PayMongo deducts their platform fee.
 
+        // ── Timestamps ───────────────────────────────────────────────────────
         paidAt: timestamp("paid_at", { mode: "date" }),
         expiresAt: timestamp("expires_at", { mode: "date" }),
 

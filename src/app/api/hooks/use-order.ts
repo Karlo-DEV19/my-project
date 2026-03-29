@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { axiosApiClient } from "../axiosApiClient"
 
 export interface CheckoutOrderAddress {
@@ -65,6 +65,87 @@ export interface CheckoutOrderResponse {
     data: CheckoutOrderResponseData
 }
 
+// ── GET ORDER DETAILS STATUS ─────────────────────────────────────────
+
+export interface OrderDetails {
+    id: string
+    trackingNumber: string
+    referenceNumber: string
+    status: string
+    paymentStatus: string
+    paymentMethod: string
+    orderType: string
+    subtotal: string
+    vat: string
+    deliveryFee: string
+    totalAmount: string
+    confirmedAt: string | null
+    cancelledAt: string | null
+    cancellationReason: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+export interface OrderPaymentDetails {
+    status: string
+    paymentMethod: string
+    amountPaid: string
+    vat: string
+    netAmount: string
+    paidAt: string | null
+    expiresAt: string | null
+}
+
+export interface GetOrderDetailsStatusResponse {
+    success: boolean
+    data: {
+        order: OrderDetails
+        payment: OrderPaymentDetails | null
+    }
+}
+
+// ── GET ALL ORDERS ───────────────────────────────────────────────────
+
+export interface OrderSummaryPayment {
+    orderId: string
+    status: string
+    amountPaid: string | null
+    paidAt: string | null
+}
+
+export interface OrderSummary {
+    id: string
+    trackingNumber: string
+    referenceNumber: string
+    status: string
+    paymentStatus: string
+    paymentMethod: string
+    orderType: string
+    customerFirstName: string
+    customerLastName: string
+    customerEmail: string
+    customerPhone: string
+    totalAmount: string
+    createdAt: string
+    updatedAt: string
+    payment: OrderSummaryPayment | null
+}
+
+export interface PaginationDetails {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+}
+
+export interface GetAllOrdersResponse {
+    success: boolean
+    data: OrderSummary[]
+    pagination: PaginationDetails
+}
+
 const checkoutOrderRequest = async (
     payload: CheckoutOrderPayload
 ): Promise<CheckoutOrderResponse> => {
@@ -99,5 +180,67 @@ export const useCheckoutOrder = () => {
         isError: mutation.isError,
         error: mutation.error,
         data: mutation.data,
+    }
+}
+
+export const useGetOrderDetailsStatus = (referenceNumber: string) => {
+    const getOrderDetailsStatus = async (): Promise<GetOrderDetailsStatusResponse> => {
+        const response = await axiosApiClient.get<GetOrderDetailsStatusResponse>(
+            "/orders/get-order-details-status",
+            {
+                params: {
+                    referenceNumber: referenceNumber,
+                },
+            }
+        )
+        return response.data
+    }
+
+    const query = useQuery({
+        queryKey: ["order-details-status", referenceNumber],
+        queryFn: getOrderDetailsStatus,
+        enabled: !!referenceNumber,
+    })
+
+    return {
+        isPending: query.isPending,
+        isSuccess: query.isSuccess,
+        isError: query.isError,
+        error: query.error,
+        data: query.data,
+        refetch: query.refetch,
+    }
+}
+
+interface GetAllOrdersFilters {
+    page?: number
+    limit?: number
+    search?: string
+    status?: string
+}
+
+export const useGetAllOrders = (filters: GetAllOrdersFilters = {}) => {
+    const getAllOrders = async (): Promise<GetAllOrdersResponse> => {
+        const response = await axiosApiClient.get<GetAllOrdersResponse>(
+            "/orders/get-all-orders",
+            {
+                params: filters,
+            }
+        )
+        return response.data
+    }
+
+    const query = useQuery({
+        queryKey: ["all-orders", filters],
+        queryFn: getAllOrders,
+    })
+
+    return {
+        getAllOrders: query.refetch,
+        isPending: query.isPending,
+        isSuccess: query.isSuccess,
+        isError: query.isError,
+        error: query.error,
+        data: query.data,
     }
 }

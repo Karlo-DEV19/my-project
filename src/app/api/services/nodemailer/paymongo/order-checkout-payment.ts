@@ -208,8 +208,8 @@ export async function createOrderPaymentSession(
         const orderTypeLabel =
             paymentData.orderType.charAt(0).toUpperCase() + paymentData.orderType.slice(1)
 
-        const successUrl = `${frontendUrl}/orders/success?tracking=${encodeURIComponent(paymentData.trackingNumber)}&reference=${encodeURIComponent(paymentData.referenceNumber)}`
-        const cancelUrl = `${frontendUrl}/orders/cancelled?tracking=${encodeURIComponent(paymentData.trackingNumber)}&reference=${encodeURIComponent(paymentData.referenceNumber)}`
+        const successUrl = `${frontendUrl}/checkout/success?tracking=${encodeURIComponent(paymentData.trackingNumber)}&reference=${encodeURIComponent(paymentData.referenceNumber)}`
+        const cancelUrl = `${frontendUrl}/checkout/cancelled?tracking=${encodeURIComponent(paymentData.trackingNumber)}&reference=${encodeURIComponent(paymentData.referenceNumber)}`
 
         console.log("✅ Success URL:", successUrl)
         console.log("❌ Cancel URL:", cancelUrl)

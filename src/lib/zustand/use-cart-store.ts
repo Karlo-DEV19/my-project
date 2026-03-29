@@ -29,7 +29,7 @@ export interface BlindOrderFields {
         unitPrice: number
         subTotalPerPanel: number
         panels: number
-        total: number           // subTotalPerPanel × panels — already the full config price
+        total: number           // subTotalPerPanel × panels — full config price
         minimumApplied: boolean
     }
 }
@@ -39,6 +39,10 @@ export interface CartItem {
     quantity: number            // how many sets of this exact configuration (default 1)
     order: BlindOrderFields
 }
+
+// 50% downpayment rate — change here to update everywhere
+export const DOWNPAYMENT_RATE = 0.5
+export const VAT_RATE = 0.12
 
 interface CartState {
     items: CartItem[]
@@ -87,8 +91,6 @@ export const useCartStore = create<CartStore>()(
                 const key = buildCartKey(order)
                 const existing = get().items.find(i => i.cartItemId === key)
 
-                // quantity = number of identical sets the customer wants
-                // starts at 1, not order.panels (panels is already baked into priceBreakdown.total)
                 const nextItems: CartItem[] = existing
                     ? get().items.map(i =>
                         i.cartItemId === key
@@ -131,3 +133,28 @@ export const useCartStore = create<CartStore>()(
         }
     )
 )
+
+// ── Derived cart totals (use these everywhere for consistency) ────────────────
+// Call this outside of components too (e.g. in onSubmit) by passing items directly
+export function computeCartTotals(items: CartItem[]) {
+    const fullSubtotal = items.reduce(
+        (sum, item) => sum + item.order.priceBreakdown.total * item.quantity,
+        0
+    )
+    const fullTotal = fullSubtotal * (1 + VAT_RATE)
+
+    // 50% downpayment — what the customer actually pays now
+    const downpaymentSubtotal = fullSubtotal * DOWNPAYMENT_RATE
+    const downpaymentVat = downpaymentSubtotal * VAT_RATE
+    const downpaymentTotal = downpaymentSubtotal + downpaymentVat
+
+    return {
+        fullSubtotal,                           // full order subtotal before VAT
+        fullVat: fullSubtotal * VAT_RATE,       // full VAT
+        fullTotal,                              // full order total incl. VAT
+        downpaymentRate: DOWNPAYMENT_RATE,      // 0.5
+        downpaymentSubtotal,                    // subtotal for the 50% due now
+        downpaymentVat,                         // VAT on the 50%
+        downpaymentTotal,                       // total due now (what PayMongo charges)
+    }
+}

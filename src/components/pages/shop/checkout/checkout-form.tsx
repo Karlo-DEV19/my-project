@@ -20,6 +20,7 @@ import { checkoutSchema, type CheckoutFormValues } from "@/lib/zod-schema/checko
 import type { LocationData } from "@/components/ui/location-picker"
 import { useCheckoutOrder, type PaymentMethodType } from "@/app/api/hooks/use-order"
 import type { CartItem } from "@/lib/zustand/use-cart-store"
+import type { computeCartTotals } from "@/lib/zustand/use-cart-store"
 import PaymentMethod from "./payment-method"
 
 const PhPhoneInput = dynamic(
@@ -83,30 +84,28 @@ function FieldLabel({ children, optional }: { children: React.ReactNode; optiona
     )
 }
 
-
-
 // ─── Props ────────────────────────────────────────────────────────────────────
+
+type CartTotals = ReturnType<typeof computeCartTotals>
 
 interface CheckoutFormProps {
     items: CartItem[]
     clearCart: () => void
+    totals: CartTotals
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
+export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
     const router = useRouter()
     const { checkoutOrderAsync, isPending, isError } = useCheckoutOrder()
 
-    // ── Compute totals from cart (mirrors OrderSummary exactly) ──────────────
-    // priceBreakdown.total = subTotalPerPanel × panels (full config price for the blind)
-    // quantity             = number of identical sets the customer wants (default 1)
-    const subtotal = items.reduce(
-        (sum, item) => sum + item.order.priceBreakdown.total * item.quantity,
-        0
-    )
-    const vat = subtotal * 0.12
-    const totalAmount = subtotal + vat
+    const {
+        downpaymentSubtotal,
+        downpaymentVat,
+        downpaymentTotal,
+        fullTotal,
+    } = totals
 
     const form = useForm<CheckoutFormValues>({
         resolver: zodResolver(checkoutSchema),
@@ -162,10 +161,6 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
             return
         }
 
-        // Map cart items → payload items
-        // quantity here = number of identical sets (not panels — panels is in priceBreakdown)
-        // The controller will look up unitPrice from the DB and use quantity for its own calc,
-        // but we override amount/subtotal/vat/totalAmount so PayMongo charges the cart total
         const orderItems = items.map((cartItem) => ({
             productId: cartItem.order.productId,
             colorId: cartItem.order.selectedColor?.colorId ?? undefined,
@@ -196,14 +191,17 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
                     formattedAddress: data.coordinates.formattedAddress ?? "",
                 },
                 items: orderItems,
-                subtotal,
-                vat,
-                totalAmount,
+                // Send downpayment amounts — PayMongo charges the 50% only
+                subtotal: downpaymentSubtotal,
+                vat: downpaymentVat,
+                totalAmount: downpaymentTotal,
             })
 
             if (response.data?.checkoutUrl) {
                 toast.success("Redirecting to payment...", {
-                    description: `Order ${response.data.trackingNumber} · ₱${totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
+                    description: `Order ${response.data.trackingNumber} · ${new Intl.NumberFormat('en-PH', {
+                        style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
+                    }).format(downpaymentTotal)}`,
                 })
 
                 clearCart()
@@ -244,6 +242,10 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
             </div>
         )
     }
+
+    const phpFormat = (n: number) => new Intl.NumberFormat('en-PH', {
+        style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
+    }).format(n)
 
     return (
         <div className="flex flex-col border border-border bg-background">
@@ -466,10 +468,10 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
                             <div className="flex items-start gap-3 p-4 bg-accent/10 border border-border/50">
                                 <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    For custom items like blinds, a{" "}
-                                    <span className="font-semibold text-foreground">downpayment is required</span>{" "}
-                                    to confirm your order and schedule installation. Our team will
-                                    contact you with payment instructions.
+                                    A <span className="font-semibold text-foreground">50% downpayment</span> is charged
+                                    now to confirm your order and schedule installation. The remaining{" "}
+                                    <span className="font-semibold text-foreground">{phpFormat(fullTotal - downpaymentTotal)}</span>{" "}
+                                    balance is due upon delivery. Our team will contact you with final details.
                                 </p>
                             </div>
 
@@ -500,21 +502,19 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
                         </div>
                     </section>
 
-                    {/* ── Order total preview before submit ────────────── */}
+                    {/* ── Downpayment total preview ─────────────────────── */}
                     <div className="px-6 sm:px-8 py-4 bg-accent/5 border-t border-border">
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col gap-0.5">
                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">
-                                    Amount to pay
+                                    Downpayment due now
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">
-                                    Subtotal + VAT (12%) · excl. delivery
+                                    50% of order total · incl. VAT (12%)
                                 </span>
                             </div>
                             <span className="font-serif text-2xl font-medium text-foreground">
-                                {new Intl.NumberFormat('en-PH', {
-                                    style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
-                                }).format(totalAmount)}
+                                {phpFormat(downpaymentTotal)}
                             </span>
                         </div>
                     </div>
@@ -532,7 +532,7 @@ export function CheckoutForm({ items, clearCart }: CheckoutFormProps) {
                             {isPending ? (
                                 <><Loader2 className="w-4 h-4 animate-spin" />Processing...</>
                             ) : (
-                                <><ChevronRight className="w-4 h-4" strokeWidth={2} />Place Order</>
+                                <><ChevronRight className="w-4 h-4" strokeWidth={2} />Pay {phpFormat(downpaymentTotal)}</>
                             )}
                         </button>
                         <p className="text-[10px] text-center text-muted-foreground mt-4 leading-relaxed">

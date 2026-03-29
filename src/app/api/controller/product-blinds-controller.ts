@@ -11,7 +11,7 @@ import { blindsProducts } from "@/schema/products/blinds/blinds-product";
 import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image";
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors";
 
-const createNewBlinds = async (ctx: Context) => {
+export const createNewBlinds = async (ctx: Context) => {
     try {
         const body = await ctx.req.json();
 
@@ -102,7 +102,7 @@ const createNewBlinds = async (ctx: Context) => {
 };
 
 
-const getAllBlinds = async (c: Context) => {
+export const getAllBlinds = async (c: Context) => {
     try {
         // 1. Extract and Parse Query Parameters
         const page = Number(c.req.query("page") ?? 1);
@@ -222,7 +222,7 @@ const getAllBlinds = async (c: Context) => {
 
 
 
-const getDetailsBlindByProductId = async (ctx: Context) => {
+export const getDetailsBlindByProductId = async (ctx: Context) => {
     try {
         const productId = ctx.req.param("productId");
 
@@ -277,7 +277,7 @@ const getDetailsBlindByProductId = async (ctx: Context) => {
 
 
 
-const getAllBestSeller = async (c: Context) => {
+export const getAllBestSeller = async (c: Context) => {
     try {
         const page = Number(c.req.query("page") ?? 1);
         const limit = Number(c.req.query("limit") ?? 10);
@@ -352,7 +352,7 @@ const getAllBestSeller = async (c: Context) => {
     }
 }
 
-const getAllNewArrival = async (c: Context) => {
+export const getAllNewArrival = async (c: Context) => {
     try {
         const page = Number(c.req.query("page") ?? 1);
         const limit = Number(c.req.query("limit") ?? 10);
@@ -427,10 +427,4 @@ const getAllNewArrival = async (c: Context) => {
     }
 }
 
-export {
-    createNewBlinds,
-    getAllBlinds,
-    getDetailsBlindByProductId,
-    getAllBestSeller,
-    getAllNewArrival
-}
+// No export default needed when using named exports

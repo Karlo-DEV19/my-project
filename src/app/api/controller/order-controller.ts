@@ -1,6 +1,6 @@
 import { Context } from "hono"
 import { z } from "zod"
-import { eq, inArray } from "drizzle-orm"
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/supabase/db"
 import { blindsProducts } from "@/schema/products/blinds/blinds-product"
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
@@ -391,4 +391,184 @@ export const checkoutOrder = async (ctx: Context) => {
             500
         )
     }
+}
+
+
+export const getOrderDetailsStatus = async (ctx: Context) => {
+    try {
+        const referenceNumber = ctx.req.query("referenceNumber")
+
+        if (!referenceNumber) {
+            return ctx.json({ success: false, message: "referenceNumber query param is required" }, 400)
+        }
+
+        const [order] = await db
+            .select({
+                id: orders.id,
+                trackingNumber: orders.trackingNumber,
+                referenceNumber: orders.referenceNumber,
+                status: orders.status,
+                paymentStatus: orders.paymentStatus,
+                paymentMethod: orders.paymentMethod,
+                orderType: orders.orderType,
+                subtotal: orders.subtotal,
+                vat: orders.vat,
+                deliveryFee: orders.deliveryFee,
+                totalAmount: orders.totalAmount,
+                confirmedAt: orders.confirmedAt,
+                cancelledAt: orders.cancelledAt,
+                cancellationReason: orders.cancellationReason,
+                createdAt: orders.createdAt,
+                updatedAt: orders.updatedAt,
+            })
+            .from(orders)
+            .where(eq(orders.referenceNumber, referenceNumber))
+            .limit(1)
+
+        if (!order) {
+            return ctx.json({ success: false, message: "Order not found" }, 404)
+        }
+
+        const [payment] = await db
+            .select({
+                status: paymentHistory.status,
+                paymentMethod: paymentHistory.paymentMethod,
+                amountPaid: paymentHistory.amountPaid,
+                vat: paymentHistory.vat,
+                netAmount: paymentHistory.netAmount,
+                paidAt: paymentHistory.paidAt,
+                expiresAt: paymentHistory.expiresAt,
+            })
+            .from(paymentHistory)
+            .where(eq(paymentHistory.orderId, order.id))
+            .limit(1)
+
+        return ctx.json({
+            success: true,
+            data: {
+                order,
+                payment: payment ?? null,
+            },
+        })
+    } catch (error) {
+        console.error("Failed to fetch order details:", error)
+        return ctx.json({ success: false, message: "Failed to fetch order details." }, 500)
+    }
+}
+
+
+export const getAllOrders = async (ctx: Context) => {
+    try {
+        const page = Math.max(1, Number(ctx.req.query("page") ?? 1))
+        const limit = Math.min(100, Math.max(1, Number(ctx.req.query("limit") ?? 10)))
+        const search = ctx.req.query("search")?.trim() ?? ""
+        const statusFilter = ctx.req.query("status")?.trim()
+        const paymentStatusFilter = ctx.req.query("paymentStatus")?.trim()
+        const sortOrder = ctx.req.query("sortOrder")?.toLowerCase() === "asc" ? "asc" : "desc"
+        const offset = (page - 1) * limit
+
+        // Build filters
+        const filters = []
+
+        if (statusFilter) {
+            filters.push(eq(orders.status, statusFilter))
+        }
+
+        if (paymentStatusFilter) {
+            filters.push(eq(orders.paymentStatus, paymentStatusFilter))
+        }
+
+        if (search) {
+            filters.push(
+                or(
+                    ilike(orders.trackingNumber, `%${search}%`),
+                    ilike(orders.referenceNumber, `%${search}%`),
+                    ilike(orders.customerFirstName, `%${search}%`),
+                    ilike(orders.customerLastName, `%${search}%`),
+                    ilike(orders.customerEmail, `%${search}%`),
+                    ilike(orders.customerPhone, `%${search}%`),
+                )
+            )
+        }
+
+        const whereCondition = filters.length > 0 ? and(...filters) : undefined
+
+        // Total count
+        const [totalResult] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(orders)
+            .where(whereCondition)
+
+        const total = Number(totalResult?.count ?? 0)
+        const totalPages = Math.ceil(total / limit)
+
+        // Fetch orders — no joins, lean columns only
+        const orderRows = await db
+            .select({
+                id: orders.id,
+                trackingNumber: orders.trackingNumber,
+                referenceNumber: orders.referenceNumber,
+                status: orders.status,
+                paymentStatus: orders.paymentStatus,
+                paymentMethod: orders.paymentMethod,
+                orderType: orders.orderType,
+                customerFirstName: orders.customerFirstName,
+                customerLastName: orders.customerLastName,
+                customerEmail: orders.customerEmail,
+                customerPhone: orders.customerPhone,
+                totalAmount: orders.totalAmount,
+                createdAt: orders.createdAt,
+                updatedAt: orders.updatedAt,
+            })
+            .from(orders)
+            .where(whereCondition)
+            .orderBy(sortOrder === "asc" ? orders.createdAt : sql`${orders.createdAt} desc`)
+            .limit(limit)
+            .offset(offset)
+
+        // Batch-fetch payment summaries for the returned order IDs only
+        const orderIds = orderRows.map((o) => o.id)
+
+        const paymentRows = orderIds.length > 0
+            ? await db
+                .select({
+                    orderId: paymentHistory.orderId,
+                    status: paymentHistory.status,
+                    amountPaid: paymentHistory.amountPaid,
+                    paidAt: paymentHistory.paidAt,
+                })
+                .from(paymentHistory)
+                .where(inArray(paymentHistory.orderId, orderIds))
+            : []
+
+        const paymentMap = new Map(paymentRows.map((p) => [p.orderId, p]))
+
+        const data = orderRows.map((order) => ({
+            ...order,
+            payment: paymentMap.get(order.id) ?? null,
+        }))
+
+        return ctx.json({
+            success: true,
+            data,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1,
+            },
+        })
+    } catch (error) {
+        console.error("Failed to fetch orders:", error)
+        return ctx.json({ success: false, message: "Failed to fetch orders." }, 500)
+    }
+}
+
+
+export default {
+    getOrderDetailsStatus,
+    getAllOrders,
+    checkoutOrder
 }

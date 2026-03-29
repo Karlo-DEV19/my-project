@@ -21,7 +21,7 @@ export default function ShopSection() {
         sortBy,
         sortOrder,
     });
-
+    console.log("bi", blinds)
     const handlePageChange = useCallback((page: number) => {
         setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });

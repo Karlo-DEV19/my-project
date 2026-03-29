@@ -4,6 +4,7 @@ import React from 'react'
 import Image from 'next/image'
 import { ShoppingBag } from 'lucide-react'
 import type { CartItem } from '@/lib/zustand/use-cart-store'
+import { computeCartTotals } from '@/lib/zustand/use-cart-store'
 
 function php(n: number) {
     return new Intl.NumberFormat('en-PH', {
@@ -16,15 +17,15 @@ interface OrderSummaryProps {
 }
 
 export const OrderSummary = ({ items }: OrderSummaryProps) => {
-    // priceBreakdown.total already includes all panels for that config
-    // quantity = how many identical sets (default 1)
-    // so lineTotal = priceBreakdown.total × quantity is always correct
-    const subtotal = items.reduce(
-        (sum, item) => sum + item.order.priceBreakdown.total * item.quantity,
-        0
-    )
-    const vat = subtotal * 0.12
-    const finalTotal = subtotal + vat
+    const {
+        fullSubtotal,
+        fullVat,
+        fullTotal,
+        downpaymentSubtotal,
+        downpaymentVat,
+        downpaymentTotal,
+        downpaymentRate,
+    } = computeCartTotals(items)
 
     if (items.length === 0) {
         return (
@@ -40,6 +41,7 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
 
     return (
         <div className="flex flex-col border border-border bg-background">
+            {/* Header */}
             <div className="px-6 py-5 border-b border-border bg-accent/10">
                 <h2 className="font-serif text-xl tracking-wide text-foreground">Order Summary</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -47,12 +49,10 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
                 </p>
             </div>
 
+            {/* Items */}
             <div className="flex flex-col p-6 gap-6">
                 {items.map((item) => {
                     const { order, quantity, cartItemId } = item
-
-                    // priceBreakdown.total = subTotalPerPanel × panels (full config price)
-                    // × quantity = how many identical sets
                     const lineTotal = order.priceBreakdown.total * quantity
 
                     return (
@@ -88,12 +88,9 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
                                         <span className="text-[9px] uppercase tracking-widest text-muted-foreground border border-border/60 px-1.5 py-0.5 leading-none bg-accent/20">
                                             {order.widthCm} × {order.heightCm} cm
                                         </span>
-
-                                        {/* Panels tag */}
                                         <span className="text-[9px] uppercase tracking-widest text-muted-foreground border border-border/60 px-1.5 py-0.5 leading-none bg-accent/20">
                                             {order.panels} {order.panels === 1 ? 'panel' : 'panels'}
                                         </span>
-
                                         {order.selectedColor && (
                                             <span className="text-[9px] uppercase tracking-widest text-muted-foreground border border-border/60 px-1.5 py-0.5 leading-none bg-accent/20 flex items-center gap-1.5">
                                                 <span className="relative w-3.5 h-3.5 overflow-hidden rounded-full border border-border/50 shrink-0">
@@ -110,7 +107,6 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
                                         )}
                                     </div>
 
-                                    {/* Price breakdown hint */}
                                     <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
                                         {php(order.priceBreakdown.unitPrice)}/sq·ft
                                         {' · '}
@@ -139,14 +135,19 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
 
             {/* Totals */}
             <div className="px-6 py-5 bg-accent/5 border-t border-border flex flex-col gap-4">
-                <div className="flex flex-col gap-3">
+
+                {/* Full order breakdown */}
+                <div className="flex flex-col gap-2.5">
+                    <p className="text-[9px] uppercase tracking-[0.2em] font-semibold text-muted-foreground/70">
+                        Full Order Value
+                    </p>
                     <div className="flex items-center justify-between text-xs">
                         <span className="uppercase tracking-widest font-medium text-muted-foreground">Subtotal</span>
-                        <span className="font-medium text-foreground">{php(subtotal)}</span>
+                        <span className="font-medium text-foreground">{php(fullSubtotal)}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                         <span className="uppercase tracking-widest font-medium text-muted-foreground">VAT (12%)</span>
-                        <span className="font-medium text-foreground">{php(vat)}</span>
+                        <span className="font-medium text-foreground">{php(fullVat)}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                         <span className="uppercase tracking-widest font-medium text-muted-foreground">
@@ -154,23 +155,61 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
                         </span>
                         <span className="text-muted-foreground">To be quoted</span>
                     </div>
+                    <div className="flex items-center justify-between text-xs border-t border-border/50 pt-2.5">
+                        <span className="uppercase tracking-widest font-semibold text-muted-foreground">Order Total</span>
+                        <span className="font-semibold text-foreground line-through decoration-muted-foreground/40">
+                            {php(fullTotal)}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="h-px bg-border/80" />
 
+                {/* Downpayment section */}
+                <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] uppercase tracking-[0.2em] font-semibold text-muted-foreground/70">
+                            Downpayment Due Now
+                        </p>
+                        <span className="text-[9px] uppercase tracking-[0.15em] font-semibold px-1.5 py-0.5 bg-foreground text-background">
+                            {downpaymentRate * 100}%
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="uppercase tracking-widest font-medium text-muted-foreground">
+                            50% Subtotal
+                        </span>
+                        <span className="font-medium text-foreground">{php(downpaymentSubtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="uppercase tracking-widest font-medium text-muted-foreground">
+                            VAT (12%)
+                        </span>
+                        <span className="font-medium text-foreground">{php(downpaymentVat)}</span>
+                    </div>
+                </div>
+
+                <div className="h-px bg-border/80" />
+
+                {/* Amount due */}
                 <div className="flex items-end justify-between gap-4">
                     <div className="flex flex-col">
                         <span className="text-xs uppercase tracking-widest font-semibold text-foreground">
-                            Total Estimate
+                            Amount Due Now
                         </span>
                         <span className="text-[11px] uppercase tracking-widest text-muted-foreground mt-1">
-                            Includes VAT · excl. delivery
+                            50% downpayment · incl. VAT
                         </span>
                     </div>
                     <span className="font-serif text-3xl font-medium leading-none text-foreground">
-                        {php(finalTotal)}
+                        {php(downpaymentTotal)}
                     </span>
                 </div>
+
+                <p className="text-[10px] text-muted-foreground leading-relaxed border-t border-border/40 pt-3">
+                    The remaining <span className="font-medium text-foreground">{php(fullTotal - downpaymentTotal)}</span> balance
+                    is due upon delivery and installation. Our team will contact you to confirm the schedule.
+                </p>
             </div>
         </div>
     )

@@ -57,7 +57,6 @@ const CheckoutSchema = z.object({
             })
         )
         .min(1, "At least one item is required"),
-    // Cart totals computed client-side — must match OrderSummary exactly
     subtotal: z.number().positive("subtotal must be positive"),
     vat: z.number().min(0, "vat must be non-negative"),
     totalAmount: z.number().positive("totalAmount must be positive"),
@@ -68,12 +67,17 @@ type CheckoutInput = z.infer<typeof CheckoutSchema>
 // ==================== CONTROLLER ====================
 
 export const checkoutOrder = async (ctx: Context) => {
-    try {
-        // 1. Parse + validate body
-        const body = await ctx.req.json()
-        const parsed = CheckoutSchema.safeParse(body)
+    const checkoutId = `chk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    console.log(`🛒 [${checkoutId}] === checkoutOrder START ===`)
 
+    try {
+        // 1. Parse + validate
+        const body = await ctx.req.json()
+        console.log(`🛒 [${checkoutId}] Raw body keys:`, Object.keys(body))
+
+        const parsed = CheckoutSchema.safeParse(body)
         if (!parsed.success) {
+            console.error(`🛒 [${checkoutId}] ❌ Validation failed:`, parsed.error.flatten().fieldErrors)
             return ctx.json(
                 {
                     success: false,
@@ -85,9 +89,17 @@ export const checkoutOrder = async (ctx: Context) => {
         }
 
         const input: CheckoutInput = parsed.data
+        console.log(`🛒 [${checkoutId}] Validated input:`)
+        console.log(`   email:         ${input.email}`)
+        console.log(`   paymentMethod: ${input.paymentMethod}`)
+        console.log(`   itemCount:     ${input.items.length}`)
+        console.log(`   subtotal:      ₱${input.subtotal}`)
+        console.log(`   vat:           ₱${input.vat}`)
+        console.log(`   totalAmount:   ₱${input.totalAmount}`)
 
-        // 2. Validate products exist and are active
+        // 2. Validate products
         const productIds = input.items.map((i) => i.productId)
+        console.log(`🛒 [${checkoutId}] Fetching ${productIds.length} product(s):`, productIds)
 
         const fetchedProducts = await db
             .select({
@@ -100,57 +112,54 @@ export const checkoutOrder = async (ctx: Context) => {
             .from(blindsProducts)
             .where(inArray(blindsProducts.id, productIds))
 
+        console.log(`🛒 [${checkoutId}] Products found in DB: ${fetchedProducts.length}/${productIds.length}`)
+        fetchedProducts.forEach(p => {
+            console.log(`   - ${p.id} | ${p.name} | ₱${p.unitPrice} | status: ${p.status}`)
+        })
+
         const productMap = new Map(fetchedProducts.map((p) => [p.id, p]))
 
         for (const item of input.items) {
             const product = productMap.get(item.productId)
             if (!product) {
-                return ctx.json(
-                    { success: false, message: `Product not found: ${item.productId}` },
-                    404
-                )
+                console.error(`🛒 [${checkoutId}] ❌ Product not found: ${item.productId}`)
+                return ctx.json({ success: false, message: `Product not found: ${item.productId}` }, 404)
             }
             if (product.status !== "active") {
-                return ctx.json(
-                    { success: false, message: `Product "${product.name}" is no longer available` },
-                    400
-                )
+                console.error(`🛒 [${checkoutId}] ❌ Product inactive: ${product.name} (${product.status})`)
+                return ctx.json({ success: false, message: `Product "${product.name}" is no longer available` }, 400)
             }
         }
 
-        // 3. Validate color IDs
+        // 3. Validate colors
         const colorIds = input.items.filter((i) => i.colorId).map((i) => i.colorId!)
         const colorMap = new Map<string, { id: string; name: string }>()
 
         if (colorIds.length > 0) {
+            console.log(`🛒 [${checkoutId}] Fetching ${colorIds.length} color(s):`, colorIds)
             const fetchedColors = await db
                 .select({ id: blindsProductColors.id, name: blindsProductColors.name })
                 .from(blindsProductColors)
                 .where(inArray(blindsProductColors.id, colorIds))
 
+            console.log(`🛒 [${checkoutId}] Colors found: ${fetchedColors.length}/${colorIds.length}`)
             fetchedColors.forEach((c) => colorMap.set(c.id, c))
 
             for (const item of input.items) {
                 if (item.colorId && !colorMap.has(item.colorId)) {
-                    return ctx.json(
-                        { success: false, message: `Color not found: ${item.colorId}` },
-                        404
-                    )
+                    console.error(`🛒 [${checkoutId}] ❌ Color not found: ${item.colorId}`)
+                    return ctx.json({ success: false, message: `Color not found: ${item.colorId}` }, 404)
                 }
             }
         }
 
-        // 4. Use client-computed totals (matches OrderSummary exactly)
+        // 4. Compute items
         const { subtotal, vat, totalAmount } = input
 
-        // Build order items snapshot for DB
-        // unitPrice × quantity is for record-keeping only —
-        // the actual charge comes from subtotal/vat/totalAmount sent by the client
         const computedItems = input.items.map((item) => {
             const product = productMap.get(item.productId)!
             const unitPrice = product.unitPrice
             const itemSubtotal = unitPrice * item.quantity
-
             return {
                 productId: product.id,
                 productName: product.name,
@@ -163,26 +172,36 @@ export const checkoutOrder = async (ctx: Context) => {
             }
         })
 
-        // 5. Distribute client subtotal proportionally across PayMongo line items
-        //    so the PayMongo receipt adds up to exactly what the customer sees
-        const rawSubtotalSum = computedItems.reduce((sum, i) => sum + i.subtotal, 0)
+        console.log(`🛒 [${checkoutId}] Computed items:`)
+        computedItems.forEach(i => console.log(`   - ${i.productName} × ${i.quantity} = ₱${i.subtotal}`))
 
+        // 5. Build PayMongo line items
+        const rawSubtotalSum = computedItems.reduce((sum, i) => sum + i.subtotal, 0)
         const paymongoItems = computedItems.map((item) => ({
             name: item.productName,
-            quantity: 1,  // always 1 — full line total is already in amount
+            quantity: 1,
             amount: rawSubtotalSum > 0
                 ? (item.subtotal / rawSubtotalSum) * subtotal
                 : subtotal / computedItems.length,
         }))
 
+        console.log(`🛒 [${checkoutId}] PayMongo line items:`)
+        paymongoItems.forEach(i => console.log(`   - ${i.name}: ₱${i.amount.toFixed(2)}`))
+        console.log(`   VAT line item: ₱${vat.toFixed(2)}`)
+        console.log(`   Expected total (items + vat): ₱${(paymongoItems.reduce((s, i) => s + i.amount, 0) + vat).toFixed(2)}`)
+        console.log(`   Provided totalAmount:          ₱${totalAmount.toFixed(2)}`)
+
         // 6. Generate identifiers
         const trackingNumber = generateTrackingNumber()
         const referenceNumber = generateReferenceNumber()
 
+        console.log(`🛒 [${checkoutId}] trackingNumber: ${trackingNumber}`)
+        console.log(`🛒 [${checkoutId}] referenceNumber: ${referenceNumber}`)
+
         let newOrderId!: string
 
-        // 7. Persist order + items + payment history in one transaction
-        //    Always write to DB first — PayMongo failure still leaves an audit record
+        // 7. DB transaction
+        console.log(`🛒 [${checkoutId}] Starting DB transaction...`)
         await db.transaction(async (tx) => {
             const [newOrder] = await tx
                 .insert(orders)
@@ -213,12 +232,13 @@ export const checkoutOrder = async (ctx: Context) => {
 
                     subtotal: subtotal.toFixed(2),
                     deliveryFee: "0.00",
-                    vat: vat.toFixed(2),         // ← renamed from processingFee
+                    vat: vat.toFixed(2),
                     totalAmount: totalAmount.toFixed(2),
                 })
                 .returning({ id: orders.id })
 
             newOrderId = newOrder.id
+            console.log(`🛒 [${checkoutId}] ✅ orders row inserted — orderId: ${newOrderId}`)
 
             await tx.insert(orderItems).values(
                 computedItems.map((item) => ({
@@ -233,6 +253,7 @@ export const checkoutOrder = async (ctx: Context) => {
                     colorName: item.colorName,
                 }))
             )
+            console.log(`🛒 [${checkoutId}] ✅ orderItems rows inserted (${computedItems.length})`)
 
             await tx.insert(paymentHistory).values({
                 orderId: newOrderId,
@@ -240,9 +261,13 @@ export const checkoutOrder = async (ctx: Context) => {
                 paymentMethod: input.paymentMethod,
                 referenceNumber,
             })
+            console.log(`🛒 [${checkoutId}] ✅ paymentHistory row inserted`)
         })
 
-        // 8. Create PayMongo checkout session
+        console.log(`🛒 [${checkoutId}] DB transaction committed — orderId: ${newOrderId}`)
+
+        // 8. Create PayMongo session
+        console.log(`🛒 [${checkoutId}] Calling createOrderPaymentSession...`)
         const paymentSession = await createOrderPaymentSession({
             orderId: newOrderId,
             trackingNumber,
@@ -260,9 +285,19 @@ export const checkoutOrder = async (ctx: Context) => {
             items: paymongoItems,
         })
 
-        // 9. PayMongo failed — cancel order and log reason
+        console.log(`🛒 [${checkoutId}] createOrderPaymentSession result:`)
+        console.log(`   success:         ${paymentSession.success}`)
+        console.log(`   sessionId:       ${paymentSession.sessionId ?? "❌ null"}`)
+        console.log(`   paymentIntentId: ${paymentSession.paymentIntentId ?? "❌ null"}`)
+        console.log(`   checkoutUrl:     ${paymentSession.checkoutUrl ?? "❌ null"}`)
+        console.log(`   expiresAt:       ${paymentSession.expiresAt ?? "null"}`)
         if (!paymentSession.success) {
-            console.error("❌ PayMongo session failed:", paymentSession.error)
+            console.error(`   error:           ${paymentSession.error}`)
+        }
+
+        // 9. Handle PayMongo failure
+        if (!paymentSession.success) {
+            console.error(`🛒 [${checkoutId}] ❌ PayMongo session failed — cancelling order ${newOrderId}`)
 
             await db.transaction(async (tx) => {
                 await tx
@@ -289,6 +324,7 @@ export const checkoutOrder = async (ctx: Context) => {
                     .where(eq(paymentHistory.orderId, newOrderId))
             })
 
+            console.log(`🛒 [${checkoutId}] Order ${newOrderId} cancelled in DB`)
             return ctx.json(
                 {
                     success: false,
@@ -299,8 +335,9 @@ export const checkoutOrder = async (ctx: Context) => {
             )
         }
 
-        // 10. Backfill PayMongo session details into payment_history
-        await db
+        // 10. Backfill session details
+        console.log(`🛒 [${checkoutId}] Backfilling payment session details into paymentHistory...`)
+        const backfillResult = await db
             .update(paymentHistory)
             .set({
                 sessionId: paymentSession.sessionId,
@@ -309,8 +346,16 @@ export const checkoutOrder = async (ctx: Context) => {
                 updatedAt: new Date(),
             })
             .where(eq(paymentHistory.orderId, newOrderId))
+            .returning({ id: paymentHistory.id })
 
-        // 11. Return checkout URL to frontend
+        console.log(`🛒 [${checkoutId}] Backfill rows updated: ${backfillResult.length}`)
+
+        // 11. Return success
+        console.log(`🛒 [${checkoutId}] === checkoutOrder SUCCESS ✅ ===`)
+        console.log(`   orderId:      ${newOrderId}`)
+        console.log(`   tracking:     ${trackingNumber}`)
+        console.log(`   checkoutUrl:  ${paymentSession.checkoutUrl}`)
+
         return ctx.json(
             {
                 success: true,
@@ -333,7 +378,11 @@ export const checkoutOrder = async (ctx: Context) => {
             201
         )
     } catch (error) {
-        console.error("❌ checkoutOrder error:", error)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errStack = error instanceof Error ? error.stack : ""
+        console.error(`🛒 [${checkoutId}] ❌ Unexpected error in checkoutOrder:`)
+        console.error(`   message: ${errMsg}`)
+        console.error(`   stack:   ${errStack}`)
         return ctx.json(
             {
                 success: false,

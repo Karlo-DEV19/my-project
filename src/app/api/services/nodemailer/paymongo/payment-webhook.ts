@@ -78,6 +78,7 @@ export function verifyWebhookSignature(
     signatureHeader: string
 ): { valid: boolean; error?: string } {
     console.log("🔐 === Signature Verification ===")
+    console.log("🔐 Secret configured:", !!PAYMONGO_WEBHOOK_SECRET, "| Secret length:", PAYMONGO_WEBHOOK_SECRET.length)
 
     if (!PAYMONGO_WEBHOOK_SECRET) {
         console.warn("⚠️ PAYMONGO_WEBHOOK_SECRET not configured, skipping verification")
@@ -85,6 +86,7 @@ export function verifyWebhookSignature(
     }
 
     if (!signatureHeader) {
+        console.error("🔐 ❌ No signature header received at all")
         return { valid: false, error: "Missing signature header" }
     }
 
@@ -97,8 +99,8 @@ export function verifyWebhookSignature(
             }
         })
 
-        console.log("🔐 Parsed:", {
-            t: parts["t"] ? "present" : "missing",
+        console.log("🔐 Parsed header parts:", {
+            t: parts["t"] ? `present (${parts["t"]})` : "MISSING",
             te: parts["te"] ? `${parts["te"].length} chars` : "empty",
             li: parts["li"] ? `${parts["li"].length} chars` : "empty",
         })
@@ -111,18 +113,26 @@ export function verifyWebhookSignature(
                     ? parts["li"]
                     : null
 
-        if (!timestamp) return { valid: false, error: "Missing timestamp" }
-        if (!signature) return { valid: false, error: "Missing signature" }
+        if (!timestamp) {
+            console.error("🔐 ❌ Timestamp (t=) missing from signature header")
+            return { valid: false, error: "Missing timestamp" }
+        }
+        if (!signature) {
+            console.error("🔐 ❌ Signature (te= or li=) missing from header")
+            return { valid: false, error: "Missing signature" }
+        }
 
         console.log("🔐 Mode:", parts["te"]?.length > 0 ? "test (te)" : "live (li)")
+        console.log("🔐 Payload length being signed:", payload.length)
 
         const expectedSignature = crypto
             .createHmac("sha256", PAYMONGO_WEBHOOK_SECRET)
             .update(`${timestamp}.${payload}`)
             .digest("hex")
 
-        console.log("🔐 Expected:", expectedSignature.substring(0, 16) + "...")
-        console.log("🔐 Received:", signature.substring(0, 16) + "...")
+        console.log("🔐 Expected (first 32):", expectedSignature.substring(0, 32) + "...")
+        console.log("🔐 Received (first 32):", signature.substring(0, 32) + "...")
+        console.log("🔐 Lengths match:", expectedSignature.length === signature.length)
 
         let isValid = false
         try {
@@ -130,21 +140,20 @@ export function verifyWebhookSignature(
                 Buffer.from(signature, "hex"),
                 Buffer.from(expectedSignature, "hex")
             )
-        } catch {
+        } catch (timingSafeError) {
+            console.warn("🔐 timingSafeEqual failed (likely hex decode error), falling back to string compare:", timingSafeError)
             isValid = signature === expectedSignature
         }
 
-        console.log("🔐 Valid:", isValid)
+        console.log("🔐 Result:", isValid ? "✅ VALID" : "❌ INVALID")
         return isValid ? { valid: true } : { valid: false, error: "Signature mismatch" }
     } catch (error) {
-        console.error("🔐 Verification error:", error)
+        console.error("🔐 Verification threw unexpected error:", error)
         return { valid: false, error: "Verification failed" }
     }
 }
 
 // ==================== EXTRACT METADATA ====================
-// Priority order matters — payment_intent metadata is the most reliable source
-// for checkout_session events because PayMongo propagates it from the intent.
 
 function extractMetadata(data: PayMongoWebhookEvent["attributes"]["data"]): {
     orderId: string | null
@@ -153,20 +162,19 @@ function extractMetadata(data: PayMongoWebhookEvent["attributes"]["data"]): {
 } {
     const attrs = data.attributes
 
-    // Source 1: payment_intent.attributes.metadata — PRIMARY (most reliable for checkout_session.payment.paid)
     const intentMeta = attrs.payment_intent?.attributes?.metadata ?? {}
-
-    // Source 2: checkout session top-level metadata
     const checkoutMeta = attrs.metadata ?? {}
-
-    // Source 3: individual payment metadata (fallback)
     const paymentMeta = attrs.payments?.[0]?.attributes?.metadata ?? {}
 
-    console.log("📋 [metadata] payment_intent.attributes.metadata:", intentMeta)
-    console.log("📋 [metadata] checkout session metadata:", checkoutMeta)
-    console.log("📋 [metadata] payments[0].attributes.metadata:", paymentMeta)
+    console.log("📋 [metadata] === Metadata Extraction ===")
+    console.log("📋 [metadata] payment_intent present:", !!attrs.payment_intent)
+    console.log("📋 [metadata] payment_intent.id:", attrs.payment_intent?.id ?? "N/A")
+    console.log("📋 [metadata] payment_intent.attributes.metadata:", JSON.stringify(intentMeta))
+    console.log("📋 [metadata] checkout session metadata:", JSON.stringify(checkoutMeta))
+    console.log("📋 [metadata] payments array length:", attrs.payments?.length ?? 0)
+    console.log("📋 [metadata] payments[0].attributes.metadata:", JSON.stringify(paymentMeta))
+    console.log("📋 [metadata] attrs.payment_intent_id (top-level field):", attrs.payment_intent_id ?? "N/A")
 
-    // Resolve in priority order: intent → checkout → payment
     const orderId =
         intentMeta.order_id ??
         checkoutMeta.order_id ??
@@ -184,10 +192,14 @@ function extractMetadata(data: PayMongoWebhookEvent["attributes"]["data"]): {
         attrs.payment_intent_id ??
         null
 
-    console.log("📋 [metadata] Resolved — orderId:", orderId, "| tracking:", trackingNumber, "| intentId:", paymentIntentId)
+    console.log("📋 [metadata] ─── Resolved ───")
+    console.log("📋 [metadata]   orderId:", orderId ?? "❌ NOT FOUND")
+    console.log("📋 [metadata]   trackingNumber:", trackingNumber ?? "❌ NOT FOUND")
+    console.log("📋 [metadata]   paymentIntentId:", paymentIntentId ?? "❌ NOT FOUND")
 
     if (!orderId) {
-        console.warn("⚠️ [metadata] order_id not found in any metadata source. Full attrs:", JSON.stringify(attrs, null, 2))
+        console.error("📋 [metadata] ❌ CRITICAL: order_id missing from ALL metadata sources!")
+        console.error("📋 [metadata] Full data.attributes dump:", JSON.stringify(attrs, null, 2))
     }
 
     return { orderId, trackingNumber, paymentIntentId }
@@ -196,23 +208,34 @@ function extractMetadata(data: PayMongoWebhookEvent["attributes"]["data"]): {
 // ==================== GET ORDER ====================
 
 async function getOrder(orderId: string) {
+    console.log("🗄️ [getOrder] Looking up order:", orderId)
     const [order] = await db
         .select()
         .from(orders)
         .where(eq(orders.id, orderId))
         .limit(1)
+    if (order) {
+        console.log("🗄️ [getOrder] Found — status:", order.status, "| paymentStatus:", order.paymentStatus)
+    } else {
+        console.error("🗄️ [getOrder] ❌ Order NOT found in DB for id:", orderId)
+    }
     return order ?? null
 }
 
 // ==================== CHECK IDEMPOTENCY ====================
-// Returns true if this event has already been successfully processed.
 
 async function isAlreadyProcessed(eventId: string): Promise<boolean> {
+    console.log("🔁 [idempotency] Checking eventId:", eventId)
     const [existing] = await db
-        .select({ id: paymentHistory.id })
+        .select({ id: paymentHistory.id, status: paymentHistory.status })
         .from(paymentHistory)
         .where(eq(paymentHistory.idempotencyKey, eventId))
         .limit(1)
+    if (existing) {
+        console.log("🔁 [idempotency] Already processed — paymentHistory.id:", existing.id, "| status:", existing.status)
+    } else {
+        console.log("🔁 [idempotency] Not yet processed — proceeding")
+    }
     return !!existing
 }
 
@@ -220,20 +243,21 @@ async function isAlreadyProcessed(eventId: string): Promise<boolean> {
 
 async function handlePaymentSuccess(
     data: PayMongoWebhookEvent["attributes"]["data"],
-    eventId: string  // PayMongo event.id used as idempotency key
+    eventId: string
 ): Promise<WebhookResult> {
+    console.log("💰 [handlePaymentSuccess] === START ===")
+    console.log("💰 [handlePaymentSuccess] eventId:", eventId)
+
     const { orderId, trackingNumber, paymentIntentId } = extractMetadata(data)
 
     if (!orderId) {
-        console.error("❌ No order_id in metadata")
+        console.error("💰 [handlePaymentSuccess] ❌ Aborting — no orderId resolved from metadata")
         return { success: false, message: "Missing order_id in metadata" }
     }
 
-    // ── Idempotency check ──────────────────────────────────────────────────
-    // Check BEFORE loading the order to short-circuit duplicate webhook deliveries.
     const alreadyProcessed = await isAlreadyProcessed(eventId)
     if (alreadyProcessed) {
-        console.log("   ⏭️ Idempotency: event already processed, skipping")
+        console.log("💰 [handlePaymentSuccess] ⏭️ Skipping — idempotency hit")
         return {
             success: true,
             message: "Event already processed (idempotent)",
@@ -241,18 +265,15 @@ async function handlePaymentSuccess(
             trackingNumber,
         }
     }
-    // ──────────────────────────────────────────────────────────────────────
 
     const existingOrder = await getOrder(orderId)
     if (!existingOrder) {
-        console.error("❌ Order not found:", orderId)
+        console.error("💰 [handlePaymentSuccess] ❌ Aborting — order not in DB")
         return { success: false, message: `Order not found: ${orderId}` }
     }
 
-    console.log("   Order status:", existingOrder.status, "/", existingOrder.paymentStatus)
-
     if (existingOrder.paymentStatus === "paid") {
-        console.log("   ⏭️ Order already paid, skipping")
+        console.log("💰 [handlePaymentSuccess] ⏭️ Skipping — order already marked paid in DB")
         return {
             success: true,
             message: "Order already paid",
@@ -266,23 +287,15 @@ async function handlePaymentSuccess(
     const attrs = data.attributes
     const payment = attrs.payments?.[0]?.attributes
 
-    // Gross amount the customer paid (centavos → PHP)
     const amountPaid = (payment?.amount ?? attrs.amount) / 100
-
-    // PayMongo's own platform cut — stored for audit only
     const paymongoFee = (payment?.fee ?? attrs.fee ?? 0) / 100
-
-    // What lands in your account after PayMongo deducts their fee
     const netAmount = (payment?.net_amount ?? attrs.net_amount ?? attrs.amount) / 100
-
-    // VAT stored in metadata at checkout time — check all sources in priority order
     const vatFromMeta = parseFloat(
         (attrs.payment_intent?.attributes?.metadata ?? {}).vat ??
         (attrs.metadata ?? {}).vat ??
         (attrs.payments?.[0]?.attributes?.metadata ?? {}).vat ??
         "0"
     )
-
     const paidAt =
         payment?.paid_at
             ? new Date(payment.paid_at * 1000)
@@ -290,17 +303,18 @@ async function handlePaymentSuccess(
                 ? new Date(attrs.paid_at * 1000)
                 : new Date()
 
-    console.log("   Amount paid:  ₱", amountPaid)
-    console.log("   VAT (12%):    ₱", vatFromMeta)
-    console.log("   PayMongo fee: ₱", paymongoFee)
-    console.log("   Net amount:   ₱", netAmount)
-    console.log("   Event ID:     ", eventId, "(idempotency key)")
+    console.log("💰 [handlePaymentSuccess] Payment figures:")
+    console.log("   amountPaid:   ₱", amountPaid)
+    console.log("   vatFromMeta:  ₱", vatFromMeta)
+    console.log("   paymongoFee:  ₱", paymongoFee)
+    console.log("   netAmount:    ₱", netAmount)
+    console.log("   paidAt:       ", paidAt.toISOString())
+    console.log("   paymentIntentId to write:", paymentIntentId ?? data.id, paymentIntentId ? "(from intent)" : "(fallback to data.id)")
+    console.log("💰 [handlePaymentSuccess] Attempting DB transaction...")
 
     try {
         await db.transaction(async (tx) => {
-            // ── Optimistic lock ────────────────────────────────────────────
-            // WHERE paymentStatus != 'paid' prevents two concurrent webhooks
-            // from both committing. If rowCount === 0, the race was lost — bail.
+            console.log("💰 [tx] Updating orders table — orderId:", orderId)
             const updatedOrders = await tx
                 .update(orders)
                 .set({
@@ -312,26 +326,25 @@ async function handlePaymentSuccess(
                 .where(
                     and(
                         eq(orders.id, orderId),
-                        ne(orders.paymentStatus, "paid") // optimistic lock
+                        ne(orders.paymentStatus, "paid")
                     )
                 )
                 .returning({ id: orders.id })
 
+            console.log("💰 [tx] orders.update affected rows:", updatedOrders.length)
+
             if (updatedOrders.length === 0) {
-                // Another concurrent webhook already committed — abort gracefully
-                console.log("   ⏭️ Optimistic lock: order already paid by concurrent webhook")
-                // Throwing here rolls back this transaction, which is intentional.
-                // The outer catch will return a success response.
+                console.warn("💰 [tx] ⚠️ Optimistic lock: 0 rows updated — order already paid by concurrent webhook")
                 throw new AlreadyPaidError()
             }
-            // ──────────────────────────────────────────────────────────────
 
-            await tx
+            console.log("💰 [tx] Updating paymentHistory table — orderId:", orderId)
+            const updatedHistory = await tx
                 .update(paymentHistory)
                 .set({
                     status: "paid",
                     paymentIntentId: paymentIntentId ?? data.id,
-                    idempotencyKey: eventId,     // ← idempotency written atomically
+                    idempotencyKey: eventId,
                     amountPaid: amountPaid.toFixed(2),
                     vat: vatFromMeta.toFixed(2),
                     netAmount: netAmount.toFixed(2),
@@ -348,11 +361,20 @@ async function handlePaymentSuccess(
                     },
                 })
                 .where(eq(paymentHistory.orderId, orderId))
+                .returning({ id: paymentHistory.id })
+
+            console.log("💰 [tx] paymentHistory.update affected rows:", updatedHistory.length)
+
+            if (updatedHistory.length === 0) {
+                console.error("💰 [tx] ❌ paymentHistory update hit 0 rows — no payment_history record for orderId:", orderId)
+                console.error("💰 [tx] This means the order exists but has no paymentHistory row. Check insert in checkoutOrder.")
+            }
         })
 
-        console.log("   ✅ Transaction committed — order confirmed and payment recorded")
+        console.log("💰 [handlePaymentSuccess] ✅ Transaction committed successfully")
     } catch (err) {
         if (err instanceof AlreadyPaidError) {
+            console.log("💰 [handlePaymentSuccess] ⏭️ AlreadyPaidError caught — returning success")
             return {
                 success: true,
                 message: "Order already paid (concurrent webhook)",
@@ -362,10 +384,11 @@ async function handlePaymentSuccess(
                 paymentStatus: "paid",
             }
         }
-        console.error("   ❌ Transaction failed:", err)
+        console.error("💰 [handlePaymentSuccess] ❌ Transaction threw unexpected error:", err)
         throw err
     }
 
+    console.log("💰 [handlePaymentSuccess] === DONE ✅ ===")
     return {
         success: true,
         message: "Payment processed successfully",
@@ -383,24 +406,21 @@ async function handlePaymentFailed(
     eventId: string
 ): Promise<WebhookResult> {
     const { orderId, trackingNumber } = extractMetadata(data)
-
-    console.log("❌ Payment Failed — order:", orderId, "| event:", eventId)
+    console.log("❌ [handlePaymentFailed] orderId:", orderId, "| eventId:", eventId)
 
     if (!orderId) return { success: false, message: "Missing order_id in metadata" }
 
-    // Idempotency: skip if already recorded
     const alreadyProcessed = await isAlreadyProcessed(eventId)
     if (alreadyProcessed) {
-        console.log("   ⏭️ Idempotency: failure event already recorded")
+        console.log("❌ [handlePaymentFailed] ⏭️ Already processed")
         return { success: true, message: "Event already processed (idempotent)", orderId, trackingNumber }
     }
 
     const existingOrder = await getOrder(orderId)
     if (!existingOrder) return { success: false, message: `Order not found: ${orderId}` }
 
-    // Never overwrite a paid order with a failure — payments can fire out-of-order
     if (existingOrder.paymentStatus === "paid") {
-        console.log("   ⏭️ Already paid, ignoring failure event")
+        console.log("❌ [handlePaymentFailed] ⏭️ Order already paid — ignoring failure event")
         return {
             success: true,
             message: "Order already paid, ignoring failure",
@@ -411,6 +431,7 @@ async function handlePaymentFailed(
         }
     }
 
+    console.log("❌ [handlePaymentFailed] Recording failure in DB...")
     await db.transaction(async (tx) => {
         await tx
             .update(orders)
@@ -432,7 +453,7 @@ async function handlePaymentFailed(
             .where(eq(paymentHistory.orderId, orderId))
     })
 
-    console.log("   ⚠️ Failure recorded")
+    console.log("❌ [handlePaymentFailed] ✅ Failure recorded")
     return {
         success: true,
         message: "Payment failure recorded",
@@ -450,15 +471,13 @@ async function handleCheckoutExpired(
     eventId: string
 ): Promise<WebhookResult> {
     const { orderId, trackingNumber } = extractMetadata(data)
-
-    console.log("⏰ Checkout Expired — order:", orderId, "| event:", eventId)
+    console.log("⏰ [handleCheckoutExpired] orderId:", orderId, "| eventId:", eventId)
 
     if (!orderId) return { success: false, message: "Missing order_id in metadata" }
 
-    // Idempotency: skip if already recorded
     const alreadyProcessed = await isAlreadyProcessed(eventId)
     if (alreadyProcessed) {
-        console.log("   ⏭️ Idempotency: expiry event already recorded")
+        console.log("⏰ [handleCheckoutExpired] ⏭️ Already processed")
         return { success: true, message: "Event already processed (idempotent)", orderId, trackingNumber }
     }
 
@@ -466,7 +485,7 @@ async function handleCheckoutExpired(
     if (!existingOrder) return { success: false, message: `Order not found: ${orderId}` }
 
     if (existingOrder.paymentStatus === "paid") {
-        console.log("   ⏭️ Already paid, ignoring expiration")
+        console.log("⏰ [handleCheckoutExpired] ⏭️ Already paid — ignoring expiry")
         return {
             success: true,
             message: "Order already paid",
@@ -478,7 +497,7 @@ async function handleCheckoutExpired(
     }
 
     if (existingOrder.status === "cancelled") {
-        console.log("   ⏭️ Already cancelled")
+        console.log("⏰ [handleCheckoutExpired] ⏭️ Already cancelled")
         return {
             success: true,
             message: "Order already cancelled",
@@ -489,6 +508,7 @@ async function handleCheckoutExpired(
         }
     }
 
+    console.log("⏰ [handleCheckoutExpired] Cancelling order in DB...")
     await db.transaction(async (tx) => {
         await tx
             .update(orders)
@@ -517,7 +537,7 @@ async function handleCheckoutExpired(
             .where(eq(paymentHistory.orderId, orderId))
     })
 
-    console.log("   ⚠️ Order cancelled — session expired")
+    console.log("⏰ [handleCheckoutExpired] ✅ Order cancelled")
     return {
         success: true,
         message: "Order cancelled - payment expired",
@@ -529,7 +549,6 @@ async function handleCheckoutExpired(
 }
 
 // ==================== ALREADY PAID SENTINEL ====================
-// Used to cleanly abort a transaction when an optimistic lock detects a race.
 
 class AlreadyPaidError extends Error {
     constructor() {
@@ -550,42 +569,59 @@ export async function processWebhookEvent(
 
     const eventType = event.attributes.type
     const eventData = event.attributes.data
-    const eventId = event.id  // used as idempotency key throughout
+    const eventId = event.id
 
     console.log("═══════════════════════════════════")
-    console.log("📨 Webhook event:", eventType)
-    console.log("   Event ID:", eventId)
-    console.log("   Live mode:", event.attributes.livemode)
-    console.log("   Data ID:", eventData.id)
-    console.log("   Time:", new Date().toISOString())
+    console.log("📨 [processWebhookEvent] Received event")
+    console.log("   Type:      ", eventType)
+    console.log("   Event ID:  ", eventId)
+    console.log("   Live mode: ", event.attributes.livemode)
+    console.log("   Data ID:   ", eventData.id)
+    console.log("   Data type: ", eventData.type)
+    console.log("   Data status:", eventData.attributes?.status ?? "N/A")
+    console.log("   Amount (raw centavos):", eventData.attributes?.amount ?? "N/A")
+    console.log("   Time:      ", new Date().toISOString())
     console.log("═══════════════════════════════════")
+
+    // Dump the full raw event for maximum debuggability
+    console.log("📨 [processWebhookEvent] Full event.attributes.data.attributes (truncated):")
+    try {
+        const safeAttrs = JSON.stringify(eventData.attributes, null, 2)
+        // Print in chunks to avoid log truncation
+        const chunkSize = 2000
+        for (let i = 0; i < safeAttrs.length; i += chunkSize) {
+            console.log(safeAttrs.slice(i, i + chunkSize))
+        }
+    } catch {
+        console.log("   (could not serialise attributes)")
+    }
 
     try {
         switch (eventType) {
-            // ── Payment success ──────────────────────────────────────────
             case "checkout_session.payment.paid":
             case "payment_intent.succeeded":
             case "payment.paid":
+                console.log("📨 [processWebhookEvent] → routing to handlePaymentSuccess")
                 return await handlePaymentSuccess(eventData, eventId)
 
-            // ── Payment failure ──────────────────────────────────────────
-            case "checkout_session.payment.failed":   // ← added
+            case "checkout_session.payment.failed":
             case "payment_intent.payment_failed":
             case "payment.failed":
+                console.log("📨 [processWebhookEvent] → routing to handlePaymentFailed")
                 return await handlePaymentFailed(eventData, eventId)
 
-            // ── Session expiry ───────────────────────────────────────────
             case "checkout_session.expired":
-            case "checkout_session.payment.expired":  // ← added
+            case "checkout_session.payment.expired":
+                console.log("📨 [processWebhookEvent] → routing to handleCheckoutExpired")
                 return await handleCheckoutExpired(eventData, eventId)
 
             default:
-                console.log(`   ℹ️ Unhandled event type: ${eventType}`)
+                console.warn("📨 [processWebhookEvent] ⚠️ Unhandled event type:", eventType)
                 return { success: true, message: `Event ${eventType} acknowledged` }
         }
     } catch (error) {
         console.error(
-            "❌ processWebhookEvent error:",
+            "📨 [processWebhookEvent] ❌ Uncaught error:",
             error instanceof Error ? error.message : error
         )
         throw error

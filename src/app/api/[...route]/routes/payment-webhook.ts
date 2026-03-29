@@ -9,11 +9,6 @@ const webhooksRoute = new Hono()
 
 // ==================== HELPERS ====================
 
-/**
- * Detect a unique-constraint violation coming from the idempotency_key column.
- * Postgres error code 23505 = unique_violation.
- * Drizzle surfaces this as a plain Error with the pg message in .message.
- */
 function isIdempotencyConflict(error: unknown): boolean {
     if (error instanceof Error) {
         return (
@@ -27,120 +22,116 @@ function isIdempotencyConflict(error: unknown): boolean {
 
 // ==================== TEST ====================
 
-// GET /api/v1/webhooks/test
 webhooksRoute.get("/test", (c) => {
     return c.json({ success: true, message: "Webhook route works!" })
 })
 
 // ==================== PAYMONGO WEBHOOK ====================
 
-// POST /api/v1/webhooks/paymongo
 webhooksRoute.post("/paymongo", async (c) => {
-    console.log("═══════════════════════════════════")
-    console.log("🔔 Webhook received:", new Date().toISOString())
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
-    // Read raw body FIRST — calling c.req.text() after c.req.json() returns empty string
+    console.log("═══════════════════════════════════════════════════")
+    console.log(`🔔 [${requestId}] Webhook POST received: ${new Date().toISOString()}`)
+    console.log(`🔔 [${requestId}] URL: ${c.req.url}`)
+    console.log(`🔔 [${requestId}] Method: ${c.req.method}`)
+
+    // Log all headers for diagnostics
+    const allHeaders: Record<string, string> = {}
+    c.req.raw.headers.forEach((value, key) => { allHeaders[key] = value })
+    console.log(`🔔 [${requestId}] Headers:`, JSON.stringify(allHeaders, null, 2))
+
+    // Read raw body FIRST
     const rawBody = await c.req.text()
     const signatureHeader = c.req.header("paymongo-signature") ?? ""
 
-    console.log("📦 Body length:", rawBody.length)
-    console.log("🔑 Signature present:", !!signatureHeader)
+    console.log(`📦 [${requestId}] Body length: ${rawBody.length}`)
+    console.log(`📦 [${requestId}] Body preview (first 500 chars): ${rawBody.slice(0, 500)}`)
+    console.log(`🔑 [${requestId}] paymongo-signature header: ${signatureHeader ? signatureHeader.slice(0, 60) + "..." : "❌ MISSING"}`)
 
     if (!rawBody) {
-        console.error("❌ Empty body")
-        // Return 200 so PayMongo doesn't retry an empty-body delivery
+        console.error(`❌ [${requestId}] Empty body — returning 200 to stop retry`)
         return c.json({ success: false, message: "Empty request body" }, 200)
     }
 
-    // 1. Verify PayMongo signature
+    // 1. Verify signature
+    console.log(`🔐 [${requestId}] Verifying signature...`)
     const verification = verifyWebhookSignature(rawBody, signatureHeader)
     if (!verification.valid) {
-        console.error("❌ Signature invalid:", verification.error)
-        // 401 is intentional here — bad signatures should NOT be retried
+        console.error(`❌ [${requestId}] Signature INVALID: ${verification.error}`)
+        console.error(`❌ [${requestId}] Returning 401 — PayMongo will NOT retry 4xx`)
         return c.json(
             { success: false, message: "Invalid signature", error: verification.error },
             401
         )
     }
-
-    console.log("✅ Signature verified")
+    console.log(`✅ [${requestId}] Signature verified`)
 
     // 2. Parse JSON
     let payload: PayMongoWebhookPayload
     try {
         payload = JSON.parse(rawBody)
-    } catch {
-        console.error("❌ Invalid JSON")
-        // Return 200 — malformed JSON will never succeed on retry
+        console.log(`✅ [${requestId}] JSON parsed OK`)
+    } catch (parseErr) {
+        console.error(`❌ [${requestId}] JSON parse failed:`, parseErr)
         return c.json({ success: false, message: "Invalid JSON payload" }, 200)
     }
 
-    // 3. Validate PayMongo event envelope: { data: { id, type, attributes: { type, data } } }
+    // 3. Validate envelope
     const event = payload.data
+    console.log(`📨 [${requestId}] Envelope check:`)
+    console.log(`   payload.data present:              ${!!payload.data}`)
+    console.log(`   payload.data.id:                   ${event?.id ?? "❌ MISSING"}`)
+    console.log(`   payload.data.attributes.type:      ${event?.attributes?.type ?? "❌ MISSING"}`)
+    console.log(`   payload.data.attributes.data:      ${event?.attributes?.data ? "present" : "❌ MISSING"}`)
+    console.log(`   payload.data.attributes.livemode:  ${event?.attributes?.livemode}`)
+
     if (!event?.id || !event?.attributes?.type || !event?.attributes?.data) {
-        console.error("❌ Invalid event structure", {
-            hasData: !!payload.data,
-            eventId: event?.id,
-            eventType: event?.attributes?.type,
-            hasEventData: !!event?.attributes?.data,
-        })
-        // Return 200 — structural failures won't be fixed by a retry
+        console.error(`❌ [${requestId}] Invalid event envelope — returning 200`)
         return c.json({ success: false, message: "Invalid event structure" }, 200)
     }
 
-    console.log("📨 Event type:", event.attributes.type)
-    console.log("📨 Event ID:", event.id)
+    console.log(`📨 [${requestId}] Event type: ${event.attributes.type}`)
+    console.log(`📨 [${requestId}] Event ID:   ${event.id}`)
 
-    // 4. Process event
-    // ── Error handling strategy ────────────────────────────────────────────
-    // PayMongo retries any non-2xx response. We therefore return 200 for ALL
-    // outcomes EXCEPT a bad signature (401 above) — including unexpected errors.
-    // Idempotency + optimistic locking inside processWebhookEvent() guarantee
-    // that retries are safe and won't double-process a payment.
-    // ──────────────────────────────────────────────────────────────────────
+    // 4. Process
     try {
+        console.log(`⚙️  [${requestId}] Calling processWebhookEvent...`)
         const result = await processWebhookEvent(payload)
 
-        console.log("✅ Result:", result.message)
-        if (result.orderId) {
-            console.log("   Order:", result.orderId)
-            console.log("   Status:", result.orderStatus, "/", result.paymentStatus)
-        }
-        console.log("═══════════════════════════════════")
+        console.log(`✅ [${requestId}] processWebhookEvent returned:`, JSON.stringify(result))
+        console.log("═══════════════════════════════════════════════════")
 
         return c.json(result, 200)
     } catch (error) {
-        // Idempotency key conflict — a concurrent webhook already committed.
-        // This is not an error; return 200 so PayMongo stops retrying.
         if (isIdempotencyConflict(error)) {
-            console.warn("⚠️ Idempotency conflict detected — event already processed by concurrent request")
-            console.log("═══════════════════════════════════")
+            console.warn(`⚠️  [${requestId}] Idempotency conflict — already processed concurrently`)
+            console.log("═══════════════════════════════════════════════════")
             return c.json(
                 { success: true, message: "Event already processed (concurrent)" },
                 200
             )
         }
 
-        // Any other unexpected error: log it, but still return 200.
-        // Returning 500 here would cause PayMongo to retry indefinitely, which
-        // risks duplicate processing once the transient error clears.
-        // The error is logged for alerting; investigate via logs/APM.
-        console.error("❌ Webhook processing error:", error instanceof Error ? error.message : error)
-        console.log("═══════════════════════════════════")
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errStack = error instanceof Error ? error.stack : ""
+        console.error(`❌ [${requestId}] processWebhookEvent threw unexpected error:`)
+        console.error(`   message: ${errMsg}`)
+        console.error(`   stack:   ${errStack}`)
+        console.log("═══════════════════════════════════════════════════")
 
         return c.json(
             {
                 success: false,
                 message: "Webhook processing failed — logged for investigation",
             },
-            200  // ← intentional 200 to stop PayMongo retry loop
+            200
         )
     }
 })
 
 // ==================== STATUS ====================
 
-// GET /api/v1/webhooks/paymongo/status
 webhooksRoute.get("/paymongo/status", (c) => {
     return c.json({
         success: true,

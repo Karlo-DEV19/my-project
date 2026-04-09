@@ -1,8 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { DollarSign, Package, ShoppingCart, Users, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { DollarSign, Package, ShoppingCart, Users, TrendingUp, ArrowUpRight, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { NotificationBell } from '@/components/ui/notification-bell';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminPageHeader from '@/components/pages/admin/components/admin-page-header';
 import StatCard from '@/components/pages/admin/components/stat-card';
 import OrderStatusBadge, {
@@ -10,6 +13,16 @@ import OrderStatusBadge, {
 } from '@/components/pages/admin/components/order-status-badge';
 
 const AdminDashboardPage = () => {
+  const [isMounted, setIsMounted] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [page, setPage] = useState(1);
+  const perPage = 4;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const stats = [
     {
       title: 'Total Products',
@@ -101,7 +114,30 @@ const AdminDashboardPage = () => {
       status: 'Completed' as OrderStatus,
       createdAt: '2026-03-04',
     },
+    {
+      id: 'ORD-2039',
+      customer: 'Robert King',
+      total: '₱35,100',
+      status: 'Processing' as OrderStatus,
+      createdAt: '2026-03-03',
+    },
+    {
+      id: 'ORD-2038',
+      customer: 'Sarah Lee',
+      total: '₱12,000',
+      status: 'Pending' as OrderStatus,
+      createdAt: '2026-03-02',
+    },
   ];
+
+  const filteredOrders = recentOrders.filter((order) => {
+    const matchesSearch = order.customer.toLowerCase().includes(search.toLowerCase()) || order.id.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filteredOrders.length / perPage) || 1;
+  const paginatedOrders = filteredOrders.slice((page - 1) * perPage, page * perPage);
 
   const chartDays = [
     { label: 'M', value: 8 },
@@ -115,6 +151,10 @@ const AdminDashboardPage = () => {
 
   const maxValue = Math.max(...chartDays.map((d) => d.value));
 
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <div className="w-full min-h-screen bg-background">
       <div className="w-full max-w-[1400px] mx-auto px-6 py-8 space-y-8">
@@ -125,9 +165,12 @@ const AdminDashboardPage = () => {
             title="Dashboard"
             description="Quick overview of your store performance, orders, customers, and activity."
           />
-          <p className="text-xs text-muted-foreground pb-0.5">
-            Last updated: March 25, 2026
-          </p>
+          <div className="flex items-center gap-4 pb-0.5 justify-between md:justify-end">
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Last updated: March 25, 2026
+            </p>
+            <NotificationBell />
+          </div>
         </div>
 
         {/* ── Stat Cards ── */}
@@ -253,16 +296,50 @@ const AdminDashboardPage = () => {
           </div>
 
           {/* Recent Orders — spans 1.5 cols */}
-          <div className="lg:col-span-2 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-sm font-semibold text-foreground">Recent Orders</h2>
-              <Link
-                href="/admin/orders"
-                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/70 transition-colors"
-              >
-                View all
-                <ArrowUpRight className="h-3 w-3" />
-              </Link>
+          <div className="lg:col-span-2 rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border px-5 py-4 gap-4">
+              <div className="flex items-center justify-between w-full sm:w-auto">
+                <h2 className="text-sm font-semibold text-foreground">Recent Orders</h2>
+                <Link
+                  href="/admin/orders"
+                  className="flex sm:hidden items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/70 transition-colors"
+                >
+                  View all
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-40">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search..."
+                    className="h-8 w-full pl-8 text-xs bg-background"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setPage(1); }}>
+                  <SelectTrigger className="h-8 w-[110px] text-xs bg-background">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Status</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Processing">Processing</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Link
+                  href="/admin/orders"
+                  className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/70 transition-colors ml-2"
+                >
+                  View all
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
             </div>
 
             {/* Table header */}
@@ -272,23 +349,57 @@ const AdminDashboardPage = () => {
               <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground text-right">Amount</span>
             </div>
 
-            <ul className="divide-y divide-border">
-              {recentOrders.map((order) => (
-                <li
-                  key={order.id}
-                  className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/50"
-                >
-                  <div className="min-w-0 space-y-0.5">
-                    <p className="text-sm font-medium text-foreground">{order.customer}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">{order.id} · {order.createdAt}</p>
-                  </div>
-                  <OrderStatusBadge status={order.status} />
-                  <p className="text-right text-sm font-semibold tabular-nums text-foreground">
-                    {order.total}
-                  </p>
+            <ul className="divide-y divide-border flex-1">
+              {paginatedOrders.length > 0 ? (
+                paginatedOrders.map((order) => (
+                  <li
+                    key={order.id}
+                    className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/50"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-sm font-medium text-foreground">{order.customer}</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">{order.id} · {order.createdAt}</p>
+                    </div>
+                    <OrderStatusBadge status={order.status} />
+                    <p className="text-right text-sm font-semibold tabular-nums text-foreground">
+                      {order.total}
+                    </p>
+                  </li>
+                ))
+              ) : (
+                <li className="px-5 py-8 text-center text-sm text-muted-foreground">
+                  No orders found.
                 </li>
-              ))}
+              )}
             </ul>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border px-5 py-3 mt-auto">
+                <span className="text-[11px] text-muted-foreground">
+                  Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, filteredOrders.length)} of {filteredOrders.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-1 rounded-md hover:bg-muted disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-[11px] font-medium px-2">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="p-1 rounded-md hover:bg-muted disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

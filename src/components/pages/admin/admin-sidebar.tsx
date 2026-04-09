@@ -60,7 +60,6 @@ const sidebarGroups: Array<{ label: string; links: SidebarLink[] }> = [
         links: [
             { name: 'Sales', href: '/admin/sales', icon: TrendingUp },
             { name: 'Activity Logs', href: '/admin/activity-logs', icon: ClipboardList },
-            { name: 'Audit Trail', href: '/admin/audit-trail', icon: ShieldCheck },
         ],
     },
     {

@@ -10,6 +10,7 @@ import OurCustomerSays from '@/components/layout/sections/our-customer-says';
 import OurSystemWorks from '@/components/layout/sections/our-system-works';
 import RecentInstallation from '@/components/layout/sections/recent-installation';
 import WelcomeSection from '@/components/layout/sections/welcome-section';
+import PermitSection from '@/components/layout/sections/Permit-section';
 import { useGetAllBestSeller, useGetAllNewArrival } from '../api/hooks/use-product-blinds';
 
 // Adjust the path to where your hooks actually live
@@ -53,10 +54,11 @@ const HomePage = () => {
             {/* 2. SPACING CONNECTOR */}
             <div className="w-full h-24 md:h-32" />
 
-            {/* 3. WELCOME SECTION */}
-            <div className="relative z-20">
-                <WelcomeSection />
-            </div>
+            {/* PERMITS & LEGALITY */}
+            <PermitSection />
+
+            {/* 7. ABOUT SECTION */}
+            <AboutSection />
 
             {/* 4. BEST SELLER SECTION */}
             <BestSeller
@@ -66,8 +68,10 @@ const HomePage = () => {
                 onPageChange={setBestSellerPage}
             />
 
-            {/* 5. RECENT INSTALLATIONS */}
-            <RecentInstallation />
+            {/* 3. WELCOME SECTION */}
+            <div className="relative z-20">
+                <WelcomeSection />
+            </div>
 
             {/* 6. NEW ARRIVALS */}
             <NewArrival
@@ -77,16 +81,16 @@ const HomePage = () => {
                 onPageChange={setNewArrivalPage}
             />
 
-            {/* 7. ABOUT SECTION */}
-            <AboutSection />
+            {/* 5. RECENT INSTALLATIONS */}
+            <RecentInstallation />
 
-            {/* 8. CUSTOMER STORIES */}
+            {/* 9. CUSTOMER STORIES */}
             <OurCustomerSays />
 
-            {/* 9. HOW OUR SYSTEM WORKS */}
+            {/* 10. HOW OUR SYSTEM WORKS */}
             <OurSystemWorks />
 
-            {/* 10. CHAT SECTION */}
+            {/* 11. CHAT SECTION */}
             <ChatSection />
         </div>
     );

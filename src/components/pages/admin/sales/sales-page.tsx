@@ -1,7 +1,15 @@
 "use client";
 
-import React from "react";
-import { DollarSign, Receipt, ShoppingCart } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { DollarSign, Receipt, ShoppingCart, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Area,
   AreaChart,
@@ -114,9 +122,32 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export default function SalesPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
   const totalRevenue = MOCK_SALES.reduce((sum, p) => sum + p.revenue, 0);
   const totalOrders = MOCK_SALES.reduce((sum, p) => sum + p.orders, 0);
   const totalSales = totalRevenue;
+
+  const filteredTransactions = useMemo(() => {
+    let result = MOCK_TX;
+
+    if (statusFilter !== "All") {
+      result = result.filter((tx) => tx.status === statusFilter);
+    }
+
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (tx) =>
+          tx.customer.toLowerCase().includes(q) ||
+          tx.id.toLowerCase().includes(q) ||
+          tx.method.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [searchQuery, statusFilter]);
 
   return (
     <section className="flex min-h-screen w-full flex-col bg-background/60">
@@ -234,13 +265,37 @@ export default function SalesPage() {
 
           {/* Recent Transactions */}
           <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm lg:col-span-2">
-            <div className="border-b border-border bg-muted/30 px-5 py-4">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Recent Transactions
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Latest payments and refunds (mock)
-              </p>
+            <div className="flex flex-col gap-4 border-b border-border bg-muted/30 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Recent Transactions
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Latest payments and refunds (mock)
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
+                <div className="relative w-full sm:w-40">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search..."
+                    className="h-8 w-full bg-background pl-8 text-xs font-sans"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-8 w-full sm:w-[110px] bg-background text-xs">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Status</SelectItem>
+                    <SelectItem value="Paid">Paid</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Refunded">Refunded</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="w-full overflow-x-auto">
@@ -265,27 +320,35 @@ export default function SalesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {MOCK_TX.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="px-5 py-3">
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-medium text-foreground">
-                            {tx.customer}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            <span className="font-mono">{tx.id}</span> · {tx.date} ·{" "}
-                            {tx.method}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-3 text-sm font-semibold text-foreground">
-                        {formatCurrency(tx.amount)}
-                      </TableCell>
-                      <TableCell className="px-5 py-3">
-                        <TxStatusBadge status={tx.status} />
+                  {filteredTransactions.length > 0 ? (
+                    filteredTransactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="px-5 py-3">
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-medium text-foreground">
+                              {tx.customer}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              <span className="font-mono">{tx.id}</span> · {tx.date} ·{" "}
+                              {tx.method}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-3 text-sm font-semibold text-foreground">
+                          {formatCurrency(tx.amount)}
+                        </TableCell>
+                        <TableCell className="px-5 py-3">
+                          <TxStatusBadge status={tx.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className="px-5 py-8 text-center text-sm text-muted-foreground">
+                        No transactions found.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>

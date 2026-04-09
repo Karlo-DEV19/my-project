@@ -146,9 +146,13 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                         tabIndex={searchOpen ? -1 : 0}
                         aria-hidden={searchOpen}
                     >
-                        <div className="w-9 h-9 bg-foreground text-background flex items-center justify-center font-bold text-base transition-transform duration-300 group-hover:rotate-90 shrink-0">
-                            M
-                        </div>
+                        <div className="w-9 h-9 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:rotate-90">
+  <img
+    src="/logo pic/logo.png"
+    alt="Logo"
+    className="w-full h-full object-contain"
+  />
+</div>
                         <div className="hidden sm:flex flex-col leading-none">
                             <span className="text-foreground text-[11px] font-bold tracking-[0.2em] uppercase">
                                 MJ Decor 888

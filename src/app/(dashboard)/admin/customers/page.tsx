@@ -62,18 +62,18 @@ type Pagination = {
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const MOCK_CUSTOMERS: Customer[] = [
-  { id: 'C-1001', name: 'Jane Doe',        email: 'jane.doe@email.com',     phone: '0917 694 8888', totalOrders: 5,  dateJoined: '2025-11-18' },
-  { id: 'C-1002', name: 'John Smith',      email: 'john.smith@email.com',   phone: '0999 123 4567', totalOrders: 2,  dateJoined: '2026-01-09' },
-  { id: 'C-1003', name: 'MJ Interiors',    email: 'orders@mjinteriors.com', phone: '0922 555 0000', totalOrders: 12, dateJoined: '2024-08-03' },
-  { id: 'C-1004', name: 'Andrea Cruz',     email: 'andrea.cruz@email.com',  phone: '0918 222 3344', totalOrders: 1,  dateJoined: '2026-02-20' },
-  { id: 'C-1005', name: 'Mark Reyes',      email: 'mark.reyes@email.com',   phone: '0908 111 2233', totalOrders: 7,  dateJoined: '2025-06-14' },
-  { id: 'C-1006', name: 'Sofia Lim',       email: 'sofia.lim@email.com',    phone: '0917 333 4455', totalOrders: 3,  dateJoined: '2025-09-01' },
-  { id: 'C-1007', name: 'Carlos Tan',      email: 'carlos.tan@email.com',   phone: '0921 444 5566', totalOrders: 9,  dateJoined: '2024-12-20' },
-  { id: 'C-1008', name: 'Anna Villanueva', email: 'anna.v@email.com',       phone: '0933 666 7788', totalOrders: 4,  dateJoined: '2026-03-05' },
-  { id: 'C-1009', name: 'Rico Santos',     email: 'rico.s@email.com',       phone: '0945 777 8899', totalOrders: 6,  dateJoined: '2025-07-22' },
-  { id: 'C-1010', name: 'Pia Garcia',      email: 'pia.garcia@email.com',   phone: '0956 888 9900', totalOrders: 0,  dateJoined: '2026-02-01' },
-  { id: 'C-1011', name: 'Luis Mendoza',    email: 'luis.m@email.com',       phone: '0967 999 0011', totalOrders: 11, dateJoined: '2024-10-10' },
-  { id: 'C-1012', name: 'Karen Bautista',  email: 'karen.b@email.com',      phone: '0978 000 1122', totalOrders: 2,  dateJoined: '2025-03-18' },
+  { id: 'C-1001', name: 'Jane Doe', email: 'jane.doe@email.com', phone: '0917 694 8888', totalOrders: 5, dateJoined: '2025-11-18' },
+  { id: 'C-1002', name: 'John Smith', email: 'john.smith@email.com', phone: '0999 123 4567', totalOrders: 2, dateJoined: '2026-01-09' },
+  { id: 'C-1003', name: 'MJ Interiors', email: 'orders@mjinteriors.com', phone: '0922 555 0000', totalOrders: 12, dateJoined: '2024-08-03' },
+  { id: 'C-1004', name: 'Andrea Cruz', email: 'andrea.cruz@email.com', phone: '0918 222 3344', totalOrders: 1, dateJoined: '2026-02-20' },
+  { id: 'C-1005', name: 'Mark Reyes', email: 'mark.reyes@email.com', phone: '0908 111 2233', totalOrders: 7, dateJoined: '2025-06-14' },
+  { id: 'C-1006', name: 'Sofia Lim', email: 'sofia.lim@email.com', phone: '0917 333 4455', totalOrders: 3, dateJoined: '2025-09-01' },
+  { id: 'C-1007', name: 'Carlos Tan', email: 'carlos.tan@email.com', phone: '0921 444 5566', totalOrders: 9, dateJoined: '2024-12-20' },
+  { id: 'C-1008', name: 'Anna Villanueva', email: 'anna.v@email.com', phone: '0933 666 7788', totalOrders: 4, dateJoined: '2026-03-05' },
+  { id: 'C-1009', name: 'Rico Santos', email: 'rico.s@email.com', phone: '0945 777 8899', totalOrders: 6, dateJoined: '2025-07-22' },
+  { id: 'C-1010', name: 'Pia Garcia', email: 'pia.garcia@email.com', phone: '0956 888 9900', totalOrders: 0, dateJoined: '2026-02-01' },
+  { id: 'C-1011', name: 'Luis Mendoza', email: 'luis.m@email.com', phone: '0967 999 0011', totalOrders: 11, dateJoined: '2024-10-10' },
+  { id: 'C-1012', name: 'Karen Bautista', email: 'karen.b@email.com', phone: '0978 000 1122', totalOrders: 2, dateJoined: '2025-03-18' },
 ];
 
 const PER_PAGE_OPTIONS = [5, 10, 20];
@@ -82,9 +82,9 @@ const PER_PAGE_OPTIONS = [5, 10, 20];
 
 function buildPagination(total: number, page: number, limit: number): Pagination {
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const safePage   = Math.min(Math.max(1, page), totalPages);
+  const safePage = Math.min(Math.max(1, page), totalPages);
   return {
-    page:        safePage,
+    page: safePage,
     limit,
     total,
     totalPages,
@@ -146,7 +146,7 @@ function TablePagination({
   const { page, limit, total, totalPages, hasNextPage, hasPrevPage } = pagination;
 
   const rangeStart = total === 0 ? 0 : (page - 1) * limit + 1;
-  const rangeEnd   = Math.min(page * limit, total);
+  const rangeEnd = Math.min(page * limit, total);
 
   const pageNumbers = useMemo(() => {
     const delta = 2;
@@ -256,20 +256,29 @@ function TablePagination({
 
 export default function CustomersPage() {
   const [query, setQuery] = useState('');
-  const [page, setPage]   = useState(1);
+  const [activityFilter, setActivityFilter] = useState('All');
+  const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
   // 1. Filter
   const filtered = useMemo(() => {
+    let result = MOCK_CUSTOMERS;
+
+    if (activityFilter === 'Active') {
+      result = result.filter(c => c.totalOrders > 0);
+    } else if (activityFilter === 'Zero') {
+      result = result.filter(c => c.totalOrders === 0);
+    }
+
     const q = query.trim().toLowerCase();
-    if (!q) return MOCK_CUSTOMERS;
-    return MOCK_CUSTOMERS.filter(
+    if (!q) return result;
+    return result.filter(
       (c) =>
-        c.name.toLowerCase().includes(q)  ||
+        c.name.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q) ||
         c.phone.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, activityFilter]);
 
   // 2. Pagination
   const pagination = useMemo<Pagination>(
@@ -301,16 +310,28 @@ export default function CustomersPage() {
 
         {/* ── Search + Count ── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:w-80">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-              placeholder="Search by name, email or phone…"
-              className="h-9 rounded-none pl-10 text-sm"
-            />
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-80">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                placeholder="Search by name, email or phone…"
+                className="h-9 rounded-none pl-10 text-sm"
+              />
+            </div>
+            <Select value={activityFilter} onValueChange={(val) => { setActivityFilter(val); setPage(1); }}>
+              <SelectTrigger className="h-9 w-full sm:w-[150px] rounded-none text-sm">
+                <SelectValue placeholder="Filter Activity" />
+              </SelectTrigger>
+              <SelectContent className="rounded-none">
+                <SelectItem value="All">All Customers</SelectItem>
+                <SelectItem value="Active">Active Buyers</SelectItem>
+                <SelectItem value="Zero">Zero Orders</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground shrink-0 mt-1 sm:mt-0 text-left sm:text-right">
             {filtered.length} customer{filtered.length === 1 ? '' : 's'}
           </p>
         </div>

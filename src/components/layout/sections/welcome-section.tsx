@@ -21,7 +21,7 @@ const WelcomeSection = () => {
                 {/* Header - Aligned with BestSeller & OurCustomerSays */}
                 <div className="flex flex-col items-center justify-center text-center mb-16">
                     <h2 className="text-3xl md:text-4xl font-serif tracking-wide mb-4">
-                        Mastering Light & Space
+                        MJ DECOR 888 INC.
                     </h2>
                     <div className="w-16 h-[1px] bg-foreground/20 mb-6"></div>
 

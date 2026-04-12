@@ -6,7 +6,7 @@ import { blindsProducts } from "@/schema/products/blinds/blinds-product"
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
 import { orderItems, orders } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
-import { createOrderPaymentSession } from "../services/nodemailer/paymongo/order-checkout-payment"
+import { createOrderPaymentSession } from "../services/paymongo/order-checkout-payment"
 import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image"
 import { sendOrderStatusEmail } from "../services/nodemailer/send-order-status-service"
 

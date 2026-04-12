@@ -1,15 +1,177 @@
-// src/lib/blinds/create.ts
-import { db } from "@/lib/supabase/db";
-import { Context } from "hono";
-import { z } from "zod";
+// src/app/api/controller/product-blinds-controller.ts
 import {
     blindsProductSchema,
     BlindsProductValues,
 } from "@/app/api/zod/product-blinds-zod-schema";
-import { or, eq, and, like, sql, ilike } from "drizzle-orm"; // <- use these for conditions
+import { ActivityAction, ActivityActionType, ActivityModule, ActivityModuleType } from "@/lib/constans/activity-log";
+import { db } from "@/lib/supabase/db";
 import { blindsProducts } from "@/schema/products/blinds/blinds-product";
-import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image";
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors";
+import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image";
+import { and, eq, ilike, or, sql } from "drizzle-orm"; // <- use these for conditions
+import { Context } from "hono";
+import { z } from "zod";
+import { createActivityLog } from "./activity-logs";
+
+// src/app/api/controller/product-blinds-controller.ts
+
+export const updateBlindsById = async (ctx: Context) => {
+    try {
+        // ✅ Match whatever your Hono route declares, e.g. .put("/:productId/update", ...)
+        const productId = ctx.req.param("productId");
+
+        if (!productId) {
+            return ctx.json({ success: false, message: "Missing product ID" }, 400);
+        }
+
+        const updateBlindsSchema = z.object({
+            userId:         z.string().min(1).trim(),
+            productCode:    z.string().min(1).trim(),
+            name:           z.string().min(1).trim(),
+            description:    z.string().trim().default(""),
+            type:           z.string().trim().default(""),
+            collection:     z.enum(["Shop Only", "New Arrival", "Best Seller"]),
+            status:         z.enum(["active", "inactive", "archived"]),
+            composition:    z.string().trim().default(""),
+            fabricWidth:    z.string().trim().default(""),
+            thickness:      z.string().trim().default(""),
+            packing:        z.string().trim().default(""),
+            characteristic: z.string().trim().default(""),
+            unitPrice:      z.number().min(0),
+            // ✅ Accept any non-empty string — URLs from Supabase are valid strings
+            mainImages: z
+                .array(z.string().min(1))
+                .default([]),
+            availableColors: z
+                .array(z.object({
+                    name:     z.string().min(1).trim(),
+                    imageUrl: z.string().min(1),
+                }))
+                .default([]),
+        });
+
+        const body   = await ctx.req.json();
+        const parsed = updateBlindsSchema.safeParse(body);
+
+        if (!parsed.success) {
+            return ctx.json({
+                success: false,
+                message: "Invalid request payload",
+                errors:  parsed.error.flatten().fieldErrors,
+            }, 400);
+        }
+
+        const {
+            productCode, name, description, type,
+            collection, status, composition, fabricWidth,
+            thickness, packing, characteristic, unitPrice,
+            mainImages, availableColors,
+        } = parsed.data;
+
+        // Check product exists
+        const [existing] = await db
+            .select({ id: blindsProducts.id, productCode: blindsProducts.productCode })
+            .from(blindsProducts)
+            .where(eq(blindsProducts.id, productId))
+            .limit(1);
+
+        if (!existing) {
+            return ctx.json({ success: false, message: "Product not found" }, 404);
+        }
+
+        // Duplicate productCode guard
+        if (productCode !== existing.productCode) {
+            const [duplicate] = await db
+                .select({ id: blindsProducts.id })
+                .from(blindsProducts)
+                .where(eq(blindsProducts.productCode, productCode))
+                .limit(1);
+
+            if (duplicate) {
+                return ctx.json({ success: false, message: "Product code already in use" }, 400);
+            }
+        }
+
+        // Normalize — strip whitespace, drop empty strings
+        const normalizedImages = mainImages
+            .map((url) => url.trim())
+            .filter(Boolean);
+
+        const normalizedColors = availableColors
+            .map((c) => ({ name: c.name.trim(), imageUrl: c.imageUrl.trim() }))
+            .filter((c) => c.name && c.imageUrl);
+
+        // ✅ Full replace inside a single transaction
+        const updatedProduct = await db.transaction(async (tx) => {
+
+            // 1. Update product row
+            const [product] = await tx
+                .update(blindsProducts)
+                .set({
+                    productCode, name, description, type,
+                    collection, status, composition, fabricWidth,
+                    thickness, packing, characteristic, unitPrice,
+                    updatedAt: new Date(),
+                })
+                .where(eq(blindsProducts.id, productId))
+                .returning();
+
+            // 2. Wipe old images → insert exactly what client sent
+            await tx
+                .delete(blindsProductImages)
+                .where(eq(blindsProductImages.productId, productId));
+
+            const insertedImages =
+                normalizedImages.length > 0
+                    ? await tx
+                          .insert(blindsProductImages)
+                          .values(
+                              normalizedImages.map((imageUrl) => ({ productId, imageUrl }))
+                          )
+                          .returning()
+                    : [];
+
+            // 3. Wipe old colors → insert exactly what client sent
+            await tx
+                .delete(blindsProductColors)
+                .where(eq(blindsProductColors.productId, productId));
+
+            const insertedColors =
+                normalizedColors.length > 0
+                    ? await tx
+                          .insert(blindsProductColors)
+                          .values(
+                              normalizedColors.map((c) => ({
+                                  productId,
+                                  name:     c.name,
+                                  imageUrl: c.imageUrl,
+                              }))
+                          )
+                          .returning()
+                    : [];
+
+            return { ...product, images: insertedImages, colors: insertedColors };
+        });
+
+        await createActivityLog(db, {
+            userId:      parsed.data.userId,
+            action:      "UPDATE" as ActivityActionType,
+            module:      "BLINDS_PRODUCT" as ActivityModuleType,
+            referenceId: productId,
+            description: `Updated product ${productCode}`,
+        });
+
+        return ctx.json({
+            success: true,
+            message: "Product updated successfully",
+            data:    updatedProduct,
+        });
+
+    } catch (error) {
+        console.error("[updateBlindsById]", error);
+        return ctx.json({ success: false, message: "Internal server error" }, 500);
+    }
+};
 
 export const createNewBlinds = async (ctx: Context) => {
     try {
@@ -79,14 +241,24 @@ export const createNewBlinds = async (ctx: Context) => {
 
         // 5️⃣ Insert available colors
         if (parsedData.availableColors.length > 0) {
-            await db.insert(blindsProductColors).values(
-                parsedData.availableColors.map((color) => ({
-                    productId,
-                    name: color.name,
-                    imageUrl: color.imageUrl,
-                }))
-            );
+            await db.insert(blindsProductColors).
+                values(
+                    parsedData.availableColors.map((color) => ({
+                        productId,
+                        name: color.name,
+                        imageUrl: color.imageUrl,
+                    }))
+                );
         }
+
+        // 6️⃣ Log activity (non-blocking — will not throw on failure)
+        await createActivityLog(db, {
+            userId: parsedData.userId,
+            action: ActivityAction.CREATE,
+            module: ActivityModule.BLINDS_PRODUCT,
+            referenceId: insertedProduct.id,
+            description: `Created blinds product: ${parsedData.name} (${parsedData.productCode})`,
+        });
 
         return ctx.json({ success: true, product: insertedProduct });
     } catch (error) {

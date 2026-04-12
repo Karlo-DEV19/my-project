@@ -75,8 +75,22 @@ export interface GetBlindsProductsResponse {
 }
 
 
+// types.ts (or wherever your types reside)
+export interface BlindsImage {
+    id: string;
+    productId: string;
+    imageUrl: string;
+    createdAt: string;
+}
 
-// view details product blinds by id
+export interface BlindsColor {
+    id: string;
+    productId: string;
+    name: string;
+    imageUrl: string;
+    createdAt: string;
+}
+
 export interface BlindsProductDetailResponse {
     success: boolean;
     data: {
@@ -85,6 +99,7 @@ export interface BlindsProductDetailResponse {
         name: string;
         description: string | null;
         type: string;
+        collection: string | null; // Added missing collection field based on API JSON
         characteristic: string | null;
         composition: string | null;
         fabricWidth: string | null;
@@ -98,22 +113,6 @@ export interface BlindsProductDetailResponse {
         colors: BlindsColor[];
     };
 }
-// view details product blinds by id
-export interface BlindsImage {
-    id: string;
-    productId: string;
-    imageUrl: string;
-    createdAt: string;
-}
-// view details product blinds by id
-export interface BlindsColor {
-    id: string;
-    productId: string;
-    name: string;
-    imageUrl: string;
-    createdAt: string;
-}
-
 export interface NewArrivalProductColor {
     name: string
     imageUrl: string
@@ -200,4 +199,26 @@ export interface GetAllBestSellerProductBlinds {
     success: boolean
     blinds: BestSellerProduct[]
     pagination: Pagination
+}
+
+
+export interface EditProductPayload {
+  productCode: string;
+  name: string;
+  description: string;
+  type: string;
+  collection: "Shop Only" | "New Arrival" | "Best Seller";
+  status: "active" | "inactive" | "archived";
+  composition: string;
+  fabricWidth: string;
+  thickness: string;
+  packing: string;
+  characteristic: string;
+  unitPrice: number;
+  mainImages: string[]; // Array of URLs
+  availableColors: {
+    imageUrl: string; // The URL string for the swatch
+    name: string;     // Color name
+  }[];
+  userId: string;
 }

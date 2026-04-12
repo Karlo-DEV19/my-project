@@ -9,6 +9,7 @@ export const blindsColorSchema = z.object({
 
 // Schema for blinds product
 export const blindsProductSchema = z.object({
+    userId: z.string().min(1, 'User ID required'),
     productCode: z.string().min(1, 'Product code required'),
     name: z.string().min(2, 'Product name required'),
     type: z.string().min(1, 'Select a type'),

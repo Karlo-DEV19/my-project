@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface CartItemColor {
     colorId: string
@@ -29,14 +29,14 @@ export interface BlindOrderFields {
         unitPrice: number
         subTotalPerPanel: number
         panels: number
-        total: number           // subTotalPerPanel × panels — full config price
+        total: number
         minimumApplied: boolean
     }
 }
 
 export interface CartItem {
     cartItemId: string
-    quantity: number            // how many sets of this exact configuration (default 1)
+    quantity: number
     order: BlindOrderFields
 }
 
@@ -48,6 +48,8 @@ interface CartState {
     items: CartItem[]
     itemCount: number
     isSheetOpen: boolean
+    /** Becomes true after Zustand has rehydrated from localStorage on the client */
+    _hydrated: boolean
 }
 
 interface CartActions {
@@ -58,6 +60,7 @@ interface CartActions {
     toggleCartSheet: () => void
     openCartSheet: () => void
     closeCartSheet: () => void
+    setHydrated: () => void
 }
 
 type CartStore = CartState & CartActions
@@ -83,9 +86,14 @@ function deriveCount(items: CartItem[]): number {
 export const useCartStore = create<CartStore>()(
     persist(
         (set, get) => ({
+            // ── State ──────────────────────────────────────────────────────
             items: [],
             itemCount: 0,
             isSheetOpen: false,
+            _hydrated: false,
+
+            // ── Actions ────────────────────────────────────────────────────
+            setHydrated: () => set({ _hydrated: true }),
 
             addToCart: (order) => {
                 const key = buildCartKey(order)
@@ -129,13 +137,43 @@ export const useCartStore = create<CartStore>()(
         }),
         {
             name: 'mj-decor-cart',
-            partialize: (state) => ({ items: state.items, itemCount: state.itemCount }),
+            // Use createJSONStorage to be explicit and avoid SSR issues
+            storage: createJSONStorage(() => {
+                // Safely return localStorage only on the client
+                if (typeof window !== 'undefined') return localStorage
+                // Return a no-op storage on the server so persist doesn't crash
+                return {
+                    getItem: () => null,
+                    setItem: () => {},
+                    removeItem: () => {},
+                }
+            }),
+            // Only persist cart data — never persist UI state or _hydrated flag
+            partialize: (state) => ({
+                items: state.items,
+                itemCount: state.itemCount,
+            }),
+            // Called once rehydration from localStorage is complete
+            onRehydrateStorage: () => (state) => {
+                if (state) state.setHydrated()
+            },
         }
     )
 )
 
+// ─── Hydration-safe selector hook ────────────────────────────────────────────
+// Use this instead of direct useCartStore(s => s.items) in SSR components
+// to avoid hydration mismatches. Returns empty defaults until rehydrated.
+export function useHydratedCartStore<T>(
+    selector: (state: CartStore) => T,
+    fallback: T
+): T {
+    const _hydrated = useCartStore(s => s._hydrated)
+    const value = useCartStore(selector)
+    return _hydrated ? value : fallback
+}
+
 // ── Derived cart totals (use these everywhere for consistency) ────────────────
-// Call this outside of components too (e.g. in onSubmit) by passing items directly
 export function computeCartTotals(items: CartItem[]) {
     const fullSubtotal = items.reduce(
         (sum, item) => sum + item.order.priceBreakdown.total * item.quantity,
@@ -143,18 +181,17 @@ export function computeCartTotals(items: CartItem[]) {
     )
     const fullTotal = fullSubtotal * (1 + VAT_RATE)
 
-    // 50% downpayment — what the customer actually pays now
     const downpaymentSubtotal = fullSubtotal * DOWNPAYMENT_RATE
     const downpaymentVat = downpaymentSubtotal * VAT_RATE
     const downpaymentTotal = downpaymentSubtotal + downpaymentVat
 
     return {
-        fullSubtotal,                           // full order subtotal before VAT
-        fullVat: fullSubtotal * VAT_RATE,       // full VAT
-        fullTotal,                              // full order total incl. VAT
-        downpaymentRate: DOWNPAYMENT_RATE,      // 0.5
-        downpaymentSubtotal,                    // subtotal for the 50% due now
-        downpaymentVat,                         // VAT on the 50%
-        downpaymentTotal,                       // total due now (what PayMongo charges)
+        fullSubtotal,
+        fullVat: fullSubtotal * VAT_RATE,
+        fullTotal,
+        downpaymentRate: DOWNPAYMENT_RATE,
+        downpaymentSubtotal,
+        downpaymentVat,
+        downpaymentTotal,
     }
 }

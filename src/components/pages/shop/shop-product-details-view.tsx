@@ -7,11 +7,17 @@ import {
     MapPin, Phone, Mail, ShoppingCart, X, ZoomIn, ChevronLeft, ChevronRight,
     Package, Layers, Maximize2,
 } from 'lucide-react';
-// BlindOrderFields now lives in the cart store — import from there
 import { useCartStore, type BlindOrderFields } from '@/lib/zustand/use-cart-store';
 import { BlindsProductDetailResponse } from '@/lib/types/product-blinds-type';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
+
+type ProductData = NonNullable<BlindsProductDetailResponse['data']>
+
+interface Props {
+    /** Product is guaranteed non-null by the time this component renders */
+    product: ProductData
+}
 
 interface PriceBreakdown {
     widthCm: number;
@@ -39,7 +45,7 @@ const BRANCHES = [
         mobile: '0917-694-8888',
         email: 'mjdecor888@gmail.com',
     },
-];
+] as const;
 
 const STANDARD_SIZES = [
     { label: '60 × 120', width: 60, height: 120, popular: false },
@@ -50,11 +56,11 @@ const STANDARD_SIZES = [
     { label: '160 × 220', width: 160, height: 220, popular: false },
     { label: '180 × 220', width: 180, height: 220, popular: true },
     { label: '200 × 240', width: 200, height: 240, popular: false },
-];
+] as const;
 
-const MOUNTING_OPTIONS = ['Inside Mount', 'Outside Mount'];
-const CONTROL_OPTIONS = ['Right Hand', 'Left Hand'];
-const CONTROL_TYPE_OPTIONS = ['Cordless', 'Corded', 'Motorized'];
+const MOUNTING_OPTIONS = ['Inside Mount', 'Outside Mount'] as const;
+const CONTROL_OPTIONS = ['Right Hand', 'Left Hand'] as const;
+const CONTROL_TYPE_OPTIONS = ['Cordless', 'Corded', 'Motorized'] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -69,10 +75,7 @@ function calcPrice(
     const chargeableSqFt = minimumApplied ? MIN_SQFT : sqFt;
     const subTotalPerPanel = unitPrice * chargeableSqFt;
     const total = subTotalPerPanel * panels;
-    return {
-        widthCm, heightCm, sqFt, chargeableSqFt,
-        unitPrice, subTotalPerPanel, panels, total, minimumApplied,
-    };
+    return { widthCm, heightCm, sqFt, chargeableSqFt, unitPrice, subTotalPerPanel, panels, total, minimumApplied };
 }
 
 function php(n: number) {
@@ -111,25 +114,25 @@ const Lightbox = ({
         >
             <button onClick={onClose}
                 className="absolute top-5 right-5 z-10 w-10 h-10 flex items-center justify-center border border-border text-foreground hover:bg-accent transition-colors"
-                aria-label="Close">
+                aria-label="Close lightbox">
                 <X className="w-4 h-4" strokeWidth={1.5} />
             </button>
             <div className="absolute top-5 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
                 {idx + 1} / {images.length}
             </div>
             <div className="relative w-full max-w-4xl h-[80vh] mx-6" onClick={e => e.stopPropagation()}>
-                <Image src={images[idx]} alt={`Image ${idx + 1}`} fill className="object-contain" sizes="100vw" priority />
+                <Image src={images[idx]} alt={`Product image ${idx + 1}`} fill className="object-contain" sizes="100vw" priority />
             </div>
             {images.length > 1 && (
                 <>
                     <button onClick={(e) => { e.stopPropagation(); prev(); }}
                         className="absolute left-4 md:left-8 w-10 h-10 flex items-center justify-center border border-border bg-background text-foreground hover:bg-accent transition-colors"
-                        aria-label="Previous">
+                        aria-label="Previous image">
                         <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); next(); }}
                         className="absolute right-4 md:right-8 w-10 h-10 flex items-center justify-center border border-border bg-background text-foreground hover:bg-accent transition-colors"
-                        aria-label="Next">
+                        aria-label="Next image">
                         <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
                     </button>
                 </>
@@ -138,7 +141,8 @@ const Lightbox = ({
                 <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2">
                     {images.map((url, i) => (
                         <button key={i} onClick={(e) => { e.stopPropagation(); setIdx(i); }}
-                            className={`relative w-12 h-12 border overflow-hidden transition-all ${i === idx ? 'border-foreground opacity-100' : 'border-border opacity-50 hover:opacity-80'}`}>
+                            className={`relative w-12 h-12 border overflow-hidden transition-all ${i === idx ? 'border-foreground opacity-100' : 'border-border opacity-50 hover:opacity-80'}`}
+                            aria-label={`Go to image ${i + 1}`}>
                             <Image src={url} alt={`Thumbnail ${i + 1}`} fill className="object-cover" />
                         </button>
                     ))}
@@ -168,7 +172,7 @@ const ColorImageDialog = ({
         >
             <button onClick={onClose}
                 className="absolute top-5 right-5 z-10 w-10 h-10 flex items-center justify-center border border-border text-foreground hover:bg-accent transition-colors"
-                aria-label="Close">
+                aria-label="Close color preview">
                 <X className="w-4 h-4" strokeWidth={1.5} />
             </button>
             <div
@@ -189,7 +193,7 @@ const SelectField = ({
 }: {
     label: string
     value: string
-    options: string[]
+    options: readonly string[]
     onChange: (v: string) => void
 }) => (
     <div className="flex flex-col gap-1.5">
@@ -197,7 +201,7 @@ const SelectField = ({
         <div className="relative">
             <select value={value} onChange={e => onChange(e.target.value)}
                 className="h-11 w-full border border-border bg-transparent px-4 pr-8 text-sm text-foreground appearance-none focus:outline-none focus:border-foreground transition-colors cursor-pointer">
-                {options.map(o => <option key={o}>{o}</option>)}
+                {options.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" strokeWidth={1.5} />
         </div>
@@ -213,19 +217,17 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-interface Props {
-    product: NonNullable<BlindsProductDetailResponse['data']>
-}
-
 const ShopProductDetailsView = ({ product }: Props) => {
+    // Subscribe to addToCart only — avoids re-renders from unrelated state changes
     const addToCart = useCartStore(s => s.addToCart);
 
-    const imageUrls = product.images.map(i => i.imageUrl);
-    const colors = product.colors; // BlindsColor[] — each has id, name, imageUrl
+    const imageUrls = useMemo(() => product.images.map(i => i.imageUrl), [product.images]);
+    const colors = product.colors;
 
     const [activeImageIdx, setActiveImageIdx] = useState(0);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIdx, setLightboxIdx] = useState(0);
+
     const openLightbox = useCallback((idx: number) => {
         setLightboxIdx(idx);
         setLightboxOpen(true);
@@ -233,19 +235,24 @@ const ShopProductDetailsView = ({ product }: Props) => {
 
     const [colorDialog, setColorDialog] = useState<{ name: string; imageUrl: string } | null>(null);
 
-    // Default to first color if available — selectedColor always carries colorId
+    // Default to first color if available
     const [selectedColor, setSelectedColor] = useState<typeof colors[0] | null>(
         colors.length > 0 ? colors[0] : null
     );
-    const [selectedPreset, setSelectedPreset] = useState<typeof STANDARD_SIZES[0] | null>(null);
+    const [selectedPreset, setSelectedPreset] = useState<typeof STANDARD_SIZES[number] | null>(null);
     const [widthCm, setWidthCm] = useState('');
     const [heightCm, setHeightCm] = useState('');
     const [panels, setPanels] = useState(1);
-    const [mountingType, setMountingType] = useState(MOUNTING_OPTIONS[0]);
-    const [controlSide, setControlSide] = useState(CONTROL_OPTIONS[0]);
-    const [controlType, setControlType] = useState(CONTROL_TYPE_OPTIONS[0]);
+    const [mountingType, setMountingType] = useState<string>(MOUNTING_OPTIONS[0]);
+    const [controlSide, setControlSide] = useState<string>(CONTROL_OPTIONS[0]);
+    const [controlType, setControlType] = useState<string>(CONTROL_TYPE_OPTIONS[0]);
     const [notes, setNotes] = useState('');
     const [branch, setBranch] = useState(BRANCHES[0]);
+
+    // Reset image index when product changes (navigating between products)
+    useEffect(() => {
+        setActiveImageIdx(0);
+    }, [product.id]);
 
     const isReady = !!widthCm && !!heightCm && Number(widthCm) > 0 && Number(heightCm) > 0;
 
@@ -256,18 +263,19 @@ const ShopProductDetailsView = ({ product }: Props) => {
         return calcPrice(w, h, product.unitPrice, panels);
     }, [widthCm, heightCm, panels, product.unitPrice]);
 
-    const handlePresetSelect = (preset: typeof STANDARD_SIZES[0]) => {
+    const handlePresetSelect = useCallback((preset: typeof STANDARD_SIZES[number]) => {
         setSelectedPreset(preset);
         setWidthCm(String(preset.width));
         setHeightCm(String(preset.height));
-    };
+    }, []);
 
-    const handleDimChange = (field: 'w' | 'h', val: string) => {
+    const handleDimChange = useCallback((field: 'w' | 'h', val: string) => {
         setSelectedPreset(null);
-        field === 'w' ? setWidthCm(val) : setHeightCm(val);
-    };
+        if (field === 'w') setWidthCm(val);
+        else setHeightCm(val);
+    }, []);
 
-    const handleAddToCart = () => {
+    const handleAddToCart = useCallback(() => {
         if (!isReady || !price) return;
 
         const payload: BlindOrderFields = {
@@ -275,32 +283,41 @@ const ShopProductDetailsView = ({ product }: Props) => {
             productName: product.name,
             productCode: product.productCode,
             productImage: imageUrls[0] ?? '',
-
-            // selectedColor maps BlindsColor.id → CartItemColor.colorId
-            // This is the UUID the checkout controller uses to look up the color
             selectedColor: selectedColor
                 ? {
-                    colorId: selectedColor.id,       // BlindsColor.id from the API
+                    colorId: selectedColor.id,
                     name: selectedColor.name,
                     imageUrl: selectedColor.imageUrl,
                 }
                 : undefined,
-
             widthCm: Number(widthCm),
             heightCm: Number(heightCm),
             panels,
             mountingType,
             controlSide,
             controlType,
-            notes,
+            notes: notes.trim() || undefined,
             branch: branch.id,
             priceBreakdown: price,
         };
 
         addToCart(payload);
-    };
+    }, [
+        isReady, price, product, imageUrls, selectedColor,
+        widthCm, heightCm, panels, mountingType, controlSide,
+        controlType, notes, branch, addToCart,
+    ]);
 
     const maxFabricWidth = parseInt(product.fabricWidth ?? '280', 10) || 280;
+
+    const specRows = useMemo(() => ([
+        { icon: Package, label: 'Composition', value: product.composition },
+        { icon: Maximize2, label: 'Fabric Width', value: product.fabricWidth },
+        { icon: Ruler, label: 'Thickness', value: product.thickness },
+        { icon: Package, label: 'Packing', value: product.packing },
+        ...(product.characteristic ? [{ icon: Info, label: 'Characteristic', value: product.characteristic }] : []),
+    ] as { icon: React.ElementType; label: string; value: string | null }[])
+        .filter(r => !!r.value), [product]);
 
     return (
         <>
@@ -308,7 +325,11 @@ const ShopProductDetailsView = ({ product }: Props) => {
                 <Lightbox images={imageUrls} initialIndex={lightboxIdx} onClose={() => setLightboxOpen(false)} />
             )}
             {colorDialog && (
-                <ColorImageDialog colorName={colorDialog.name} imageUrl={colorDialog.imageUrl} onClose={() => setColorDialog(null)} />
+                <ColorImageDialog
+                    colorName={colorDialog.name}
+                    imageUrl={colorDialog.imageUrl}
+                    onClose={() => setColorDialog(null)}
+                />
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 xl:gap-24 items-start w-full">
@@ -318,13 +339,20 @@ const ShopProductDetailsView = ({ product }: Props) => {
                     <div
                         className="relative aspect-[4/5] w-full bg-muted border border-border overflow-hidden group cursor-zoom-in"
                         onClick={() => openLightbox(activeImageIdx)}
-                        role="button" tabIndex={0} aria-label="Open full-size image"
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Open full-size image"
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openLightbox(activeImageIdx); }}
                     >
                         {imageUrls.length > 0 ? (
-                            <Image src={imageUrls[activeImageIdx]} alt={product.name} fill priority
+                            <Image
+                                src={imageUrls[activeImageIdx]}
+                                alt={product.name}
+                                fill
+                                priority
                                 sizes="(max-width: 1024px) 100vw, 50vw"
-                                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]" />
+                                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                            />
                         ) : (
                             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/40 font-serif text-sm bg-accent/20">
                                 Image Unavailable
@@ -352,13 +380,16 @@ const ShopProductDetailsView = ({ product }: Props) => {
 
                     {imageUrls.length > 1 && (
                         <div className="grid grid-cols-5 gap-2">
-                            {imageUrls.map((url: string, idx: number) => (
-                                <button key={idx} onClick={() => setActiveImageIdx(idx)}
+                            {imageUrls.map((url, idx) => (
+                                <button
+                                    key={`thumb-${idx}`}
+                                    onClick={() => setActiveImageIdx(idx)}
                                     className={`relative aspect-square overflow-hidden border transition-all duration-200 ${activeImageIdx === idx
                                         ? 'border-foreground opacity-100 ring-1 ring-foreground/20'
                                         : 'border-border opacity-55 hover:opacity-90 hover:border-foreground/40'
                                         }`}
-                                    aria-label={`View image ${idx + 1}`}>
+                                    aria-label={`View image ${idx + 1}`}
+                                >
                                     <Image src={url} alt={`${product.name} ${idx + 1}`} fill className="object-cover" sizes="80px" />
                                 </button>
                             ))}
@@ -366,31 +397,25 @@ const ShopProductDetailsView = ({ product }: Props) => {
                     )}
 
                     {/* Specs — desktop only */}
-                    <div className="hidden lg:block border border-border mt-2">
-                        <div className="px-5 py-4 border-b border-border bg-accent/20">
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-foreground flex items-center gap-2">
-                                <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
-                                Technical Specifications
-                            </span>
-                        </div>
-                        <div className="divide-y divide-border">
-                            {([
-                                { icon: Package, label: 'Composition', value: product.composition },
-                                { icon: Maximize2, label: 'Fabric Width', value: product.fabricWidth },
-                                { icon: Ruler, label: 'Thickness', value: product.thickness },
-                                { icon: Package, label: 'Packing', value: product.packing },
-                                ...(product.characteristic ? [{ icon: Info, label: 'Characteristic', value: product.characteristic }] : []),
-                            ] as { icon: React.ElementType; label: string; value: string | null }[])
-                                .filter(r => !!r.value)
-                                .map(({ icon: Icon, label, value }) => (
+                    {specRows.length > 0 && (
+                        <div className="hidden lg:block border border-border mt-2">
+                            <div className="px-5 py-4 border-b border-border bg-accent/20">
+                                <span className="text-[10px] uppercase tracking-widest font-semibold text-foreground flex items-center gap-2">
+                                    <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                    Technical Specifications
+                                </span>
+                            </div>
+                            <div className="divide-y divide-border">
+                                {specRows.map(({ icon: Icon, label, value }) => (
                                     <div key={label} className="flex items-start gap-4 px-5 py-3 hover:bg-accent/30 transition-colors">
                                         <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" strokeWidth={1.5} />
                                         <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium w-28 shrink-0 pt-px">{label}</span>
                                         <span className="text-xs text-foreground font-medium leading-relaxed">{value}</span>
                                     </div>
                                 ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* ── RIGHT: Configurator ───────────────────────────── */}
@@ -487,11 +512,14 @@ const ShopProductDetailsView = ({ product }: Props) => {
                             {STANDARD_SIZES.map(preset => {
                                 const active = selectedPreset?.label === preset.label;
                                 return (
-                                    <button key={preset.label} onClick={() => handlePresetSelect(preset)}
+                                    <button
+                                        key={preset.label}
+                                        onClick={() => handlePresetSelect(preset)}
                                         className={`relative flex flex-col items-center justify-center px-3 py-3 border text-center transition-all duration-200 gap-1 ${active
                                             ? 'border-foreground bg-foreground text-background'
                                             : 'border-border hover:border-foreground/40 bg-transparent text-foreground'
-                                            }`}>
+                                            }`}
+                                    >
                                         <span className="text-xs font-medium tracking-wide">{preset.label}</span>
                                         <span className={`text-[9px] font-medium ${active ? 'text-background/60' : 'text-muted-foreground'}`}>cm</span>
                                         {preset.popular && (
@@ -510,10 +538,15 @@ const ShopProductDetailsView = ({ product }: Props) => {
                             ]).map(({ field, label, val, hint, ph }) => (
                                 <div key={field} className="flex flex-col gap-1.5">
                                     <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">{label}</label>
-                                    <input type="number" min={20} max={field === 'w' ? maxFabricWidth : 3000}
-                                        placeholder={ph} value={val}
+                                    <input
+                                        type="number"
+                                        min={20}
+                                        max={field === 'w' ? maxFabricWidth : 3000}
+                                        placeholder={ph}
+                                        value={val}
                                         onChange={e => handleDimChange(field, e.target.value)}
-                                        className="h-11 border border-border bg-transparent px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground transition-colors" />
+                                        className="h-11 border border-border bg-transparent px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground transition-colors"
+                                    />
                                     <span className="text-[10px] text-muted-foreground">{hint}</span>
                                 </div>
                             ))}
@@ -527,13 +560,21 @@ const ShopProductDetailsView = ({ product }: Props) => {
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Panels</label>
                                 <div className="flex items-center border border-border h-11">
-                                    <button onClick={() => setPanels(p => Math.max(1, p - 1))}
+                                    <button
+                                        onClick={() => setPanels(p => Math.max(1, p - 1))}
                                         className="w-11 h-full flex items-center justify-center text-foreground hover:bg-accent transition-colors text-lg font-light shrink-0"
-                                        aria-label="Decrease panels">−</button>
+                                        aria-label="Decrease panels"
+                                    >
+                                        −
+                                    </button>
                                     <span className="flex-1 text-center text-sm font-medium text-foreground">{panels}</span>
-                                    <button onClick={() => setPanels(p => p + 1)}
+                                    <button
+                                        onClick={() => setPanels(p => p + 1)}
                                         className="w-11 h-full flex items-center justify-center text-foreground hover:bg-accent transition-colors text-lg font-light shrink-0"
-                                        aria-label="Increase panels">+</button>
+                                        aria-label="Increase panels"
+                                    >
+                                        +
+                                    </button>
                                 </div>
                             </div>
                             <SelectField label="Mounting Type" value={mountingType} options={MOUNTING_OPTIONS} onChange={setMountingType} />
@@ -544,9 +585,13 @@ const ShopProductDetailsView = ({ product }: Props) => {
                             <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
                                 Special Notes <span className="normal-case text-muted-foreground/60">(optional)</span>
                             </label>
-                            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
+                            <textarea
+                                rows={2}
+                                value={notes}
+                                onChange={e => setNotes(e.target.value)}
                                 placeholder="e.g. arched window, specific bracket type…"
-                                className="border border-border bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground transition-colors resize-none" />
+                                className="border border-border bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground transition-colors resize-none"
+                            />
                         </div>
                     </div>
 
@@ -599,8 +644,11 @@ const ShopProductDetailsView = ({ product }: Props) => {
                                 Please select a size to continue.
                             </p>
                         )}
-                        <button onClick={handleAddToCart} disabled={!isReady}
-                            className="flex items-center justify-center gap-3 h-14 w-full bg-foreground text-background uppercase tracking-widest text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        <button
+                            onClick={handleAddToCart}
+                            disabled={!isReady}
+                            className="flex items-center justify-center gap-3 h-14 w-full bg-foreground text-background uppercase tracking-widest text-xs font-medium hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                             <ShoppingCart className="w-4 h-4" strokeWidth={1.5} />
                             Add to Cart
                         </button>
@@ -622,26 +670,24 @@ const ShopProductDetailsView = ({ product }: Props) => {
                     </div>
 
                     {/* Specs — mobile only */}
-                    <div className="lg:hidden py-7">
-                        <SectionLabel>Technical Specifications</SectionLabel>
-                        <div className="grid grid-cols-1 divide-y divide-border border-y border-border">
-                            {([
-                                { label: 'Composition', value: product.composition },
-                                { label: 'Fabric Width', value: product.fabricWidth },
-                                { label: 'Thickness', value: product.thickness },
-                                { label: 'Packing', value: product.packing },
-                                { label: 'Unit Price', value: `${php(product.unitPrice)} / sq·ft` },
-                                ...(product.characteristic ? [{ label: 'Characteristic', value: product.characteristic }] : []),
-                            ] as { label: string; value: string | null }[])
-                                .filter(r => !!r.value)
-                                .map(({ label, value }) => (
-                                    <div key={label} className="grid grid-cols-2 py-4 gap-4 items-start hover:bg-accent/30 transition-colors px-1">
-                                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">{label}</span>
-                                        <span className="text-xs text-foreground font-medium leading-relaxed">{value}</span>
-                                    </div>
-                                ))}
+                    {specRows.length > 0 && (
+                        <div className="lg:hidden py-7">
+                            <SectionLabel>Technical Specifications</SectionLabel>
+                            <div className="grid grid-cols-1 divide-y divide-border border-y border-border">
+                                {([
+                                    ...specRows,
+                                    { label: 'Unit Price', value: `${php(product.unitPrice)} / sq·ft` },
+                                ] as { label: string; value: string | null }[])
+                                    .filter(r => !!r.value)
+                                    .map(({ label, value }) => (
+                                        <div key={label} className="grid grid-cols-2 py-4 gap-4 items-start hover:bg-accent/30 transition-colors px-1">
+                                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">{label}</span>
+                                            <span className="text-xs text-foreground font-medium leading-relaxed">{value}</span>
+                                        </div>
+                                    ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </>

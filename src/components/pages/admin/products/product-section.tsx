@@ -118,7 +118,7 @@ const ProductSection = () => {
                                             <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}`) }} className="cursor-pointer">
                                                 <Eye className="mr-2 h-4 w-4" /> View Details
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => { }} className="cursor-pointer">
+                                            <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}/edit`) }} className="cursor-pointer">
                                                 <Edit3 className="mr-2 h-4 w-4" /> Edit Details
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />

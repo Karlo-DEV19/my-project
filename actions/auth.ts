@@ -15,6 +15,8 @@ import type { AuthResponse } from "@/lib/types/auth"
 import { admins } from "@/schema/admin/admins"
 import { otpCodes } from "@/schema/otp/otp-code"
 import { sendOtpEmail } from "@/app/api/services/nodemailer/send-otp-code-service"
+import { createActivityLog } from "@/app/api/controller/activity-logs"
+import { ActivityAction, ActivityModule } from "@/lib/constans/activity-log"
 
 // ─────────────────────────────────────────────────────────────
 // Shared return type for all mutation actions
@@ -25,13 +27,6 @@ type ActionResult =
 
 // ─────────────────────────────────────────────────────────────
 // getUserSession
-//
-// Reads the current authenticated user and enriches it with
-// data from our own tables (admins or employees).
-//
-// - Called by the auth provider and any server component
-// - React cache() ensures it only runs once per request even
-//   if multiple components call it simultaneously
 // ─────────────────────────────────────────────────────────────
 export const getUserSession = cache(async (): Promise<AuthResponse> => {
     const supabase = await createClient()
@@ -98,12 +93,6 @@ export const getUserSession = cache(async (): Promise<AuthResponse> => {
 
 // ─────────────────────────────────────────────────────────────
 // verifyAdminPasscode  (Gatekeeper — Step 0)
-//
-// A pre-login gate that hides the login form behind a master
-// passcode. On success it sets an encrypted httpOnly cookie
-// valid for 24 hours so the user isn't prompted again.
-//
-// Set ENCRYPTION_KEY in your .env file.
 // ─────────────────────────────────────────────────────────────
 export async function verifyAdminPasscode(passcode: string): Promise<ActionResult> {
     const correctPasscode = process.env.ENCRYPTION_KEY
@@ -138,16 +127,6 @@ export async function verifyAdminPasscode(passcode: string): Promise<ActionResul
 
 // ─────────────────────────────────────────────────────────────
 // initiateSignIn  (Step 1 — credentials → OTP)
-//
-// 1. Validates email + password with Supabase auth
-// 2. Confirms the user is in our admins or employees table
-//    and that their account is active
-// 3. Generates a 6-digit OTP, invalidates any previous ones,
-//    and emails it to the user
-//
-// The Supabase session is established here. The 2fa_verified
-// cookie (set in verifyOtpCode) is the second gate. Your
-// middleware must check BOTH before allowing /admin access.
 // ─────────────────────────────────────────────────────────────
 export async function initiateSignIn(email: string, password: string): Promise<ActionResult> {
     const supabase = await createClient()
@@ -192,8 +171,6 @@ export async function initiateSignIn(email: string, password: string): Promise<A
 
     // 3. Generate OTP — invalidate old ones first, then insert fresh
     const code = Math.floor(100000 + Math.random() * 900000).toString()
-
-    // OTP schema fields: email, code, expiresAt, isUsed, createdAt (auto)
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes from now
 
     try {
@@ -208,7 +185,7 @@ export async function initiateSignIn(email: string, password: string): Promise<A
                 )
             )
 
-        // Insert the new OTP — matches schema: { email, code, expiresAt, isUsed }
+        // Insert the new OTP
         await db.insert(otpCodes).values({
             email,
             code,
@@ -234,25 +211,19 @@ export async function initiateSignIn(email: string, password: string): Promise<A
 // ─────────────────────────────────────────────────────────────
 // verifyOtpCode  (Step 2 — OTP → session unlock)
 //
-// Validates the code against the otp_codes table:
-//   - email must match
-//   - code must match
-//   - isUsed must be false
-//   - expiresAt must be in the future  ← uses gt() against new Date()
-//
-// On success, marks the OTP as used and sets the 2fa_verified
-// httpOnly cookie. Middleware checks this cookie on every
-// request to /admin routes.
+// After OTP is validated, we resolve the userId from Supabase's
+// active session (the session was already established in
+// initiateSignIn via signInWithPassword) and log the LOGIN event.
 // ─────────────────────────────────────────────────────────────
 export async function verifyOtpCode(email: string, code: string): Promise<ActionResult> {
     try {
         // All four conditions must pass — any mismatch returns invalid
         const validOtp = await db.query.otpCodes.findFirst({
             where: and(
-                eq(otpCodes.email, email),       // matches the account
-                eq(otpCodes.code, code),          // user entered the right code
-                eq(otpCodes.isUsed, false),        // hasn't been consumed yet
-                gt(otpCodes.expiresAt, new Date()) // hasn't expired yet
+                eq(otpCodes.email, email),
+                eq(otpCodes.code, code),
+                eq(otpCodes.isUsed, false),
+                gt(otpCodes.expiresAt, new Date())
             ),
         })
 
@@ -276,6 +247,22 @@ export async function verifyOtpCode(email: string, code: string): Promise<Action
             path: "/",
         })
 
+        // ── Resolve userId from the active Supabase session ──────────────
+        // signInWithPassword in initiateSignIn already set the session,
+        // so getUser() returns the authenticated user here.
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        // Log LOGIN — non-blocking, will never throw or break the flow
+        if (user?.id) {
+            await createActivityLog(db, {
+                userId: user.id,
+                action: ActivityAction.LOGIN,
+                module: ActivityModule.AUTH,
+                description: `Login successful for ${email}`,
+            })
+        }
+
         revalidatePath("/", "layout")
         return { success: true }
     } catch (err) {
@@ -287,11 +274,26 @@ export async function verifyOtpCode(email: string, code: string): Promise<Action
 // ─────────────────────────────────────────────────────────────
 // signOut
 //
-// Clears the Supabase session and all auth-related cookies.
-// Always redirects to /login — never throws.
+// Resolves the userId BEFORE signing out (getUser() returns
+// null after signOut), logs the LOGOUT event, then clears
+// all auth cookies and redirects to /login.
 // ─────────────────────────────────────────────────────────────
 export async function signOut(): Promise<never> {
     const supabase = await createClient()
+
+    // ── Resolve userId BEFORE the session is destroyed ───────────────────
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Log LOGOUT — must happen before signOut() invalidates the session
+    if (user?.id) {
+        await createActivityLog(db, {
+            userId: user.id,
+            action: ActivityAction.LOGOUT,
+            module: ActivityModule.AUTH,
+            description: `User signed out`,
+        })
+    }
+
     await supabase.auth.signOut()
 
     const cookieStore = await cookies()

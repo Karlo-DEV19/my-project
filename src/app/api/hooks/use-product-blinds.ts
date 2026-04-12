@@ -1,8 +1,98 @@
 // src/lib/hooks/useCreateNewBlinds.ts
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosApiClient } from "../axiosApiClient";
-import { BestSellerProduct, BlindsProduct, BlindsProductDetailResponse, CreateBlindsResponse, GetAllBestSellerProductBlinds, GetAllNewArrivalProductBlinds, GetBlindsProductsResponse, NewArrivalProduct } from "@/lib/types/product-blinds-type";
+import { BestSellerProduct, BlindsProduct, BlindsProductDetailResponse, CreateBlindsResponse, EditProductPayload, GetAllBestSellerProductBlinds, GetAllNewArrivalProductBlinds, GetBlindsProductsResponse, NewArrivalProduct } from "@/lib/types/product-blinds-type";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface UpdateBlindsParams {
+  id: string;
+  payload: EditProductPayload;
+}
+
+interface UpdateBlindsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    id: string;
+    productCode: string;
+    name: string;
+    description: string | null;
+    type: string | null;
+    collection: string;
+    status: string;
+    composition: string | null;
+    fabricWidth: string | null;
+    thickness: string | null;
+    packing: string | null;
+    characteristic: string | null;
+    unitPrice: number;
+    createdAt: string;
+    updatedAt: string;
+    images: {
+      id: string;
+      productId: string;
+      imageUrl: string;
+      createdAt: string;
+    }[];
+    colors: {
+      id: string;
+      productId: string;
+      name: string;
+      imageUrl: string;
+      createdAt: string;
+    }[];
+  };
+}
+
+// ─── API Request ──────────────────────────────────────────────────────────────
+
+const updateBlindsRequest = async ({
+  id,
+  payload,
+}: UpdateBlindsParams): Promise<UpdateBlindsResponse> => {
+    console.log("id", id);
+    console.log("payload", payload);
+  const { data } = await axiosApiClient.put<UpdateBlindsResponse>(
+    `/product-blinds/${id}/update`,
+    payload
+  );
+  return data;
+};
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export const useUpdateBlindsById = () => {
+  const queryClient = useQueryClient();
+
+  // ✅ Fixed: added the missing < generic bracket
+  const mutation = useMutation<UpdateBlindsResponse, Error, UpdateBlindsParams>(
+    {
+      mutationFn: updateBlindsRequest,
+      onSuccess: (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ["blindsProducts"] });
+        queryClient.invalidateQueries({
+          queryKey: ["blinds-product", variables.id],
+        });
+        queryClient.setQueryData(["blinds-product", variables.id], data.data);
+      },
+      onError: (error) => {
+        console.error("[useUpdateBlindsById] Error:", error);
+      },
+    }
+  );
+
+  return {
+    updateBlinds: mutation.mutate,
+    updateBlindsAsync: mutation.mutateAsync,
+    isUpdating: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+    error: mutation.error,
+    data: mutation.data,
+    reset: mutation.reset,
+  };
+};
 
 export function useCreateNewBlinds() {
     const queryClient = useQueryClient();
@@ -85,38 +175,28 @@ export function useGetBlindsProducts({
 
 export function useGetBlindsDetailsByProductId(productId: string | undefined | null) {
     const query = useQuery({
-        // The productId in the key ensures data is cached specifically for this record
         queryKey: ["blindsProduct", productId],
-
         queryFn: async (): Promise<BlindsProductDetailResponse> => {
+            // Replace `axiosApiClient` with your actual configured axios instance
             const { data } = await axiosApiClient.get<BlindsProductDetailResponse>(
                 `/product-blinds/${productId}`
             );
             return data;
         },
-
-        // Optimization: Prevent the query from running if the ID is invalid
-        enabled: !!productId && productId !== "" && productId !== "null" && productId !== "undefined",
-
-        // Cache Management
-        staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-        gcTime: 10 * 60 * 1000,    // Keep unused data in memory for 10 minutes
-
-        // Error resilience
+        enabled: !!productId && productId !== "null" && productId !== "undefined",
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        gcTime: 10 * 60 * 1000,   // 10 minutes
         retry: (failureCount, error: any) => {
-            // Don't retry if the product simply doesn't exist (404)
             if (error?.response?.status === 404) return false;
             return failureCount < 2;
         }
     });
 
     return {
-        // Safe access to the nested data
         product: query.data?.data,
         ...query,
     };
 }
-
 
 interface UseGetBlindsProductsProps {
     page?: number;

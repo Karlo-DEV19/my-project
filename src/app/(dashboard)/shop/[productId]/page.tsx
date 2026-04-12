@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { useParams, notFound } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useGetBlindsDetailsByProductId } from '@/app/api/hooks/use-product-blinds';
 import ShopProductDetailsView from '@/components/pages/shop/shop-product-details-view';
+
 // ─── Loading skeleton ────────────────────────────────────────────────────────
 
 const ProductDetailSkeleton = () => (
@@ -35,7 +36,7 @@ const ProductDetailSkeleton = () => (
     </div>
 );
 
-// ─── Error state ──────────────────────────────────────────────────────────────
+// ─── Error / 404 state ───────────────────────────────────────────────────────
 
 const ProductNotFound = () => (
     <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
@@ -45,7 +46,7 @@ const ProductNotFound = () => (
         <h2 className="font-serif text-3xl tracking-wide text-foreground">Product Not Found</h2>
         <div className="w-10 h-px bg-border" />
         <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-            The product you're looking for doesn't exist or has been removed from our collection.
+            The product you&apos;re looking for doesn&apos;t exist or has been removed from our collection.
         </p>
         <a
             href="/shop"
@@ -59,16 +60,28 @@ const ProductNotFound = () => (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ShopProductPage() {
-    // next/navigation useParams — route: /shop/[productId]
     const params = useParams<{ productId: string }>();
     const productId = params?.productId;
 
-    const { product, isLoading, isError, error } = useGetBlindsDetailsByProductId(productId);
+    // Guard: bad param — render 404 immediately, don't call the hook
+    const isInvalidId =
+        !productId ||
+        productId === 'null' ||
+        productId === 'undefined' ||
+        productId.trim() === '';
 
-    // If the hook was never enabled (bad param) or got a 404, show not-found UI
-    const is404 = (error as any)?.response?.status === 404;
+    const { product, isLoading, isError, error } = useGetBlindsDetailsByProductId(
+        // Pass undefined when id is invalid so the hook can disable itself
+        isInvalidId ? undefined : productId
+    );
 
-    if (!productId || productId === 'null' || productId === 'undefined') {
+    const is404 =
+        isInvalidId ||
+        (error as any)?.response?.status === 404 ||
+        (!isLoading && !isError && !product);
+
+    // ── Invalid id (before any fetch) ──────────────────────────────────────
+    if (isInvalidId) {
         return (
             <main className="w-full max-w-7xl mx-auto p-6 md:p-10 lg:p-12 font-sans">
                 <ProductNotFound />
@@ -76,22 +89,23 @@ export default function ShopProductPage() {
         );
     }
 
+    // ── Loading ────────────────────────────────────────────────────────────
     if (isLoading) {
         return (
             <main className="w-full max-w-7xl mx-auto p-6 md:p-10 lg:p-12 font-sans">
-                {/* Breadcrumb skeleton */}
-                <div className="flex items-center gap-2 mb-8">
+                <nav className="flex items-center gap-2 mb-8">
                     <div className="h-3 w-10 bg-muted rounded animate-pulse" />
                     <span className="text-muted-foreground/40 text-xs">/</span>
                     <div className="h-3 w-16 bg-muted rounded animate-pulse" />
                     <span className="text-muted-foreground/40 text-xs">/</span>
                     <div className="h-3 w-28 bg-muted rounded animate-pulse" />
-                </div>
+                </nav>
                 <ProductDetailSkeleton />
             </main>
         );
     }
 
+    // ── Error / 404 ────────────────────────────────────────────────────────
     if (isError || is404 || !product) {
         return (
             <main className="w-full max-w-7xl mx-auto p-6 md:p-10 lg:p-12 font-sans">
@@ -100,25 +114,26 @@ export default function ShopProductPage() {
         );
     }
 
+    // ── Happy path ─────────────────────────────────────────────────────────
     return (
         <main className="w-full max-w-7xl mx-auto p-6 md:p-10 lg:p-12 font-sans animate-in fade-in duration-500">
-
-            {/* Breadcrumb */}
-            <nav className="flex items-center gap-2 mb-8 text-[10px] uppercase tracking-widest font-medium">
+            <nav
+                className="flex items-center gap-2 mb-8 text-[10px] uppercase tracking-widest font-medium"
+                aria-label="Breadcrumb"
+            >
                 <a href="/" className="text-muted-foreground hover:text-foreground transition-colors">
                     Home
                 </a>
-                <span className="text-muted-foreground/40">/</span>
+                <span className="text-muted-foreground/40" aria-hidden="true">/</span>
                 <a href="/shop" className="text-muted-foreground hover:text-foreground transition-colors">
                     Shop
                 </a>
-                <span className="text-muted-foreground/40">/</span>
+                <span className="text-muted-foreground/40" aria-hidden="true">/</span>
                 <span className="text-foreground truncate max-w-[200px]">{product.name}</span>
             </nav>
 
-            {/* Details view — receives the fully-typed `data` object from the API */}
+            {/* product is guaranteed non-null here */}
             <ShopProductDetailsView product={product} />
-
         </main>
     );
 }

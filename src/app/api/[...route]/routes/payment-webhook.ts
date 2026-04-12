@@ -3,7 +3,7 @@ import {
     PayMongoWebhookPayload,
     processWebhookEvent,
     verifyWebhookSignature,
-} from "@/app/api/services/nodemailer/paymongo/payment-webhook"
+} from "@/app/api/services/paymongo/payment-webhook"
 
 const webhooksRoute = new Hono()
 

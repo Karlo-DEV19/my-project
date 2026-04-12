@@ -3,7 +3,7 @@ import { db } from "@/lib/supabase/db"
 import { and, eq, isNull, ne } from "drizzle-orm"
 import { orders, orderItems } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
-import { sendOrderStatusEmail } from "../send-order-status-service"
+import { sendOrderStatusEmail } from "../nodemailer/send-order-status-service"
 
 const PAYMONGO_WEBHOOK_SECRET = process.env.PAYMONGO_WEBHOOK_SECRET ?? ""
 

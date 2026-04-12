@@ -6,7 +6,8 @@ import { blindsProducts } from "@/schema/products/blinds/blinds-product"
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
 import { orderItems, orders } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
-import { createOrderPaymentSession } from "../services/paymongo/order-checkout-payment"
+import { notifications } from "@/schema/notifications/notifications.schema"
+import { createOrderPaymentSession } from "../services/nodemailer/paymongo/order-checkout-payment"
 import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image"
 import { sendOrderStatusEmail } from "../services/nodemailer/send-order-status-service"
 
@@ -88,6 +89,12 @@ const CheckoutSchema = z.object({
 })
 
 type CheckoutInput = z.infer<typeof CheckoutSchema>
+
+const UpdateOrderStatusSchema = z.object({
+    status: z.enum(['pending', 'processing', 'shipped', 'completed', 'cancelled'], {
+        error: () => ({ message: "Status must be a valid order status" }),
+    })
+})
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
@@ -359,6 +366,13 @@ export const checkoutOrder = async (ctx: Context) => {
                 paymentMethod: input.paymentMethod,
                 referenceNumber,
                 amountDue: downpaymentAmount.toFixed(2),
+            })
+
+            // ── Notification: new order placed ─────────────────────────────
+            await tx.insert(notifications).values({
+                title: "New Order",
+                message: "A new customer has placed an order",
+                isRead: false,
             })
         })
 
@@ -696,9 +710,48 @@ export const getAllOrders = async (ctx: Context) => {
     }
 }
 
+export const updateOrderStatus = async (ctx: Context) => {
+    try {
+        const id = ctx.req.param("id");
+
+        if (!id) {
+            return ctx.json({ success: false, message: "Order ID is required" }, 400);
+        }
+
+        const body = await ctx.req.json();
+        const parsed = UpdateOrderStatusSchema.safeParse(body);
+
+        if (!parsed.success) {
+            return ctx.json(
+                {
+                    success: false,
+                    message: "Validation failed",
+                    errors: parsed.error.flatten().fieldErrors,
+                },
+                400
+            );
+        }
+
+        const [updatedOrder] = await db
+            .update(orders)
+            .set({ status: parsed.data.status, updatedAt: new Date() })
+            .where(eq(orders.id, id))
+            .returning({ id: orders.id, status: orders.status });
+
+        if (!updatedOrder) {
+            return ctx.json({ success: false, message: "Order not found" }, 404);
+        }
+
+        return ctx.json({ success: true, message: "Order status updated", data: updatedOrder });
+    } catch (error) {
+        console.error("Failed to update order status:", error);
+        return ctx.json({ success: false, message: "Failed to update order status." }, 500);
+    }
+};
 
 export default {
     getOrderDetailsStatus,
     getAllOrders,
-    checkoutOrder
+    checkoutOrder,
+    updateOrderStatus
 }

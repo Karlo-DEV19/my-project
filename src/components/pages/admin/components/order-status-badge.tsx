@@ -20,6 +20,8 @@ const statusStyles: Record<OrderStatus, string> = {
 };
 
 export default function OrderStatusBadge({ status }: { status: OrderStatus }) {
+  const normalized = status?.toLowerCase() as OrderStatus;
+
   return (
     <Badge
       variant="outline"

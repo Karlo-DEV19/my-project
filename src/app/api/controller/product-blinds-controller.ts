@@ -25,39 +25,39 @@ export const updateBlindsById = async (ctx: Context) => {
         }
 
         const updateBlindsSchema = z.object({
-            userId:         z.string().min(1).trim(),
-            productCode:    z.string().min(1).trim(),
-            name:           z.string().min(1).trim(),
-            description:    z.string().trim().default(""),
-            type:           z.string().trim().default(""),
-            collection:     z.enum(["Shop Only", "New Arrival", "Best Seller"]),
-            status:         z.enum(["active", "inactive", "archived"]),
-            composition:    z.string().trim().default(""),
-            fabricWidth:    z.string().trim().default(""),
-            thickness:      z.string().trim().default(""),
-            packing:        z.string().trim().default(""),
+            userId: z.string().min(1).trim(),
+            productCode: z.string().min(1).trim(),
+            name: z.string().min(1).trim(),
+            description: z.string().trim().default(""),
+            type: z.string().trim().default(""),
+            collection: z.enum(["Shop Only", "New Arrival", "Best Seller"]),
+            status: z.enum(["active", "inactive", "archived"]),
+            composition: z.string().trim().default(""),
+            fabricWidth: z.string().trim().default(""),
+            thickness: z.string().trim().default(""),
+            packing: z.string().trim().default(""),
             characteristic: z.string().trim().default(""),
-            unitPrice:      z.number().min(0),
+            unitPrice: z.number().min(0),
             // ✅ Accept any non-empty string — URLs from Supabase are valid strings
             mainImages: z
                 .array(z.string().min(1))
                 .default([]),
             availableColors: z
                 .array(z.object({
-                    name:     z.string().min(1).trim(),
+                    name: z.string().min(1).trim(),
                     imageUrl: z.string().min(1),
                 }))
                 .default([]),
         });
 
-        const body   = await ctx.req.json();
+        const body = await ctx.req.json();
         const parsed = updateBlindsSchema.safeParse(body);
 
         if (!parsed.success) {
             return ctx.json({
                 success: false,
                 message: "Invalid request payload",
-                errors:  parsed.error.flatten().fieldErrors,
+                errors: parsed.error.flatten().fieldErrors,
             }, 400);
         }
 
@@ -124,11 +124,11 @@ export const updateBlindsById = async (ctx: Context) => {
             const insertedImages =
                 normalizedImages.length > 0
                     ? await tx
-                          .insert(blindsProductImages)
-                          .values(
-                              normalizedImages.map((imageUrl) => ({ productId, imageUrl }))
-                          )
-                          .returning()
+                        .insert(blindsProductImages)
+                        .values(
+                            normalizedImages.map((imageUrl) => ({ productId, imageUrl }))
+                        )
+                        .returning()
                     : [];
 
             // 3. Wipe old colors → insert exactly what client sent
@@ -139,24 +139,24 @@ export const updateBlindsById = async (ctx: Context) => {
             const insertedColors =
                 normalizedColors.length > 0
                     ? await tx
-                          .insert(blindsProductColors)
-                          .values(
-                              normalizedColors.map((c) => ({
-                                  productId,
-                                  name:     c.name,
-                                  imageUrl: c.imageUrl,
-                              }))
-                          )
-                          .returning()
+                        .insert(blindsProductColors)
+                        .values(
+                            normalizedColors.map((c) => ({
+                                productId,
+                                name: c.name,
+                                imageUrl: c.imageUrl,
+                            }))
+                        )
+                        .returning()
                     : [];
 
             return { ...product, images: insertedImages, colors: insertedColors };
         });
 
         await createActivityLog(db, {
-            userId:      parsed.data.userId,
-            action:      "UPDATE" as ActivityActionType,
-            module:      "BLINDS_PRODUCT" as ActivityModuleType,
+            userId: parsed.data.userId,
+            action: "UPDATE" as ActivityActionType,
+            module: "BLINDS_PRODUCT" as ActivityModuleType,
             referenceId: productId,
             description: `Updated product ${productCode}`,
         });
@@ -164,7 +164,7 @@ export const updateBlindsById = async (ctx: Context) => {
         return ctx.json({
             success: true,
             message: "Product updated successfully",
-            data:    updatedProduct,
+            data: updatedProduct,
         });
 
     } catch (error) {

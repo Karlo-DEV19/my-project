@@ -61,17 +61,19 @@ const PermitSection = () => {
         </div>
 
         {/* IMAGE (MATCHED STYLE) */}
-        <div className="relative w-full overflow-hidden rounded-xl bg-muted cursor-pointer"
-          style={{ aspectRatio: "16/9" }}>
-
+        <div
+          className="relative w-full overflow-hidden rounded-xl bg-muted cursor-pointer"
+          style={{ aspectRatio: "16/9" }}
+        >
           <Image
             src={item.image}
             alt={item.title}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 90vw, 896px"
             className="object-contain p-6"
           />
 
-          {/* Gradient overlay (same as recent installation) */}
+          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
           {/* Text overlay */}

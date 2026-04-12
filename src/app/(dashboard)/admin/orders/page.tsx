@@ -11,6 +11,9 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { axiosApiClient } from '@/app/api/axiosApiClient';
 import AdminPageHeader from '@/components/pages/admin/components/admin-page-header';
 import OrderStatusBadge, {
   type OrderStatus,
@@ -53,7 +56,7 @@ import { cn } from '@/lib/utils';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PaymentStatus = 'Paid' | 'Unpaid' | 'Refunded' | 'Failed';
-type Tab           = 'orders' | 'payment-history';
+type Tab = 'orders' | 'payment-history';
 
 type OrderItem = {
   name: string;
@@ -61,18 +64,39 @@ type OrderItem = {
   price: number;
 };
 
-type Order = {
-  id: string;
-  customerName: string;
-  items: OrderItem[];
-  totalAmount: number;
-  status: OrderStatus;
-  orderDate: string;
-  address: string;
-  phone: string;
-  paymentMethod: string;
+/** Raw payment row returned by the backend inside each order */
+type ApiPayment = {
+  orderId: string;
+  paymentType: string;
+  status: string;
+  amountDue: string | null;
+  amountPaid: string | null;
+  paidAt: string | null;
+  paymentMethod?: string;
 };
 
+/** Raw order row returned by GET /api/v1/orders */
+type ApiOrder = {
+  id: string;
+  trackingNumber: string;
+  referenceNumber: string;
+  status: OrderStatus;
+  paymentStatus: string;
+  paymentMethod: string;
+  orderType: string;
+  customerFirstName: string;
+  customerLastName: string;
+  customerEmail: string;
+  customerPhone: string;
+  totalAmount: string;
+  downpaymentAmount: string;
+  balanceAmount: string;
+  createdAt: string;
+  updatedAt: string;
+  payments: ApiPayment[];
+};
+
+/** Normalised payment row used by the UI */
 type Payment = {
   id: string;
   orderId: string;
@@ -92,112 +116,19 @@ type Pagination = {
   hasPrevPage: boolean;
 };
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Payment status normaliser ────────────────────────────────────────────────
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 'ORD-2043',
-    customerName: 'Jane Doe',
-    items: [
-      { name: 'Evergreen Blackout Blinds', qty: 1, price: 8200 },
-      { name: 'Afternoon Sheer Curtains',  qty: 2, price: 6750 },
-    ],
-    totalAmount: 21700,
-    status: 'Processing',
-    orderDate: '2026-03-07',
-    address: '35 20th Avenue, Murphy Cubao, Quezon City, PH 1109',
-    phone: '0917 694 8888',
-    paymentMethod: 'GCash',
-  },
-  {
-    id: 'ORD-2042',
-    customerName: 'John Smith',
-    items: [{ name: 'Phantom Roller Shades', qty: 1, price: 12400 }],
-    totalAmount: 12400,
-    status: 'Completed',
-    orderDate: '2026-03-06',
-    address: 'Makati City, Metro Manila, PH',
-    phone: '0999 123 4567',
-    paymentMethod: 'Bank Transfer',
-  },
-  {
-    id: 'ORD-2041',
-    customerName: 'MJ Interiors',
-    items: [{ name: 'Modern Daylight Shades', qty: 6, price: 5900 }],
-    totalAmount: 35400,
-    status: 'Pending',
-    orderDate: '2026-03-05',
-    address: 'BGC, Taguig, PH',
-    phone: '0922 555 0000',
-    paymentMethod: 'Maya',
-  },
-  {
-    id: 'ORD-2040',
-    customerName: 'Andrea Cruz',
-    items: [{ name: 'Blackout Premium Panels', qty: 2, price: 9950 }],
-    totalAmount: 19900,
-    status: 'Shipped',
-    orderDate: '2026-03-02',
-    address: 'Pasig City, Metro Manila, PH',
-    phone: '0918 222 3344',
-    paymentMethod: 'GCash',
-  },
-  {
-    id: 'ORD-2039',
-    customerName: 'Carlos Reyes',
-    items: [{ name: 'Afternoon Sheer Curtains', qty: 1, price: 6750 }],
-    totalAmount: 6750,
-    status: 'Cancelled',
-    orderDate: '2026-02-28',
-    address: 'Quezon City, Metro Manila, PH',
-    phone: '0917 000 1111',
-    paymentMethod: 'Card',
-  },
-  {
-    id: 'ORD-2038',
-    customerName: 'Sofia Lim',
-    items: [{ name: 'Velvet Drape Curtains', qty: 3, price: 4800 }],
-    totalAmount: 14400,
-    status: 'Pending',
-    orderDate: '2026-02-25',
-    address: 'Mandaluyong, Metro Manila, PH',
-    phone: '0917 333 4455',
-    paymentMethod: 'Maya',
-  },
-  {
-    id: 'ORD-2037',
-    customerName: 'Mark Reyes',
-    items: [{ name: 'Bamboo Roman Shades', qty: 2, price: 7200 }],
-    totalAmount: 14400,
-    status: 'Shipped',
-    orderDate: '2026-02-20',
-    address: 'Caloocan, Metro Manila, PH',
-    phone: '0908 111 2233',
-    paymentMethod: 'GCash',
-  },
-  {
-    id: 'ORD-2036',
-    customerName: 'Anna Villanueva',
-    items: [{ name: 'Linen Sheer Panels', qty: 4, price: 3500 }],
-    totalAmount: 14000,
-    status: 'Completed',
-    orderDate: '2026-02-18',
-    address: 'Las Piñas, Metro Manila, PH',
-    phone: '0933 666 7788',
-    paymentMethod: 'Bank Transfer',
-  },
-];
+const PAYMENT_STATUS_MAP: Record<string, PaymentStatus> = {
+  paid: 'Paid',
+  unpaid: 'Unpaid',
+  pending: 'Unpaid',
+  refunded: 'Refunded',
+  failed: 'Failed',
+};
 
-const MOCK_PAYMENTS: Payment[] = [
-  { id: 'PAY-5001', orderId: 'ORD-2043', customer: 'Jane Doe',        amount: 21700, method: 'GCash',         status: 'Paid',     date: '2026-03-07' },
-  { id: 'PAY-5002', orderId: 'ORD-2042', customer: 'John Smith',      amount: 12400, method: 'Bank Transfer', status: 'Paid',     date: '2026-03-06' },
-  { id: 'PAY-5003', orderId: 'ORD-2041', customer: 'MJ Interiors',    amount: 35400, method: 'Maya',          status: 'Unpaid',   date: '2026-03-05' },
-  { id: 'PAY-5004', orderId: 'ORD-2040', customer: 'Andrea Cruz',     amount: 19900, method: 'GCash',         status: 'Paid',     date: '2026-03-02' },
-  { id: 'PAY-5005', orderId: 'ORD-2039', customer: 'Carlos Reyes',    amount: 6750,  method: 'Card',          status: 'Refunded', date: '2026-02-28' },
-  { id: 'PAY-5006', orderId: 'ORD-2038', customer: 'Sofia Lim',       amount: 14400, method: 'Maya',          status: 'Unpaid',   date: '2026-02-25' },
-  { id: 'PAY-5007', orderId: 'ORD-2037', customer: 'Mark Reyes',      amount: 14400, method: 'GCash',         status: 'Paid',     date: '2026-02-20' },
-  { id: 'PAY-5008', orderId: 'ORD-2036', customer: 'Anna Villanueva', amount: 14000, method: 'Bank Transfer', status: 'Failed',   date: '2026-02-18' },
-];
+function normalisePaymentStatus(raw: string): PaymentStatus {
+  return PAYMENT_STATUS_MAP[raw.toLowerCase()] ?? 'Unpaid';
+}
 
 const ALL_STATUSES: Array<OrderStatus | 'All'> = ['All', 'Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'];
 const ALL_PAYMENT_STATUSES: Array<PaymentStatus | 'All'> = ['All', 'Paid', 'Unpaid', 'Refunded', 'Failed'];
@@ -207,7 +138,7 @@ const PER_PAGE_OPTIONS = [5, 10, 20];
 
 function buildPagination(total: number, page: number, limit: number): Pagination {
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const safePage   = Math.min(Math.max(1, page), totalPages);
+  const safePage = Math.min(Math.max(1, page), totalPages);
   return {
     page: safePage,
     limit,
@@ -228,10 +159,10 @@ const formatCurrency = (value: number) =>
 // ─── Payment Status Badge ─────────────────────────────────────────────────────
 
 const paymentStatusStyles: Record<PaymentStatus, string> = {
-  Paid:     'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  Unpaid:   'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  Paid: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  Unpaid: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
   Refunded: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-  Failed:   'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  Failed: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
 };
 
 function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
@@ -263,7 +194,7 @@ function TablePagination({
 }) {
   const { page, limit, total, totalPages, hasNextPage, hasPrevPage } = pagination;
   const rangeStart = total === 0 ? 0 : (page - 1) * limit + 1;
-  const rangeEnd   = Math.min(page * limit, total);
+  const rangeEnd = Math.min(page * limit, total);
 
   const pageNumbers = useMemo(() => {
     const delta = 2;
@@ -355,39 +286,102 @@ function TablePagination({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
-  const [activeTab, setActiveTab]       = useState<Tab>('orders');
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<Tab>('orders');
 
   // Orders state
-  const [query, setQuery]               = useState('');
+  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All'>('All');
-  const [dateFilter, setDateFilter]     = useState('');
-  const [page, setPage]                 = useState(1);
-  const [limit, setLimit]               = useState(5);
-  const [openOrderId, setOpenOrderId]   = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);
+  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
 
   // Payment state
-  const [payQuery, setPayQuery]               = useState('');
+  const [payQuery, setPayQuery] = useState('');
   const [payStatusFilter, setPayStatusFilter] = useState<PaymentStatus | 'All'>('All');
-  const [payDateFilter, setPayDateFilter]     = useState('');
-  const [payPage, setPayPage]                 = useState(1);
-  const [payLimit, setPayLimit]               = useState(5);
+  const [payDateFilter, setPayDateFilter] = useState('');
+  const [payPage, setPayPage] = useState(1);
+  const [payLimit, setPayLimit] = useState(5);
+
+  const { data: ordersResponse, isLoading } = useQuery<{ success: boolean; data: ApiOrder[] }>({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const response = await axiosApiClient.get('/orders');
+      return response.data;
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await axiosApiClient.patch(`/orders/${id}/status`, { status });
+      return res.data;
+    },
+    onMutate: async (newStatusUpdate) => {
+      await queryClient.cancelQueries({ queryKey: ['orders'] });
+      const previousOrders = queryClient.getQueryData<{ success: boolean; data: ApiOrder[] }>(['orders']);
+
+      if (previousOrders) {
+        queryClient.setQueryData(['orders'], {
+          ...previousOrders,
+          data: previousOrders.data.map((order) =>
+            order.id === newStatusUpdate.id
+              ? { ...order, status: newStatusUpdate.status as OrderStatus }
+              : order
+          ),
+        });
+      }
+      return { previousOrders };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousOrders) {
+        queryClient.setQueryData(['orders'], context.previousOrders);
+      }
+      toast.error('Failed to update status');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onSuccess: () => {
+      toast.success('Order status updated');
+    },
+  });
+
+  const ordersData: ApiOrder[] = ordersResponse?.data ?? [];
 
   const selectedOrder = useMemo(
-    () => MOCK_ORDERS.find((o) => o.id === openOrderId) ?? null,
-    [openOrderId]
+    () => ordersData.find((o) => o.id === openOrderId) ?? null,
+    [openOrderId, ordersData]
+  );
+
+  /** Flat list of payments derived from real order data — no extra API call */
+  const allPayments = useMemo<Payment[]>(() =>
+    ordersData.flatMap((order) =>
+      order.payments.map((p) => ({
+        id: p.orderId + '-' + p.paymentType,
+        orderId: order.id,
+        customer: `${order.customerFirstName} ${order.customerLastName}`,
+        amount: parseFloat(p.amountPaid ?? p.amountDue ?? '0'),
+        method: order.paymentMethod,
+        status: normalisePaymentStatus(p.status),
+        date: p.paidAt ?? order.createdAt,
+      }))
+    ),
+    [ordersData]
   );
 
   // ── Orders pipeline ──────────────────────────────────────────────────────
 
   const filteredOrders = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MOCK_ORDERS.filter((o) => {
-      const matchesQuery  = !q || o.id.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q);
+    return ordersData.filter((o) => {
+      const customer = `${o.customerFirstName} ${o.customerLastName}`;
+      const matchesQuery = !q || o.id.toLowerCase().includes(q) || customer.toLowerCase().includes(q);
       const matchesStatus = statusFilter === 'All' || o.status === statusFilter;
-      const matchesDate   = !dateFilter || o.orderDate === dateFilter;
+      const matchesDate = !dateFilter || o.createdAt === dateFilter || o.createdAt.startsWith(dateFilter);
       return matchesQuery && matchesStatus && matchesDate;
     });
-  }, [query, statusFilter, dateFilter]);
+  }, [query, statusFilter, dateFilter, ordersData]);
 
   const orderPagination = useMemo<Pagination>(
     () => buildPagination(filteredOrders.length, page, limit),
@@ -403,13 +397,13 @@ export default function OrdersPage() {
 
   const filteredPayments = useMemo(() => {
     const q = payQuery.trim().toLowerCase();
-    return MOCK_PAYMENTS.filter((p) => {
-      const matchesQuery  = !q || p.id.toLowerCase().includes(q) || p.customer.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q);
+    return allPayments.filter((p) => {
+      const matchesQuery = !q || p.id.toLowerCase().includes(q) || p.customer.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q);
       const matchesStatus = payStatusFilter === 'All' || p.status === payStatusFilter;
-      const matchesDate   = !payDateFilter || p.date === payDateFilter;
+      const matchesDate = !payDateFilter || p.date === payDateFilter || p.date.startsWith(payDateFilter);
       return matchesQuery && matchesStatus && matchesDate;
     });
-  }, [payQuery, payStatusFilter, payDateFilter]);
+  }, [payQuery, payStatusFilter, payDateFilter, allPayments]);
 
   const paymentPagination = useMemo<Pagination>(
     () => buildPagination(filteredPayments.length, payPage, payLimit),
@@ -519,65 +513,17 @@ export default function OrdersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pagedOrders.map((o) => {
-                      const itemsCount = o.items.reduce((sum, i) => sum + i.qty, 0);
-                      return (
-                        <TableRow key={o.id} className="hover:bg-muted/40 transition-colors">
-                          <TableCell className="px-5 py-3.5 font-mono text-xs text-muted-foreground">
-                            {o.id}
-                          </TableCell>
-                          <TableCell className="px-5 py-3.5 text-sm font-medium text-foreground">
-                            {o.customerName}
-                          </TableCell>
-                          <TableCell className="px-5 py-3.5 text-sm tabular-nums text-muted-foreground">
-                            {itemsCount}
-                          </TableCell>
-                          <TableCell className="px-5 py-3.5 text-sm font-semibold tabular-nums text-foreground">
-                            {formatCurrency(o.totalAmount)}
-                          </TableCell>
-                          <TableCell className="px-5 py-3.5">
-                            <OrderStatusBadge status={o.status} />
-                          </TableCell>
-                          <TableCell className="px-5 py-3.5 text-sm text-muted-foreground">
-                            {o.orderDate}
-                          </TableCell>
-                          <TableCell className="px-5 py-3.5">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 rounded-none text-muted-foreground hover:text-foreground"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                  <span className="sr-only">Open menu</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 rounded-none border-border">
-                                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                  {o.id}
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator className="bg-border" />
-                                <DropdownMenuItem
-                                  className="cursor-pointer gap-2 rounded-none text-sm"
-                                  onClick={() => setOpenOrderId(o.id)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator className="bg-border" />
-                                <DropdownMenuItem className="cursor-pointer gap-2 rounded-none text-sm text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete Order
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-
-                    {pagedOrders.length === 0 && (
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="px-6 py-20 text-center">
+                          <div className="flex flex-col items-center justify-center">
+                            <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                              Loading Orders...
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : pagedOrders.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="px-6 py-20">
                           <div className="flex flex-col items-center justify-center text-center">
@@ -591,6 +537,85 @@ export default function OrdersPage() {
                           </div>
                         </TableCell>
                       </TableRow>
+                    ) : (
+                      pagedOrders.map((o) => {
+                        const customer = `${o.customerFirstName} ${o.customerLastName}`;
+                        const total = parseFloat(o.totalAmount);
+                        const date = o.createdAt;
+                        return (
+                          <TableRow key={o.id} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="px-5 py-3.5 font-mono text-xs text-muted-foreground">
+                              {o.trackingNumber}
+                            </TableCell>
+                            <TableCell className="px-5 py-3.5 text-sm font-medium text-foreground">
+                              {customer}
+                            </TableCell>
+                            <TableCell className="px-5 py-3.5 text-sm tabular-nums text-muted-foreground">
+                              {o.payments.length}
+                            </TableCell>
+                            <TableCell className="px-5 py-3.5 text-sm font-semibold tabular-nums text-foreground">
+                              {formatCurrency(total)}
+                            </TableCell>
+                            <TableCell className="px-5 py-3.5">
+                              <Select
+                                value={o.status}
+                                onValueChange={(val) => {
+                                  updateStatusMutation.mutate({ id: o.id, status: val });
+                                }}
+                                disabled={updateStatusMutation.isPending && updateStatusMutation.variables?.id === o.id}
+                              >
+                                <SelectTrigger className="h-8 border-0 bg-transparent shadow-none hover:bg-muted/50 focus:ring-0 focus:ring-offset-0 px-2 min-w-[150px] transition-colors rounded-md">
+                                  <SelectValue>
+                                    <OrderStatusBadge status={o.status} />
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent className="rounded-lg border-border">
+                                  {['pending', 'processing', 'shipped', 'completed', 'cancelled'].map((s) => (
+                                    <SelectItem key={s} value={s} className="cursor-pointer">
+                                      <OrderStatusBadge status={s as OrderStatus} />
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell className="px-5 py-3.5 text-sm text-muted-foreground">
+                              {date}
+                            </TableCell>
+                            <TableCell className="px-5 py-3.5">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-none text-muted-foreground hover:text-foreground"
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Open menu</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 rounded-none border-border">
+                                  <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                    {o.trackingNumber}
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuSeparator className="bg-border" />
+                                  <DropdownMenuItem
+                                    className="cursor-pointer gap-2 rounded-none text-sm"
+                                    onClick={() => setOpenOrderId(o.id)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="bg-border" />
+                                  <DropdownMenuItem className="cursor-pointer gap-2 rounded-none text-sm text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete Order
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -732,7 +757,7 @@ export default function OrdersPage() {
             <DialogTitle className="font-serif text-base">Order Details</DialogTitle>
             <DialogDescription>
               {selectedOrder && (
-                <span className="font-mono text-xs">{selectedOrder.id}</span>
+                <span className="font-mono text-xs">{selectedOrder.trackingNumber}</span>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -745,10 +770,10 @@ export default function OrdersPage() {
                     Customer
                   </p>
                   <p className="mt-1.5 text-sm font-medium text-foreground">
-                    {selectedOrder.customerName}
+                    {`${selectedOrder.customerFirstName} ${selectedOrder.customerLastName}`}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedOrder.phone}
+                    {selectedOrder.customerPhone}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
@@ -759,39 +784,42 @@ export default function OrdersPage() {
                     {selectedOrder.paymentMethod}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedOrder.orderDate}
+                    {selectedOrder.createdAt}
                   </p>
                 </div>
               </div>
 
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Delivery Address
+                  Reference
                 </p>
-                <p className="mt-1.5 text-sm text-foreground">{selectedOrder.address}</p>
+                <p className="mt-1.5 text-sm font-mono text-foreground">{selectedOrder.referenceNumber}</p>
               </div>
 
               <div className="overflow-hidden rounded-lg border border-border">
                 <div className="bg-muted/50 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Ordered Products
+                    Payments
                   </p>
                 </div>
                 <div className="divide-y divide-border">
-                  {selectedOrder.items.map((item) => (
+                  {selectedOrder.payments.map((p) => (
                     <div
-                      key={item.name}
+                      key={p.orderId + p.paymentType}
                       className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/30 transition-colors"
                     >
                       <div>
-                        <p className="font-medium text-foreground">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">Qty: {item.qty}</p>
+                        <p className="font-medium text-foreground capitalize">{p.paymentType}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{p.status}</p>
                       </div>
                       <p className="font-semibold tabular-nums text-foreground">
-                        {formatCurrency(item.price * item.qty)}
+                        {formatCurrency(parseFloat(p.amountDue ?? '0'))}
                       </p>
                     </div>
                   ))}
+                  {selectedOrder.payments.length === 0 && (
+                    <div className="px-4 py-3 text-sm text-muted-foreground">No payment records.</div>
+                  )}
                 </div>
                 <div className="flex items-center justify-between bg-muted/40 px-4 py-3">
                   <div className="flex items-center gap-2">
@@ -805,7 +833,7 @@ export default function OrdersPage() {
                       Total
                     </p>
                     <p className="text-lg font-bold tabular-nums text-foreground">
-                      {formatCurrency(selectedOrder.totalAmount)}
+                      {formatCurrency(parseFloat(selectedOrder.totalAmount))}
                     </p>
                   </div>
                 </div>

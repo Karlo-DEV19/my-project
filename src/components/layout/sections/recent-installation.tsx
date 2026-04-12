@@ -103,11 +103,10 @@ function ArrowButton({
         fill="none"
         stroke="currentColor"
         strokeWidth={1.5}
-        className={`w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 ${
-          direction === "left"
+        className={`w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 ${direction === "left"
             ? "group-hover:-translate-x-0.5"
             : "group-hover:translate-x-0.5"
-        }`}
+          }`}
       >
         {direction === "left" ? (
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -136,11 +135,10 @@ function DotIndicators({
           key={i}
           onClick={() => onSelect(i)}
           aria-label={`Go to slide ${i + 1}`}
-          className={`rounded-full transition-all duration-300 ${
-            i === current
+          className={`rounded-full transition-all duration-300 ${i === current
               ? "w-6 h-[3px] bg-foreground"
               : "w-[3px] h-[3px] bg-foreground/30 hover:bg-foreground/60"
-          }`}
+            }`}
         />
       ))}
     </div>
@@ -172,7 +170,6 @@ function InstallationModal({
     setScale(1);
   }, [currentIndex]);
 
-  // Lock body scroll when modal open
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -205,23 +202,17 @@ function InstallationModal({
   };
 
   return (
-    // Full viewport overlay — uses fixed + inset-0 + high z-index
-    // pt accounts for typical navbar height so panel never goes under it
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm px-3 py-4 md:px-6 md:py-6"
-      style={{ paddingTop: "72px" }} // clears navbar
+      style={{ paddingTop: "72px" }}
       onClick={onClose}
     >
-      {/* Modal panel */}
       <div
-        className="
-          relative w-full max-w-4xl bg-[#111111] rounded-xl overflow-hidden shadow-2xl
-          flex flex-col
-        "
+        className="relative w-full max-w-4xl bg-[#111111] rounded-xl overflow-hidden shadow-2xl flex flex-col"
         style={{ maxHeight: "calc(100vh - 90px)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Top bar: title + close ── */}
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
           <div>
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-0.5">
@@ -237,11 +228,7 @@ function InstallationModal({
           <button
             onClick={onClose}
             aria-label="Close modal"
-            className="
-              ml-4 flex-shrink-0 w-8 h-8 flex items-center justify-center
-              rounded-full bg-white/10 hover:bg-white/25
-              text-white/60 hover:text-white transition-all duration-200
-            "
+            className="ml-4 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/60 hover:text-white transition-all duration-200"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -249,7 +236,7 @@ function InstallationModal({
           </button>
         </div>
 
-        {/* ── Body: image left, details right on md+ ── */}
+        {/* Body */}
         <div className="flex flex-col md:flex-row overflow-hidden flex-1 min-h-0">
 
           {/* Image */}
@@ -271,6 +258,7 @@ function InstallationModal({
                 src={item.image}
                 alt={item.title}
                 fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 60vw, 768px"
                 className="object-cover select-none"
                 draggable={false}
                 priority
@@ -292,16 +280,7 @@ function InstallationModal({
           </div>
 
           {/* Details sidebar */}
-          <div
-            className="
-              w-full md:w-56 lg:w-64 flex-shrink-0
-              flex flex-col justify-center
-              px-5 py-5 md:py-6
-              bg-[#0f0f0f]
-              border-t border-white/10 md:border-t-0 md:border-l md:border-white/10
-              overflow-y-auto
-            "
-          >
+          <div className="w-full md:w-56 lg:w-64 flex-shrink-0 flex flex-col justify-center px-5 py-5 md:py-6 bg-[#0f0f0f] border-t border-white/10 md:border-t-0 md:border-l md:border-white/10 overflow-y-auto">
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/80 mb-4 font-medium">
               Installation Details
             </p>
@@ -325,16 +304,14 @@ function InstallationModal({
               </div>
             </div>
 
-            {/* Dot nav */}
             <div className="flex items-center gap-2 mt-6">
               {Array.from({ length: total }).map((_, i) => (
                 <div
                   key={i}
-                  className={`rounded-full transition-all duration-300 ${
-                    i === currentIndex
+                  className={`rounded-full transition-all duration-300 ${i === currentIndex
                       ? "w-5 h-[2px] bg-white/60"
                       : "w-[2px] h-[2px] bg-white/20"
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -415,7 +392,7 @@ const RecentInstallation = () => {
             >
               <div
                 key={currentIndex}
-                className={`absolute inset-0`}
+                className="absolute inset-0"
                 style={{
                   opacity: animating ? 0 : 1,
                   transform: animating
@@ -428,6 +405,7 @@ const RecentInstallation = () => {
                   src={item.image}
                   alt={item.title}
                   fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 90vw, 896px"
                   className="object-cover"
                   priority
                 />
@@ -478,14 +456,19 @@ const RecentInstallation = () => {
                   key={inst.id}
                   onClick={() => goTo(i, i > currentIndex ? "right" : "left")}
                   aria-label={`View ${inst.title}`}
-                  className={`relative flex-shrink-0 rounded-md overflow-hidden transition-all duration-300 ${
-                    i === currentIndex
+                  className={`relative flex-shrink-0 rounded-md overflow-hidden transition-all duration-300 ${i === currentIndex
                       ? "ring-2 ring-foreground/70 opacity-100"
                       : "opacity-40 hover:opacity-70"
-                  }`}
+                    }`}
                   style={{ width: 64, height: 44 }}
                 >
-                  <Image src={inst.image} alt={inst.title} fill className="object-cover" />
+                  <Image
+                    src={inst.image}
+                    alt={inst.title}
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                  />
                 </button>
               ))}
             </div>

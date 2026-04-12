@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AdminPageHeader from "@/components/pages/admin/components/admin-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,30 +44,62 @@ type Pagination = {
   hasPrevPage: boolean;
 };
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+type BlindProduct = {
+  id: string;
+  name: string;
+  stock: number | null;
+};
 
-const MOCK_INVENTORY: InventoryItem[] = [
-  { id: "INV-1101", name: "Evergreen Blackout Blinds",  stockQty: 32, status: "In Stock"     },
-  { id: "INV-1102", name: "Sunrise Sheer Curtains",     stockQty: 9,  status: "Low Stock"    },
-  { id: "INV-1103", name: "Phantom Roller Shades",      stockQty: 0,  status: "Out of Stock" },
-  { id: "INV-1104", name: "Modern Daylight Shades",     stockQty: 18, status: "In Stock"     },
-  { id: "INV-1105", name: "Blackout Premium Panels",    stockQty: 4,  status: "Low Stock"    },
-  { id: "INV-1106", name: "Velvet Drape Curtains",      stockQty: 22, status: "In Stock"     },
-  { id: "INV-1107", name: "Bamboo Roman Shades",        stockQty: 7,  status: "Low Stock"    },
-  { id: "INV-1108", name: "Arctic White Roller Blinds", stockQty: 0,  status: "Out of Stock" },
-  { id: "INV-1109", name: "Linen Sheer Panels",         stockQty: 14, status: "In Stock"     },
-  { id: "INV-1110", name: "Charcoal Blackout Curtains", stockQty: 3,  status: "Low Stock"    },
-  { id: "INV-1111", name: "Ivory Cellular Shades",      stockQty: 25, status: "In Stock"     },
-  { id: "INV-1112", name: "Nautical Stripe Drapes",     stockQty: 0,  status: "Out of Stock" },
-];
+// ✅ FIXED: was "data", API actually returns "blinds"
+type ProductsApiResponse = {
+  blinds: BlindProduct[];
+};
 
 const ITEMS_PER_PAGE = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function deriveStatus(stockQty: number): InventoryStatus {
+  if (stockQty === 0) return "Out of Stock";
+  if (stockQty <= 10) return "Low Stock";
+  return "In Stock";
+}
+
+function mapToInventoryItem(product: BlindProduct): InventoryItem {
+  const stockQty = product.stock ?? 0;
+  return {
+    id: product.id,
+    name: product.name,
+    stockQty,
+    status: deriveStatus(stockQty),
+  };
+}
+
+async function fetchInventory(): Promise<InventoryItem[]> {
+  const res = await fetch("/api/v1/product-blinds");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch inventory (${res.status} ${res.statusText})`);
+  }
+  const json: ProductsApiResponse = await res.json();
+  // ✅ FIXED: was json.data, API actually returns json.blinds
+  return json.blinds.map(mapToInventoryItem);
+}
+
+async function patchStock(id: string, stock: number): Promise<void> {
+  const res = await fetch(`/api/v1/product-blinds/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stock }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { message?: string };
+    throw new Error(err.message ?? `Failed to update stock (${res.status})`);
+  }
+}
+
 function buildPagination(total: number, page: number, limit: number): Pagination {
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const safePage   = Math.min(Math.max(1, page), totalPages);
+  const safePage = Math.min(Math.max(1, page), totalPages);
   return {
     page: safePage,
     limit,
@@ -80,8 +113,8 @@ function buildPagination(total: number, page: number, limit: number): Pagination
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const statusStyles: Record<InventoryStatus, string> = {
-  "In Stock":     "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  "Low Stock":    "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "In Stock": "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "Low Stock": "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "Out of Stock": "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
@@ -99,6 +132,98 @@ function InventoryStatusBadge({ status }: { status: InventoryStatus }) {
   );
 }
 
+// ─── Inline Stock Editor ──────────────────────────────────────────────────────
+
+type StockEditorProps = {
+  item: InventoryItem;
+  onSave: (id: string, stock: number) => void;
+  isSaving: boolean;
+};
+
+function StockEditor({ item, onSave, isSaving }: StockEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(item.stockQty));
+  const [error, setError] = useState("");
+
+  function handleOpen() {
+    setValue(String(item.stockQty));
+    setError("");
+    setEditing(true);
+  }
+
+  function handleCancel() {
+    setEditing(false);
+    setError("");
+  }
+
+  function handleConfirm() {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0 || value.trim() === "") {
+      setError("Must be a whole number ≥ 0");
+      return;
+    }
+    onSave(item.id, parsed);
+    setEditing(false);
+    setError("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") handleConfirm();
+    if (e.key === "Escape") handleCancel();
+  }
+
+  if (!editing) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 gap-1.5 rounded-none px-2 text-xs text-muted-foreground hover:text-foreground"
+        onClick={handleOpen}
+      >
+        <Pencil className="h-3 w-3" />
+        Edit
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <Input
+          type="number"
+          min={0}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          className="h-7 w-20 rounded-none px-2 text-sm tabular-nums"
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-none text-emerald-600 hover:text-emerald-700"
+          onClick={handleConfirm}
+          disabled={isSaving}
+        >
+          <Check className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-none text-rose-500 hover:text-rose-600"
+          onClick={handleCancel}
+          disabled={isSaving}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {error && (
+        <p className="text-[11px] text-rose-500">{error}</p>
+      )}
+    </div>
+  );
+}
+
 const FILTER_OPTIONS: Array<InventoryStatus | "All"> = [
   "All",
   "In Stock",
@@ -109,33 +234,54 @@ const FILTER_OPTIONS: Array<InventoryStatus | "All"> = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const [query, setQuery]               = useState("");
+  const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<InventoryStatus | "All">("All");
-  const [page, setPage]                 = useState(1);
+  const [page, setPage] = useState(1);
 
-  // 1. Filter
+  const queryClient = useQueryClient();
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
+  const {
+    data: inventory = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<InventoryItem[], Error>({
+    queryKey: ["inventory"],
+    queryFn: fetchInventory,
+  });
+
+  // ── Stock mutation ─────────────────────────────────────────────────────────
+  const { mutate: updateStock, isPending: isUpdating } = useMutation({
+    mutationFn: ({ id, stock }: { id: string; stock: number }) =>
+      patchStock(id, stock),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+  });
+
+  // ── Filter ─────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MOCK_INVENTORY.filter((item) => {
-      const matchesQuery  = !q || item.name.toLowerCase().includes(q);
+    return inventory.filter((item) => {
+      const matchesQuery = !q || item.name.toLowerCase().includes(q);
       const matchesStatus = statusFilter === "All" || item.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [query, statusFilter]);
+  }, [inventory, query, statusFilter]);
 
-  // 2. Build pagination object
+  // ── Pagination ─────────────────────────────────────────────────────────────
   const pagination = useMemo<Pagination>(
     () => buildPagination(filtered.length, page, ITEMS_PER_PAGE),
     [filtered.length, page]
   );
 
-  // 3. Slice for current page
   const paginated = useMemo(() => {
     const start = (pagination.page - 1) * pagination.limit;
     return filtered.slice(start, start + pagination.limit);
   }, [filtered, pagination.page, pagination.limit]);
 
-  // Reset to page 1 whenever filters change
+  // ── Handlers ───────────────────────────────────────────────────────────────
   function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
     setQuery(e.target.value);
     setPage(1);
@@ -146,200 +292,228 @@ export default function InventoryPage() {
     setPage(1);
   }
 
+  const maxStock = useMemo(
+    () => Math.max(1, ...inventory.map((i) => i.stockQty)),
+    [inventory]
+  );
+
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    // ── Full-width page wrapper ──────────────────────────────────────────
     <div className="w-full min-h-screen bg-background">
       <div className="w-full max-w-[1400px] mx-auto px-6 py-8 space-y-6">
 
         {/* ── Page Header ── */}
         <AdminPageHeader
           title="Inventory Management"
-          description="Monitor product stock levels. Search and filters are UI-only for now."
+          description="Monitor and update product stock levels."
         />
 
-        {/* ── Filters row ── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* ── Loading state ── */}
+        {isLoading && (
+          <p className="text-sm text-muted-foreground">Loading inventory…</p>
+        )}
 
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={handleQueryChange}
-                placeholder="Search products…"
-                className="h-9 rounded-none pl-10 text-sm"
-              />
-            </div>
-
-            {/* Status filter */}
-            <Select value={statusFilter} onValueChange={handleStatusChange}>
-              <SelectTrigger className="h-9 w-full rounded-none border-border bg-transparent text-sm sm:w-44">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent className="rounded-none border-border">
-                {FILTER_OPTIONS.map((s) => (
-                  <SelectItem key={s} value={s} className="rounded-none text-sm">
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {filtered.length} item{filtered.length === 1 ? "" : "s"}
+        {/* ── Error state ── */}
+        {isError && (
+          <p className="text-sm text-rose-600 dark:text-rose-400">
+            {error?.message ?? "An unexpected error occurred while fetching inventory."}
           </p>
-        </div>
+        )}
 
-        {/* ── Table card ── */}
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[600px] w-full">
+        {/* ── Main content ── */}
+        {!isLoading && !isError && (
+          <>
+            {/* ── Filters row ── */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  {["Product", "Stock Qty", "Status"].map((h) => (
-                    <TableHead key={h} className="px-5 py-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {h}
-                      </span>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {paginated.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="hover:bg-muted/40 transition-colors"
-                  >
-                    {/* Name + ID */}
-                    <TableCell className="px-5 py-3.5">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-medium text-foreground">
-                          {item.name}
-                        </p>
-                        <p className="font-mono text-[11px] text-muted-foreground">
-                          {item.id}
-                        </p>
-                      </div>
-                    </TableCell>
-
-                    {/* Stock qty with inline stock bar */}
-                    <TableCell className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold tabular-nums text-foreground w-6">
-                          {item.stockQty}
-                        </span>
-                        {/* Mini stock bar */}
-                        <div className="h-1.5 w-24 rounded-full bg-border overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all",
-                              item.status === "In Stock"     && "bg-emerald-500",
-                              item.status === "Low Stock"    && "bg-amber-400",
-                              item.status === "Out of Stock" && "bg-rose-400"
-                            )}
-                            style={{
-                              width: `${Math.min((item.stockQty / 32) * 100, 100)}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    {/* Status badge */}
-                    <TableCell className="px-5 py-3.5">
-                      <InventoryStatusBadge status={item.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-
-                {paginated.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="px-6 py-20">
-                      <div className="flex flex-col items-center justify-center text-center">
-                        <div className="mb-4 h-px w-10 bg-border" />
-                        <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                          No inventory items found
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground/60">
-                          Try adjusting your search or filter.
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-
-            </Table>
-          </div>
-
-          {/* ── Pagination Footer ── */}
-          {pagination.total > 0 && (
-            <div className="flex items-center justify-between border-t border-border px-5 py-3.5">
-
-              {/* Left: range */}
-              <p className="text-xs text-muted-foreground">
-                Showing{" "}
-                <span className="font-semibold text-foreground">
-                  {(pagination.page - 1) * pagination.limit + 1}
-                </span>
-                {" "}–{" "}
-                <span className="font-semibold text-foreground">
-                  {Math.min(pagination.page * pagination.limit, pagination.total)}
-                </span>
-                {" "}of{" "}
-                <span className="font-semibold text-foreground">
-                  {pagination.total}
-                </span>{" "}
-                items
-              </p>
-
-              {/* Right: controls */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-none"
-                  disabled={!pagination.hasPrevPage}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={cn(
-                        "h-8 w-8 rounded-none text-xs font-semibold transition-colors",
-                        p === pagination.page
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      )}
-                    >
-                      {p}
-                    </button>
-                  ))}
+                {/* Search */}
+                <div className="relative w-full sm:w-72">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={query}
+                    onChange={handleQueryChange}
+                    placeholder="Search products…"
+                    className="h-9 rounded-none pl-10 text-sm"
+                  />
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-none"
-                  disabled={!pagination.hasNextPage}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                {/* Status filter */}
+                <Select value={statusFilter} onValueChange={handleStatusChange}>
+                  <SelectTrigger className="h-9 w-full rounded-none border-border bg-transparent text-sm sm:w-44">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-none border-border">
+                    {FILTER_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s} className="rounded-none text-sm">
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                {filtered.length} item{filtered.length === 1 ? "" : "s"}
+              </p>
             </div>
-          )}
-        </div>
+
+            {/* ── Table card ── */}
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-[700px] w-full">
+
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      {["Product", "Stock Qty", "Status", "Actions"].map((h) => (
+                        <TableHead key={h} className="px-5 py-3">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {h}
+                          </span>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {paginated.map((item) => (
+                      <TableRow
+                        key={item.id}
+                        className="hover:bg-muted/40 transition-colors"
+                      >
+                        {/* Name + ID */}
+                        <TableCell className="px-5 py-3.5">
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-medium text-foreground">
+                              {item.name}
+                            </p>
+                            <p className="font-mono text-[11px] text-muted-foreground">
+                              {item.id}
+                            </p>
+                          </div>
+                        </TableCell>
+
+                        {/* Stock qty + bar */}
+                        <TableCell className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold tabular-nums text-foreground w-6">
+                              {item.stockQty}
+                            </span>
+                            <div className="h-1.5 w-24 rounded-full bg-border overflow-hidden">
+                              <div
+                                className={cn(
+                                  "h-full rounded-full transition-all",
+                                  item.status === "In Stock" && "bg-emerald-500",
+                                  item.status === "Low Stock" && "bg-amber-400",
+                                  item.status === "Out of Stock" && "bg-rose-400"
+                                )}
+                                style={{
+                                  width: `${Math.min((item.stockQty / maxStock) * 100, 100)}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Status badge */}
+                        <TableCell className="px-5 py-3.5">
+                          <InventoryStatusBadge status={item.status} />
+                        </TableCell>
+
+                        {/* Edit stock */}
+                        <TableCell className="px-5 py-3.5">
+                          <StockEditor
+                            item={item}
+                            isSaving={isUpdating}
+                            onSave={(id, stock) => updateStock({ id, stock })}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {paginated.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="px-6 py-20">
+                          <div className="flex flex-col items-center justify-center text-center">
+                            <div className="mb-4 h-px w-10 bg-border" />
+                            <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                              No inventory items found
+                            </p>
+                            <p className="mt-2 text-xs text-muted-foreground/60">
+                              Try adjusting your search or filter.
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+
+                </Table>
+              </div>
+
+              {/* ── Pagination Footer ── */}
+              {pagination.total > 0 && (
+                <div className="flex items-center justify-between border-t border-border px-5 py-3.5">
+
+                  <p className="text-xs text-muted-foreground">
+                    Showing{" "}
+                    <span className="font-semibold text-foreground">
+                      {(pagination.page - 1) * pagination.limit + 1}
+                    </span>
+                    {" "}–{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(pagination.page * pagination.limit, pagination.total)}
+                    </span>
+                    {" "}of{" "}
+                    <span className="font-semibold text-foreground">
+                      {pagination.total}
+                    </span>{" "}
+                    items
+                  </p>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-none"
+                      disabled={!pagination.hasPrevPage}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={cn(
+                            "h-8 w-8 rounded-none text-xs font-semibold transition-colors",
+                            p === pagination.page
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-none"
+                      disabled={!pagination.hasNextPage}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
       </div>
     </div>

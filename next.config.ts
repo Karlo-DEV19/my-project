@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* Keep your existing compiler setting */
   reactCompiler: true,
   
   images: {
@@ -9,6 +8,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'imgs.search.brave.com',
       },
     ],
   },

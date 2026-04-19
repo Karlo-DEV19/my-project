@@ -36,6 +36,9 @@ interface PriceBreakdown {
 const CM_TO_SQFT = 10.76;
 const MIN_SQFT = 10;
 
+/** Hard limits enforced on width and height inputs */
+const DIM_LIMITS = { widthMax: 260, heightMax: 300, min: 1 } as const;
+
 const BRANCHES = [
     {
         id: 'cubao',
@@ -242,6 +245,7 @@ const ShopProductDetailsView = ({ product }: Props) => {
     const [selectedPreset, setSelectedPreset] = useState<typeof STANDARD_SIZES[number] | null>(null);
     const [widthCm, setWidthCm] = useState('');
     const [heightCm, setHeightCm] = useState('');
+    const [dimErrors, setDimErrors] = useState<{ w: string | null; h: string | null }>({ w: null, h: null });
     const [panels, setPanels] = useState(1);
     const [mountingType, setMountingType] = useState<string>(MOUNTING_OPTIONS[0]);
     const [controlSide, setControlSide] = useState<string>(CONTROL_OPTIONS[0]);
@@ -267,12 +271,48 @@ const ShopProductDetailsView = ({ product }: Props) => {
         setSelectedPreset(preset);
         setWidthCm(String(preset.width));
         setHeightCm(String(preset.height));
+        setDimErrors({ w: null, h: null });
     }, []);
 
     const handleDimChange = useCallback((field: 'w' | 'h', val: string) => {
         setSelectedPreset(null);
+
+        // Allow empty string so user can clear the field
+        if (val === '') {
+            if (field === 'w') setWidthCm('');
+            else setHeightCm('');
+            setDimErrors(prev => ({ ...prev, [field]: null }));
+            return;
+        }
+
+        // Reject non-numeric input
+        const parsed = Number(val);
+        if (!Number.isFinite(parsed)) return;
+
+        const max = field === 'w' ? DIM_LIMITS.widthMax : DIM_LIMITS.heightMax;
+        const label = field === 'w' ? 'Width' : 'Height';
+
+        if (parsed < DIM_LIMITS.min) {
+            // Clamp to minimum — do not show an error for partial typing (e.g. "-")
+            const clamped = DIM_LIMITS.min;
+            if (field === 'w') setWidthCm(String(clamped));
+            else setHeightCm(String(clamped));
+            setDimErrors(prev => ({ ...prev, [field]: `${label} must be at least ${DIM_LIMITS.min} cm` }));
+            return;
+        }
+
+        if (parsed > max) {
+            // Clamp to maximum and show inline error
+            if (field === 'w') setWidthCm(String(max));
+            else setHeightCm(String(max));
+            setDimErrors(prev => ({ ...prev, [field]: `${label} capped at ${max} cm` }));
+            return;
+        }
+
+        // Valid value — store and clear any previous error
         if (field === 'w') setWidthCm(val);
         else setHeightCm(val);
+        setDimErrors(prev => ({ ...prev, [field]: null }));
     }, []);
 
     const handleAddToCart = useCallback(() => {
@@ -308,7 +348,8 @@ const ShopProductDetailsView = ({ product }: Props) => {
         controlType, notes, branch, addToCart,
     ]);
 
-    const maxFabricWidth = parseInt(product.fabricWidth ?? '280', 10) || 280;
+    // Respect both the product's fabric width and the hard 260 cm cap
+    const maxFabricWidth = Math.min(parseInt(product.fabricWidth ?? '280', 10) || 280, DIM_LIMITS.widthMax);
 
     const specRows = useMemo(() => ([
         { icon: Package, label: 'Composition', value: product.composition },
@@ -533,21 +574,25 @@ const ShopProductDetailsView = ({ product }: Props) => {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             {([
-                                { field: 'w' as const, label: 'Width (cm)', val: widthCm, hint: `Max: ${product.fabricWidth ?? '280cm'}`, ph: 'e.g. 120' },
-                                { field: 'h' as const, label: 'Height (cm)', val: heightCm, hint: 'Standard drop up to 300cm', ph: 'e.g. 200' },
+                                { field: 'w' as const, label: 'Width (cm)', val: widthCm, hint: `Max: ${maxFabricWidth} cm`, ph: 'e.g. 120' },
+                                { field: 'h' as const, label: 'Height (cm)', val: heightCm, hint: `Max: ${DIM_LIMITS.heightMax} cm`, ph: 'e.g. 200' },
                             ]).map(({ field, label, val, hint, ph }) => (
                                 <div key={field} className="flex flex-col gap-1.5">
                                     <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">{label}</label>
                                     <input
                                         type="number"
-                                        min={20}
-                                        max={field === 'w' ? maxFabricWidth : 3000}
+                                        min={DIM_LIMITS.min}
+                                        max={field === 'w' ? maxFabricWidth : DIM_LIMITS.heightMax}
                                         placeholder={ph}
                                         value={val}
                                         onChange={e => handleDimChange(field, e.target.value)}
                                         className="h-11 border border-border bg-transparent px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground transition-colors"
                                     />
-                                    <span className="text-[10px] text-muted-foreground">{hint}</span>
+                                    {dimErrors[field] ? (
+                                        <span className="text-[10px] text-destructive">{dimErrors[field]}</span>
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground">{hint}</span>
+                                    )}
                                 </div>
                             ))}
                         </div>

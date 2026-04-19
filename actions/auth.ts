@@ -278,27 +278,3 @@ export async function verifyOtpCode(email: string, code: string): Promise<Action
 // null after signOut), logs the LOGOUT event, then clears
 // all auth cookies and redirects to /login.
 // ─────────────────────────────────────────────────────────────
-export async function signOut(): Promise<never> {
-    const supabase = await createClient()
-
-    // ── Resolve userId BEFORE the session is destroyed ───────────────────
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Log LOGOUT — must happen before signOut() invalidates the session
-    if (user?.id) {
-        await createActivityLog(db, {
-            userId: user.id,
-            action: ActivityAction.LOGOUT,
-            module: ActivityModule.AUTH,
-            description: `User signed out`,
-        })
-    }
-
-    await supabase.auth.signOut()
-
-    const cookieStore = await cookies()
-    cookieStore.delete("2fa_verified")
-    cookieStore.delete("gatekeeper_token")
-
-    redirect("/login")
-}

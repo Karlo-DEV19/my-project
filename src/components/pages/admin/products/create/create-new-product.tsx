@@ -98,6 +98,7 @@ export default function CreateNewProductPage() {
                 mainImages: mainResults.successful.map((r) => r.url!),
                 availableColors,
                 collection: data.collection,
+                stock: data.stock,
             };
             console.log(payload);
             // 4. Final API call via your custom hook
@@ -319,6 +320,22 @@ export default function CreateNewProductPage() {
                                                         </button>
                                                     ))}
                                                 </div>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
+
+                                    <FormField control={control} name="stock" render={({ field }) => (
+                                        <FormItem className="sm:col-span-2">
+                                            <FormLabel>Stock Quantity <span className="text-destructive">*</span></FormLabel>
+                                            <FormControl>
+                                                <Input 
+                                                    type="number"
+                                                    min={0}
+                                                    placeholder="0"
+                                                    {...field}
+                                                    onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>

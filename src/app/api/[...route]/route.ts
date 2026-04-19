@@ -8,6 +8,8 @@ import webhooksRoute from "./routes/payment-webhook";
 import orderRoute from "./routes/order-controller";
 import activityLogsRoute from "./routes/activity-logs-route";
 import notificationsRoute from "./routes/notification-route";
+import userRoute from "./routes/user-route";
+
 const app = new Hono().basePath("/api/v1");
 
 // Mount routers
@@ -15,13 +17,9 @@ app.route("/product-blinds", productBlindsRoute);
 app.route("/geocode", geocodeRoute);
 app.route("/webhooks", webhooksRoute);
 app.route("/orders", orderRoute);
-app.route("/activity-logs", activityLogsRoute)
-app.route("/notifications", notificationsRoute)
-app.get('/hello', (c) => {
-    return c.json({
-        message: 'Hello from Hono!'
-    })
-})
+app.route("/activity-logs", activityLogsRoute);
+app.route("/notifications", notificationsRoute);
+app.route("/users", userRoute);
 
 
 // Export for Next.js (Edge/Node)

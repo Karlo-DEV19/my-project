@@ -57,6 +57,7 @@ export const productSchema = z.object({
             message: 'Collection display type must be one of: Shop Only, New Arrival, Best Seller',
         }),
     }),
+    stock: z.coerce.number().min(0, 'Must be 0 or greater'),
 });
 
 export type FormValues = z.infer<typeof productSchema>;
@@ -85,5 +86,6 @@ export const DEFAULT_VALUES: Partial<FormValues> = {
     mainImages: [],
     availableColors: [{ name: '', file: undefined as unknown as File | string }],
     collection: 'Shop Only',
+    stock: 0,
 
 };

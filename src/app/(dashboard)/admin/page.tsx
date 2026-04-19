@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { DollarSign, Package, ShoppingCart, Users, TrendingUp, ArrowUpRight, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { DollarSign, Package, ShoppingCart, Users, TrendingUp, TrendingDown, Minus, ArrowUpRight, Search, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,22 +12,99 @@ import StatCard from '@/components/pages/admin/components/stat-card';
 import OrderStatusBadge, {
   type OrderStatus,
 } from '@/components/pages/admin/components/order-status-badge';
+import { useGetDashboardStats, useGetMonthlySales } from '@/app/api/hooks/use-order';
+
+/** Capitalise first letter so DB lowercase statuses match the OrderStatus union */
+function toOrderStatus(raw: string): OrderStatus {
+  return (raw.charAt(0).toUpperCase() + raw.slice(1)) as OrderStatus;
+}
+
+type ForecastEntry = { month: string; value: number };
+type Trend = 'increasing' | 'decreasing' | 'stable';
+type ForecastInsight = {
+  trend: Trend;
+  lastHistorical: number;
+  firstForecast: number;
+  pctChange: number;
+};
 
 const AdminDashboardPage = () => {
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [page, setPage] = useState(1);
+  const [monthRange, setMonthRange] = useState<6 | 12>(12);
   const perPage = 4;
+
+  // ── ARIMA Forecast ──────────────────────────────────────────────────────────
+  const [forecastData, setForecastData] = useState<ForecastEntry[]>([]);
+  const [forecastInsight, setForecastInsight] = useState<ForecastInsight | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(true);
+  const [forecastError, setForecastError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadForecast() {
+      try {
+        const res = await fetch('/api/forecast');
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const json = await res.json();
+
+        if (json.error) throw new Error(json.error);
+
+        // ── Parse forecast entries ──────────────────────────────────────────
+        const forecastEntries: ForecastEntry[] = Object.entries(
+          json.forecast as Record<string, number>
+        )
+          .slice(0, 3)
+          .map(([dateStr, val]) => {
+            const d = new Date(dateStr);
+            const month = d.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+            return { month, value: val };
+          });
+
+        setForecastData(forecastEntries);
+
+        // ── Derive trend insight ─────────────────────────────────────────────
+        const historicalValues = Object.values(json.historical as Record<string, number>);
+        if (historicalValues.length > 0 && forecastEntries.length > 0) {
+          const lastHistorical = historicalValues[historicalValues.length - 1];
+          const firstForecast = forecastEntries[0].value;
+          const pctChange = ((firstForecast - lastHistorical) / lastHistorical) * 100;
+
+          let trend: Trend;
+          if (pctChange > 1) trend = 'increasing';
+          else if (pctChange < -1) trend = 'decreasing';
+          else trend = 'stable';
+
+          setForecastInsight({ trend, lastHistorical, firstForecast, pctChange });
+        }
+      } catch (err: unknown) {
+        setForecastError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setForecastLoading(false);
+      }
+    }
+
+    loadForecast();
+  }, []);
+
+  const { data: dashboardData, isPending: isDashboardLoading } = useGetDashboardStats();
+  const { data: monthlySalesData, isPending: isMonthlySalesLoading } = useGetMonthlySales(monthRange);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  const totalRevenue = dashboardData?.totalRevenue ?? 0;
+  const formattedRevenue = isDashboardLoading
+    ? '…'
+    : `₱${totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
   const stats = [
     {
       title: 'Total Products',
-      value: 128,
+      value: isDashboardLoading ? '…' : (dashboardData?.totalProducts ?? 0),
       icon: <Package className="h-4 w-4" />,
       href: '/admin/products',
       change: '+4 this week',
@@ -34,7 +112,7 @@ const AdminDashboardPage = () => {
     },
     {
       title: 'Total Orders',
-      value: 542,
+      value: isDashboardLoading ? '…' : (dashboardData?.totalOrders ?? 0),
       icon: <ShoppingCart className="h-4 w-4" />,
       href: '/admin/orders',
       change: '+21 this week',
@@ -42,7 +120,7 @@ const AdminDashboardPage = () => {
     },
     {
       title: 'Total Customers',
-      value: 312,
+      value: isDashboardLoading ? '…' : (dashboardData?.totalCustomers ?? 0),
       icon: <Users className="h-4 w-4" />,
       href: '/admin/customers',
       change: '+8 this week',
@@ -50,7 +128,7 @@ const AdminDashboardPage = () => {
     },
     {
       title: 'Total Revenue',
-      value: '₱1,284,900',
+      value: formattedRevenue,
       icon: <DollarSign className="h-4 w-4" />,
       href: '/admin/orders',
       change: '+₱84,200 this week',
@@ -58,77 +136,20 @@ const AdminDashboardPage = () => {
     },
   ];
 
-  const recentProducts = [
-    {
-      id: 'P-1021',
-      name: 'Evergreen Blackout Blinds',
-      category: 'Blinds',
-      createdAt: '2026-03-06',
-    },
-    {
-      id: 'P-1019',
-      name: 'Sunrise Sheer Curtains',
-      category: 'Curtains',
-      createdAt: '2026-03-05',
-    },
-    {
-      id: 'P-1018',
-      name: 'Phantom Roller Shades',
-      category: 'Roller Shades',
-      createdAt: '2026-03-04',
-    },
-    {
-      id: 'P-1017',
-      name: 'Nordic Linen Drapes',
-      category: 'Curtains',
-      createdAt: '2026-03-03',
-    },
-  ];
+  const recentProducts = (dashboardData?.recentProducts ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    createdAt: p.createdAt,
+  }));
 
-  const recentOrders = [
-    {
-      id: 'ORD-2043',
-      customer: 'Jane Doe',
-      total: '₱24,500',
-      status: 'Processing' as OrderStatus,
-      createdAt: '2026-03-07',
-    },
-    {
-      id: 'ORD-2042',
-      customer: 'John Smith',
-      total: '₱18,200',
-      status: 'Completed' as OrderStatus,
-      createdAt: '2026-03-06',
-    },
-    {
-      id: 'ORD-2041',
-      customer: 'MJ Interiors',
-      total: '₱72,900',
-      status: 'Pending' as OrderStatus,
-      createdAt: '2026-03-05',
-    },
-    {
-      id: 'ORD-2040',
-      customer: 'Anna Cruz',
-      total: '₱9,750',
-      status: 'Completed' as OrderStatus,
-      createdAt: '2026-03-04',
-    },
-    {
-      id: 'ORD-2039',
-      customer: 'Robert King',
-      total: '₱35,100',
-      status: 'Processing' as OrderStatus,
-      createdAt: '2026-03-03',
-    },
-    {
-      id: 'ORD-2038',
-      customer: 'Sarah Lee',
-      total: '₱12,000',
-      status: 'Pending' as OrderStatus,
-      createdAt: '2026-03-02',
-    },
-  ];
+  const recentOrders = (dashboardData?.recentOrders ?? []).map((o) => ({
+    id: o.id,
+    customer: o.customer,
+    total: o.total,
+    status: toOrderStatus(o.status),
+    createdAt: o.createdAt,
+  }));
 
   const filteredOrders = recentOrders.filter((order) => {
     const matchesSearch = order.customer.toLowerCase().includes(search.toLowerCase()) || order.id.toLowerCase().includes(search.toLowerCase());
@@ -139,17 +160,17 @@ const AdminDashboardPage = () => {
   const totalPages = Math.ceil(filteredOrders.length / perPage) || 1;
   const paginatedOrders = filteredOrders.slice((page - 1) * perPage, page * perPage);
 
-  const chartDays = [
-    { label: 'M', value: 8 },
-    { label: 'T', value: 12 },
-    { label: 'W', value: 6 },
-    { label: 'T', value: 14 },
-    { label: 'F', value: 10 },
-    { label: 'S', value: 4 },
-    { label: 'S', value: 9 },
+  const chartDays = dashboardData?.ordersPerDay ?? [
+    { label: 'M', value: 0 },
+    { label: 'T', value: 0 },
+    { label: 'W', value: 0 },
+    { label: 'T', value: 0 },
+    { label: 'F', value: 0 },
+    { label: 'S', value: 0 },
+    { label: 'S', value: 0 },
   ];
 
-  const maxValue = Math.max(...chartDays.map((d) => d.value));
+  const maxValue = Math.max(...chartDays.map((d) => d.value), 1);
 
   if (!isMounted) {
     return null;
@@ -167,7 +188,7 @@ const AdminDashboardPage = () => {
           />
           <div className="flex items-center gap-4 pb-0.5 justify-between md:justify-end">
             <p className="text-xs text-muted-foreground hidden sm:block">
-              Last updated: March 25, 2026
+              Last updated: {new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
             <NotificationBell />
           </div>
@@ -226,14 +247,14 @@ const AdminDashboardPage = () => {
                 </p>
               </div>
               <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                Sample
+                Live
               </span>
             </div>
 
             <div className="px-5 pb-5 pt-4">
               {/* Summary row */}
               <div className="mb-5 flex items-end gap-2">
-                <span className="text-3xl font-bold tracking-tight text-foreground">63</span>
+                <span className="text-3xl font-bold tracking-tight text-foreground">{dashboardData?.totalOrdersThisWeek ?? 0}</span>
                 <span className="mb-1 text-xs text-muted-foreground">total orders this week</span>
               </div>
 
@@ -255,7 +276,7 @@ const AdminDashboardPage = () => {
               </div>
 
               <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-                Connect to real order data once your API is live.
+                Showing real order data from the last 7 days.
               </p>
             </div>
           </div>
@@ -280,7 +301,10 @@ const AdminDashboardPage = () => {
                   className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/50"
                 >
                   <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p
+                      className="truncate text-sm font-medium text-foreground cursor-pointer hover:underline"
+                      onClick={() => router.push(`/admin/products?id=${product.id}`)}
+                    >
                       {product.name}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
@@ -354,7 +378,8 @@ const AdminDashboardPage = () => {
                 paginatedOrders.map((order) => (
                   <li
                     key={order.id}
-                    className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/50"
+                    className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/50 cursor-pointer"
+                    onClick={() => router.push(`/admin/orders?id=${order.id}`)}
                   >
                     <div className="min-w-0 space-y-0.5">
                       <p className="text-sm font-medium text-foreground">{order.customer}</p>
@@ -398,6 +423,300 @@ const AdminDashboardPage = () => {
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── Monthly Sales ── */}
+        <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border px-5 py-4 gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Monthly Sales</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Completed orders — revenue over time</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Grand total badge */}
+              <span className="text-[11px] text-muted-foreground">
+                Total:{' '}
+                <span className="font-semibold text-foreground">
+                  {isMonthlySalesLoading
+                    ? '…'
+                    : `₱${(monthlySalesData?.grandTotal ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                </span>
+              </span>
+              {/* Range toggle */}
+              <div className="flex items-center rounded-lg border border-border bg-background overflow-hidden">
+                {([6, 12] as const).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setMonthRange(n)}
+                    className={`px-3 py-1 text-[11px] font-medium transition-colors ${monthRange === n
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                  >
+                    {n}M
+                  </button>
+                ))}
+              </div>
+              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Live
+              </span>
+            </div>
+          </div>
+
+          <div className="px-5 pb-6 pt-5">
+            {isMonthlySalesLoading ? (
+              <div className="flex h-40 items-center justify-center">
+                <span className="text-sm text-muted-foreground">…</span>
+              </div>
+            ) : (() => {
+              const entries = monthlySalesData?.monthlySales ?? [];
+              const maxSales = Math.max(...entries.map((e) => e.total), 1);
+              const W = 800;
+              const H = 120;
+              const padX = 0;
+              const padY = 8;
+              const chartH = H - padY * 2;
+
+              const points = entries.map((e, i) => ({
+                x: entries.length > 1 ? padX + (i / (entries.length - 1)) * (W - padX * 2) : W / 2,
+                y: padY + chartH - (e.total / maxSales) * chartH,
+                ...e,
+              }));
+
+              const polyline = points.map((p) => `${p.x},${p.y}`).join(' ');
+              const fillPath = points.length > 1
+                ? `M${points[0].x},${H} ` +
+                points.map((p) => `L${p.x},${p.y}`).join(' ') +
+                ` L${points[points.length - 1].x},${H} Z`
+                : '';
+
+              return (
+                <div>
+                  {/* SVG line chart */}
+                  <div className="w-full" style={{ height: '160px' }}>
+                    <svg
+                      viewBox={`0 0 ${W} ${H}`}
+                      preserveAspectRatio="none"
+                      className="w-full h-full"
+                    >
+                      {/* Subtle fill under the line */}
+                      {fillPath && (
+                        <path
+                          d={fillPath}
+                          fill="currentColor"
+                          className="text-primary/10"
+                        />
+                      )}
+                      {/* Main line */}
+                      <polyline
+                        points={polyline}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        className="text-primary/80"
+                      />
+                      {/* Data point dots */}
+                      {points.map((p, i) => (
+                        <circle
+                          key={i}
+                          cx={p.x}
+                          cy={p.y}
+                          r="3"
+                          fill="currentColor"
+                          className="text-primary"
+                        />
+                      ))}
+                    </svg>
+                  </div>
+
+                  {/* Month x-axis labels */}
+                  <div className="flex mt-2" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                    {entries.map((e, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                          {e.label}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground/60">
+                          {e.month.slice(0, 4)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Value table below chart */}
+                  <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-x-2 gap-y-3">
+                    {entries.map((e, i) => (
+                      <div key={i} className="flex flex-col gap-0.5">
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{e.label} {e.month.slice(0, 4)}</span>
+                        <span className="text-xs font-semibold tabular-nums text-foreground">
+                          {e.total > 0
+                            ? `₱${e.total.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                            : <span className="text-muted-foreground/50">—</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+                    Showing completed-order revenue for the last {monthRange} months.
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+        </section>
+
+        {/* ── ARIMA Forecast ── */}
+        <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground">
+                <BarChart2 className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Forecast (Next 3 Months)</h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">ARIMA model · predicted sales revenue</p>
+              </div>
+            </div>
+            <span className="rounded-full border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400">
+              AI
+            </span>
+          </div>
+
+          <div className="px-5 py-5">
+            {forecastLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Loading forecast…
+              </div>
+            ) : forecastError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                <p className="text-sm font-medium text-destructive">Forecast unavailable</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{forecastError}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Make sure the ARIMA service is running: <code className="font-mono bg-muted px-1 rounded text-[10px]">uvicorn arima-service.main:app --reload</code></p>
+              </div>
+            ) : forecastData.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No forecast data returned.</p>
+            ) : (
+              <div className="space-y-4">
+                {/* ── 3 forecast cards ── */}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {forecastData.map((entry, idx) => (
+                    <div
+                      key={idx}
+                      className="group relative overflow-hidden rounded-xl border border-border bg-background px-5 py-4 transition-all duration-200 hover:border-amber-300/60 hover:shadow-md hover:-translate-y-0.5"
+                    >
+                      {/* Accent glow */}
+                      <div className="pointer-events-none absolute right-0 top-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full bg-amber-400/10 blur-2xl" />
+
+                      <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                        {entry.month}
+                      </p>
+                      <p className="mt-1.5 text-xl font-bold tabular-nums text-foreground">
+                        ₱{entry.value.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                      <div className="mt-2 flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3 text-amber-500" />
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400">Predicted</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── System Recommendation ── */}
+                {forecastInsight && (() => {
+                  const { trend, lastHistorical, firstForecast, pctChange } = forecastInsight;
+
+                  const config = {
+                    increasing: {
+                      border: 'border-emerald-300/60',
+                      bg: 'bg-emerald-50 dark:bg-emerald-950/20',
+                      glow: 'bg-emerald-400/10',
+                      badge: 'border-emerald-300/60 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400',
+                      trendLabel: 'Increasing Trend',
+                      recommendation: 'Sales are expected to increase. Consider increasing inventory.',
+                      Icon: TrendingUp,
+                      iconColor: 'text-emerald-500',
+                      titleColor: 'text-emerald-700 dark:text-emerald-400',
+                    },
+                    decreasing: {
+                      border: 'border-red-300/60',
+                      bg: 'bg-red-50 dark:bg-red-950/20',
+                      glow: 'bg-red-400/10',
+                      badge: 'border-red-300/60 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400',
+                      trendLabel: 'Decreasing Trend',
+                      recommendation: 'Sales may decline. Reduce stock levels to avoid overstock.',
+                      Icon: TrendingDown,
+                      iconColor: 'text-red-500',
+                      titleColor: 'text-red-700 dark:text-red-400',
+                    },
+                    stable: {
+                      border: 'border-border',
+                      bg: 'bg-muted/30',
+                      glow: 'bg-muted/20',
+                      badge: 'border-border bg-muted text-muted-foreground',
+                      trendLabel: 'Stable Trend',
+                      recommendation: 'Sales are stable. Maintain current inventory levels.',
+                      Icon: Minus,
+                      iconColor: 'text-muted-foreground',
+                      titleColor: 'text-muted-foreground',
+                    },
+                  }[trend];
+
+                  const fmt = (v: number) =>
+                    `₱${v.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+                  return (
+                    <div className={`relative overflow-hidden rounded-xl border ${config.border} ${config.bg}`}>
+                      <div className={`pointer-events-none absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full ${config.glow} blur-2xl`} />
+
+                      {/* Section header */}
+                      <div className="flex items-center justify-between border-b border-border/50 px-5 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          System Recommendation
+                        </p>
+                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${config.badge}`}>
+                          {config.trendLabel}
+                        </span>
+                      </div>
+
+                      {/* Body */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4">
+                        {/* Left: icon + recommendation */}
+                        <div className="flex items-start gap-3">
+                          <div className={`mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border ${config.badge}`}>
+                            <config.Icon className={`h-4 w-4 ${config.iconColor}`} />
+                          </div>
+                          <div>
+                            <p className={`text-sm font-semibold ${config.titleColor}`}>
+                              {config.recommendation}
+                            </p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              Based on ARIMA forecast · Last recorded:{' '}
+                              <span className="font-medium text-foreground">{fmt(lastHistorical)}</span>
+                              {' → '}
+                              Next forecast:{' '}
+                              <span className="font-medium text-foreground">{fmt(firstForecast)}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right: % change pill */}
+                        <div className="flex-shrink-0 self-end sm:self-auto">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold tabular-nums ${config.badge}`}>
+                            <config.Icon className="h-3 w-3" />
+                            {pctChange >= 0 ? '+' : ''}{pctChange.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

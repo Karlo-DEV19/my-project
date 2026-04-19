@@ -1,5 +1,70 @@
 import { z } from "zod"
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Normalise a PH phone number to E.164 (+639XXXXXXXXX).
+ * Accepts:
+ *   09XXXXXXXXX  → +639XXXXXXXXX
+ *   +639XXXXXXXXX → unchanged
+ * Returns null on unrecognised format.
+ */
+export function normalisePHPhone(raw: string): string | null {
+    const trimmed = raw.trim()
+    if (/^09\d{9}$/.test(trimmed)) {
+        return "+63" + trimmed.slice(1) // 09... → +639...
+    }
+    if (/^\+639\d{9}$/.test(trimmed)) {
+        return trimmed // already E.164
+    }
+    return null
+}
+
+/**
+ * Shared Zod schema for a Philippine mobile number.
+ * Validates that the raw string is one of the two accepted formats.
+ * Normalisation (09... → +63...) is done at submit time in the form.
+ */
+const phPhoneSchema = z
+    .string()
+    .min(1, "Phone number is required")
+    .refine(
+        (val) => /^[+\d]+$/.test(val.trim()),
+        "Phone number must contain digits only (no letters or symbols)"
+    )
+    .superRefine((val, ctx) => {
+        if (normalisePHPhone(val) !== null) return
+        const t = val.trim()
+        const message = t.startsWith("+63")
+            ? "International format must be +639XXXXXXXXX (13 characters total)"
+            : t.startsWith("09")
+                ? "Local format must be exactly 11 digits: 09XXXXXXXXX"
+                : "Enter a valid PH number: 09XXXXXXXXX or +639XXXXXXXXX"
+        ctx.addIssue({ code: "custom", message })
+    })
+
+/**
+ * Optional variant — only validates when a non-empty value is provided.
+ */
+const phPhoneOptionalSchema = z
+    .string()
+    .optional()
+    .refine(
+        (val) => !val || /^[+\d]+$/.test(val.trim()),
+        "Phone number must contain digits only (no letters or symbols)"
+    )
+    .superRefine((val, ctx) => {
+        if (!val || normalisePHPhone(val) !== null) return
+        const t = val.trim()
+        const message = t.startsWith("+63")
+            ? "International format must be +639XXXXXXXXX (13 characters total)"
+            : t.startsWith("09")
+                ? "Local format must be exactly 11 digits: 09XXXXXXXXX"
+                : "Enter a valid PH number: 09XXXXXXXXX or +639XXXXXXXXX"
+        ctx.addIssue({ code: "custom", message })
+    })
+
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 // IMPORTANT: `items` and all financial totals (subtotal, vat, totalAmount, etc.)
 // are intentionally NOT in this schema.
@@ -17,11 +82,35 @@ import { z } from "zod"
 
 export const checkoutSchema = z.object({
     // ── Contact ───────────────────────────────────────────────────────────────
-    firstName: z.string().min(1, "First name is required"),
-    lastName: z.string().min(1, "Last name is required"),
-    email: z.string().email("Valid email is required"),
-    phone: z.string().min(10, "Valid phone number is required"),
-    phoneSecondary: z.string().optional(),
+    firstName: z
+        .string()
+        .min(1, "First name is required")
+        .regex(
+            /^[A-Za-z\s]+$/,
+            "First name must contain letters only — no numbers or special characters"
+        ),
+    lastName: z
+        .string()
+        .min(1, "Last name is required")
+        .regex(
+            /^[A-Za-z\s]+$/,
+            "Last name must contain letters only — no numbers or special characters"
+        ),
+    email: z
+        .string()
+        .min(1, "Email address is required")
+        .email("Please enter a valid email address")
+        .refine(
+            (val) => {
+                const domain = val.split("@")[1]?.toLowerCase()
+                return domain === "gmail.com" || domain === "yahoo.com"
+            },
+            "Only Gmail (@gmail.com) and Yahoo (@yahoo.com) addresses are accepted"
+        ),
+    // Primary phone — accepts 09XXXXXXXXX or +639XXXXXXXXX, stored as E.164
+    phone: phPhoneSchema,
+    // Secondary phone — same rules but optional
+    phoneSecondary: phPhoneOptionalSchema,
 
     // ── Order meta ────────────────────────────────────────────────────────────
     paymentMethod: z.enum(["gcash", "paymaya"], {

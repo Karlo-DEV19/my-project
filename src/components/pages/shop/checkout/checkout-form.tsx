@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useRef, useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
@@ -15,8 +15,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { checkoutSchema, type CheckoutFormValues } from "@/lib/zod-schema/checkout.schema"
+import { checkoutSchema, type CheckoutFormValues, normalisePHPhone } from "@/lib/zod-schema/checkout.schema"
 import type { LocationData } from "@/components/ui/location-picker"
 import { useCheckoutOrder, type PaymentMethodType } from "@/app/api/hooks/use-order"
 import type { CartItem, computeCartTotals } from "@/lib/zustand/use-cart-store"
@@ -44,6 +51,178 @@ const LocationPicker = dynamic(
         ),
     }
 )
+
+// ─── Terms & Conditions Modal ────────────────────────────────────────────────
+
+interface TermsModalProps {
+    open: boolean
+    onConfirm: () => void
+    onClose: () => void
+}
+
+function TermsAndConditionsModal({ open, onConfirm, onClose }: TermsModalProps) {
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false)
+    const [confirmed, setConfirmed] = useState(false)
+
+    const handleScroll = () => {
+        const el = scrollRef.current
+        if (!el) return
+        const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8
+        if (isAtBottom) setHasScrolledToBottom(true)
+    }
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            // reset internal state on close
+            setHasScrolledToBottom(false)
+            setConfirmed(false)
+            onClose()
+        }
+    }
+
+    const handleConfirm = () => {
+        setHasScrolledToBottom(false)
+        setConfirmed(false)
+        onConfirm()
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogContent
+                className="max-w-lg w-full rounded-none p-0 gap-0 border border-border bg-background overflow-hidden"
+                showCloseButton={true}
+            >
+                {/* Header */}
+                <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/50">
+                    <DialogTitle className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+                        Terms &amp; Conditions
+                    </DialogTitle>
+                    <DialogDescription className="text-[10px] text-muted-foreground mt-0.5">
+                        Please read the full terms before confirming your order.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {/* Scrollable content */}
+                <div
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    className="overflow-y-auto px-6 py-5 max-h-[52vh] text-xs text-muted-foreground leading-relaxed space-y-4"
+                >
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-foreground">
+                            1. Order &amp; Payment
+                        </p>
+                        <p>
+                            All orders require a <strong className="text-foreground">50% downpayment</strong> at the
+                            time of checkout. The remaining balance is due upon delivery. MJ Decor 888 reserves the
+                            right to cancel any order if the downpayment is not received within 24 hours of placing
+                            the order.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-foreground">
+                            2. Delivery
+                        </p>
+                        <p>
+                            MJ Decor 888 is not liable for failed or delayed deliveries caused by incorrect or
+                            incomplete address information provided by the customer. It is the customer's
+                            responsibility to ensure all delivery details are accurate before submitting an order.
+                        </p>
+                        <p>
+                            Delivery timelines are estimates only and may be affected by factors beyond our control,
+                            including weather, traffic, and carrier availability.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-foreground">
+                            3. Returns &amp; Refunds
+                        </p>
+                        <p>
+                            Custom or made-to-order items are non-refundable once production has started. For
+                            eligible returns, customers must notify MJ Decor 888 within 48 hours of receiving the
+                            item. Returns must be in original, unused condition with all packaging intact.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-foreground">
+                            4. Privacy
+                        </p>
+                        <p>
+                            Personal information collected during checkout is used solely to process and fulfill your
+                            order. MJ Decor 888 does not sell, trade, or share your personal data with third parties
+                            outside of the delivery process.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-foreground">
+                            5. Liability
+                        </p>
+                        <p>
+                            MJ Decor 888's liability is limited to the amount paid for the order. We are not
+                            responsible for any indirect, incidental, or consequential damages arising from the use
+                            of our products or services.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-[0.15em] font-semibold text-foreground">
+                            6. Amendments
+                        </p>
+                        <p>
+                            MJ Decor 888 reserves the right to update these Terms &amp; Conditions at any time.
+                            Continued use of our services after changes are posted constitutes your acceptance of
+                            the revised terms.
+                        </p>
+                    </div>
+
+                    {/* Scroll sentinel */}
+                    <div aria-hidden="true" />
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-border/50 space-y-3 bg-accent/5">
+                    {!hasScrolledToBottom && (
+                        <p className="text-[10px] text-muted-foreground text-center animate-pulse">
+                            ↓ Scroll down to read and accept the terms
+                        </p>
+                    )}
+
+                    <label
+                        className={`flex items-start gap-3 cursor-pointer ${hasScrolledToBottom ? "opacity-100" : "opacity-40 pointer-events-none"
+                            } transition-opacity duration-200`}
+                    >
+                        <Checkbox
+                            id="terms-confirm-checkbox"
+                            checked={confirmed}
+                            onCheckedChange={(val) => setConfirmed(val === true)}
+                            disabled={!hasScrolledToBottom}
+                            className="mt-0.5"
+                        />
+                        <span className="text-xs text-foreground leading-snug">
+                            I have read and agree to the Terms &amp; Conditions
+                        </span>
+                    </label>
+
+                    <button
+                        type="button"
+                        disabled={!confirmed}
+                        onClick={handleConfirm}
+                        className="w-full h-11 bg-foreground text-background text-xs uppercase tracking-[0.2em] font-semibold
+                                   hover:bg-foreground/90 active:scale-[0.995] transition-all duration-150
+                                   disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Confirm &amp; Accept
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -109,6 +288,11 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
     const router = useRouter()
     const { checkoutOrderAsync, isPending, isError } = useCheckoutOrder()
+
+    // ── Terms modal state ─────────────────────────────────────────────────────
+    const [termsModalOpen, setTermsModalOpen] = useState(false)
+    // Callback ref set when user clicks the checkbox — used to accept terms
+    const pendingTermsAccept = useRef<((value: boolean | undefined) => void) | null>(null)
 
     const {
         fullSubtotal: subtotal,
@@ -200,8 +384,11 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
             firstName: data.firstName,
             lastName: data.lastName,
             email: data.email,
-            phone: data.phone,
-            phoneSecondary: data.phoneSecondary?.trim() || undefined,
+            // Normalise to E.164 (+639XXXXXXXXX) — handles both 09... and +639... inputs
+            phone: normalisePHPhone(data.phone) ?? data.phone,
+            phoneSecondary: data.phoneSecondary?.trim()
+                ? (normalisePHPhone(data.phoneSecondary) ?? data.phoneSecondary)
+                : undefined,
             paymentMethod: data.paymentMethod as PaymentMethodType,
             agreeTerms: true as const,
             deliveryNotes: data.deliveryNotes?.trim() || undefined,
@@ -326,13 +513,13 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                     <section className="p-6 sm:p-8">
                         <SectionHeader icon={Mail} step={1} title="Contact Information"
                             description="Your receipt and order updates will be sent here." />
-                        <FormField control={form.control} name="email" render={({ field }) => (
+                        <FormField control={form.control} name="email" render={({ field, fieldState }) => (
                             <FormItem>
                                 <FieldLabel>Email Address</FieldLabel>
                                 <FormControl>
-                                    <Input type="email" placeholder="e.g. juan@example.com"
+                                    <Input type="email" placeholder="e.g. juan@gmail.com"
                                         autoComplete="email"
-                                        className="h-11 bg-transparent text-sm rounded-none border-border/70"
+                                        className={`h-11 bg-transparent text-sm rounded-none ${fieldState.error ? "border-destructive" : "border-border/70"}`}
                                         {...field} />
                                 </FormControl>
                                 <FormMessage className="text-[10px]" />
@@ -346,24 +533,42 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                             description="The person who will receive the delivery." />
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="firstName" render={({ field }) => (
+                                <FormField control={form.control} name="firstName" render={({ field, fieldState }) => (
                                     <FormItem>
                                         <FieldLabel>First Name</FieldLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g. Juan" autoComplete="given-name"
-                                                className="h-11 bg-transparent text-sm rounded-none border-border/70"
-                                                {...field} />
+                                            <Input
+                                                placeholder="e.g. Juan"
+                                                autoComplete="given-name"
+                                                className={`h-11 bg-transparent text-sm rounded-none ${fieldState.error ? "border-destructive" : "border-border/70"}`}
+                                                {...field}
+                                                onKeyDown={(e) => {
+                                                    if (/^\d$/.test(e.key)) e.preventDefault()
+                                                }}
+                                                onChange={(e) => {
+                                                    field.onChange(e.target.value.replace(/\d/g, ""))
+                                                }}
+                                            />
                                         </FormControl>
                                         <FormMessage className="text-[10px]" />
                                     </FormItem>
                                 )} />
-                                <FormField control={form.control} name="lastName" render={({ field }) => (
+                                <FormField control={form.control} name="lastName" render={({ field, fieldState }) => (
                                     <FormItem>
                                         <FieldLabel>Last Name</FieldLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g. Dela Cruz" autoComplete="family-name"
-                                                className="h-11 bg-transparent text-sm rounded-none border-border/70"
-                                                {...field} />
+                                            <Input
+                                                placeholder="e.g. Dela Cruz"
+                                                autoComplete="family-name"
+                                                className={`h-11 bg-transparent text-sm rounded-none ${fieldState.error ? "border-destructive" : "border-border/70"}`}
+                                                {...field}
+                                                onKeyDown={(e) => {
+                                                    if (/^\d$/.test(e.key)) e.preventDefault()
+                                                }}
+                                                onChange={(e) => {
+                                                    field.onChange(e.target.value.replace(/\d/g, ""))
+                                                }}
+                                            />
                                         </FormControl>
                                         <FormMessage className="text-[10px]" />
                                     </FormItem>
@@ -567,9 +772,16 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                                         <FormControl>
                                             <Checkbox
                                                 checked={field.value === true}
-                                                onCheckedChange={(checked) =>
-                                                    field.onChange(checked ? true : undefined)
-                                                }
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        // Intercept — open the modal instead of checking
+                                                        pendingTermsAccept.current = field.onChange
+                                                        setTermsModalOpen(true)
+                                                    } else {
+                                                        // Allow unchecking directly
+                                                        field.onChange(undefined)
+                                                    }
+                                                }}
                                                 className="mt-0.5"
                                             />
                                         </FormControl>
@@ -586,6 +798,21 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
                                     <FormMessage className="text-[10px] mt-1" />
                                 </FormItem>
                             )} />
+
+                            {/* Terms & Conditions modal */}
+                            <TermsAndConditionsModal
+                                open={termsModalOpen}
+                                onConfirm={() => {
+                                    pendingTermsAccept.current?.(true)
+                                    pendingTermsAccept.current = null
+                                    setTermsModalOpen(false)
+                                }}
+                                onClose={() => {
+                                    // Dismissed without confirming — keep unchecked
+                                    pendingTermsAccept.current = null
+                                    setTermsModalOpen(false)
+                                }}
+                            />
                         </div>
                     </section>
 

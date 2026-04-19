@@ -280,3 +280,104 @@ export const useGetAllOrders = (filters: GetAllOrdersFilters = {}) => {
         data: query.data,
     }
 }
+
+// ── DASHBOARD STATS ───────────────────────────────────────────────────────────
+
+export interface DashboardOrderPerDay {
+    label: string
+    value: number
+}
+
+export interface DashboardRecentOrder {
+    id: string
+    customer: string
+    total: string
+    status: string
+    createdAt: string
+}
+
+export interface DashboardRecentProduct {
+    id: string
+    name: string
+    category: string
+    createdAt: string
+}
+
+export interface DashboardStatsData {
+    totalProducts: number
+    totalOrders: number
+    totalCustomers: number
+    totalRevenue: number
+    ordersPerDay: DashboardOrderPerDay[]
+    totalOrdersThisWeek: number
+    recentOrders: DashboardRecentOrder[]
+    recentProducts: DashboardRecentProduct[]
+}
+
+export interface GetDashboardStatsResponse {
+    success: boolean
+    data: DashboardStatsData
+}
+
+export const useGetDashboardStats = () => {
+    const query = useQuery({
+        queryKey: ["dashboard-stats"],
+        queryFn: async (): Promise<GetDashboardStatsResponse> => {
+            const response = await axiosApiClient.get<GetDashboardStatsResponse>(
+                "/orders/dashboard-stats"
+            )
+            return response.data
+        },
+        staleTime: 60 * 1000, // 1 minute
+    })
+
+    return {
+        isPending: query.isPending,
+        isSuccess: query.isSuccess,
+        isError: query.isError,
+        error: query.error,
+        data: query.data?.data,
+        refetch: query.refetch,
+    }
+}
+
+// ── MONTHLY SALES ─────────────────────────────────────────────────────────────
+
+export interface MonthlySalesEntry {
+    month: string   // "YYYY-MM"
+    label: string   // "Jan", "Feb", ...
+    total: number
+}
+
+export interface MonthlySalesData {
+    monthlySales: MonthlySalesEntry[]
+    grandTotal: number
+}
+
+export interface GetMonthlySalesResponse {
+    success: boolean
+    data: MonthlySalesData
+}
+
+export const useGetMonthlySales = (months: number = 12) => {
+    const query = useQuery({
+        queryKey: ["monthly-sales", months],
+        queryFn: async (): Promise<GetMonthlySalesResponse> => {
+            const response = await axiosApiClient.get<GetMonthlySalesResponse>(
+                "/orders/monthly-sales",
+                { params: { months } }
+            )
+            return response.data
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    })
+
+    return {
+        isPending: query.isPending,
+        isSuccess: query.isSuccess,
+        isError: query.isError,
+        error: query.error,
+        data: query.data?.data,
+        refetch: query.refetch,
+    }
+}

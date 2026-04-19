@@ -8,16 +8,13 @@ import { db } from "@/lib/supabase/db";
 import { blindsProducts } from "@/schema/products/blinds/blinds-product";
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors";
 import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image";
-import { and, eq, ilike, or, sql } from "drizzle-orm"; // <- use these for conditions
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { Context } from "hono";
 import { z } from "zod";
 import { createActivityLog } from "./activity-logs";
 
-// src/app/api/controller/product-blinds-controller.ts
-
 export const updateBlindsById = async (ctx: Context) => {
     try {
-        // ✅ Match whatever your Hono route declares, e.g. .put("/:productId/update", ...)
         const productId = ctx.req.param("productId");
 
         if (!productId) {
@@ -38,7 +35,6 @@ export const updateBlindsById = async (ctx: Context) => {
             packing: z.string().trim().default(""),
             characteristic: z.string().trim().default(""),
             unitPrice: z.number().min(0),
-            // ✅ Accept any non-empty string — URLs from Supabase are valid strings
             mainImages: z
                 .array(z.string().min(1))
                 .default([]),
@@ -68,7 +64,6 @@ export const updateBlindsById = async (ctx: Context) => {
             mainImages, availableColors,
         } = parsed.data;
 
-        // Check product exists
         const [existing] = await db
             .select({ id: blindsProducts.id, productCode: blindsProducts.productCode })
             .from(blindsProducts)
@@ -79,7 +74,6 @@ export const updateBlindsById = async (ctx: Context) => {
             return ctx.json({ success: false, message: "Product not found" }, 404);
         }
 
-        // Duplicate productCode guard
         if (productCode !== existing.productCode) {
             const [duplicate] = await db
                 .select({ id: blindsProducts.id })
@@ -92,7 +86,6 @@ export const updateBlindsById = async (ctx: Context) => {
             }
         }
 
-        // Normalize — strip whitespace, drop empty strings
         const normalizedImages = mainImages
             .map((url) => url.trim())
             .filter(Boolean);
@@ -101,10 +94,7 @@ export const updateBlindsById = async (ctx: Context) => {
             .map((c) => ({ name: c.name.trim(), imageUrl: c.imageUrl.trim() }))
             .filter((c) => c.name && c.imageUrl);
 
-        // ✅ Full replace inside a single transaction
         const updatedProduct = await db.transaction(async (tx) => {
-
-            // 1. Update product row
             const [product] = await tx
                 .update(blindsProducts)
                 .set({
@@ -116,7 +106,6 @@ export const updateBlindsById = async (ctx: Context) => {
                 .where(eq(blindsProducts.id, productId))
                 .returning();
 
-            // 2. Wipe old images → insert exactly what client sent
             await tx
                 .delete(blindsProductImages)
                 .where(eq(blindsProductImages.productId, productId));
@@ -131,7 +120,6 @@ export const updateBlindsById = async (ctx: Context) => {
                         .returning()
                     : [];
 
-            // 3. Wipe old colors → insert exactly what client sent
             await tx
                 .delete(blindsProductColors)
                 .where(eq(blindsProductColors.productId, productId));
@@ -177,10 +165,8 @@ export const createNewBlinds = async (ctx: Context) => {
     try {
         const body = await ctx.req.json();
 
-        // 1️⃣ Validate input
         const parsedData: BlindsProductValues = blindsProductSchema.parse(body);
 
-        // 2️⃣ Check for duplicate productCode or name
         const existing = await db
             .select()
             .from(blindsProducts)
@@ -193,9 +179,7 @@ export const createNewBlinds = async (ctx: Context) => {
 
         if (existing.length > 0) {
             const duplicateFields = [];
-            if (
-                existing.some((p) => p.productCode === parsedData.productCode)
-            )
+            if (existing.some((p) => p.productCode === parsedData.productCode))
                 duplicateFields.push("productCode");
             if (existing.some((p) => p.name === parsedData.name))
                 duplicateFields.push("name");
@@ -209,7 +193,6 @@ export const createNewBlinds = async (ctx: Context) => {
             );
         }
 
-        // 3️⃣ Insert product
         const [insertedProduct] = await db
             .insert(blindsProducts)
             .values({
@@ -223,13 +206,13 @@ export const createNewBlinds = async (ctx: Context) => {
                 thickness: parsedData.thickness,
                 packing: parsedData.packing,
                 characteristic: parsedData.characteristic,
-                collection: parsedData.collection, // ✅ added field
+                collection: parsedData.collection,
+                stock: parsedData.stock ?? 0,
             })
             .returning();
 
         const productId = insertedProduct.id;
 
-        // 4️⃣ Insert main images
         if (parsedData.mainImages.length > 0) {
             await db.insert(blindsProductImages).values(
                 parsedData.mainImages.map((url) => ({
@@ -239,26 +222,25 @@ export const createNewBlinds = async (ctx: Context) => {
             );
         }
 
-        // 5️⃣ Insert available colors
         if (parsedData.availableColors.length > 0) {
-            await db.insert(blindsProductColors).
-                values(
-                    parsedData.availableColors.map((color) => ({
-                        productId,
-                        name: color.name,
-                        imageUrl: color.imageUrl,
-                    }))
-                );
+            await db.insert(blindsProductColors).values(
+                parsedData.availableColors.map((color) => ({
+                    productId,
+                    name: color.name,
+                    imageUrl: color.imageUrl,
+                }))
+            );
         }
 
-        // 6️⃣ Log activity (non-blocking — will not throw on failure)
-        await createActivityLog(db, {
-            userId: parsedData.userId,
-            action: ActivityAction.CREATE,
-            module: ActivityModule.BLINDS_PRODUCT,
-            referenceId: insertedProduct.id,
-            description: `Created blinds product: ${parsedData.name} (${parsedData.productCode})`,
-        });
+        if (parsedData.userId) {
+            await createActivityLog(db, {
+                userId: parsedData.userId,
+                action: ActivityAction.CREATE,
+                module: ActivityModule.BLINDS_PRODUCT,
+                referenceId: insertedProduct.id,
+                description: `Created blinds product: ${parsedData.name} (${parsedData.productCode})`,
+            });
+        }
 
         return ctx.json({ success: true, product: insertedProduct });
     } catch (error) {
@@ -273,10 +255,8 @@ export const createNewBlinds = async (ctx: Context) => {
     }
 };
 
-
 export const getAllBlinds = async (c: Context) => {
     try {
-        // 1. Extract and Parse Query Parameters
         const page = Number(c.req.query("page") ?? 1);
         const limit = Number(c.req.query("limit") ?? 10);
         const search = c.req.query("search")?.toString() ?? "";
@@ -286,7 +266,6 @@ export const getAllBlinds = async (c: Context) => {
 
         const offset = (page - 1) * limit;
 
-        // 2. Build Where Conditions
         const filters = [];
         if (statusFilter) {
             filters.push(eq(blindsProducts.status, statusFilter));
@@ -302,7 +281,6 @@ export const getAllBlinds = async (c: Context) => {
 
         const whereCondition = filters.length > 0 ? and(...filters) : undefined;
 
-        // 3. Get Total Count for Pagination
         const [totalResult] = await db
             .select({ count: sql<number>`count(*)` })
             .from(blindsProducts)
@@ -311,7 +289,6 @@ export const getAllBlinds = async (c: Context) => {
         const total = Number(totalResult?.count ?? 0);
         const totalPages = Math.ceil(total / limit);
 
-        // 4. Sort Column Validation (Fixes the TS Index error)
         const validSortColumns = ["name", "productCode", "createdAt", "unitPrice", "status"] as const;
         type SortableColumn = (typeof validSortColumns)[number];
 
@@ -319,10 +296,9 @@ export const getAllBlinds = async (c: Context) => {
             ? (sortBy as SortableColumn)
             : "createdAt";
 
-        // 5. Fetch Optimized Data with Relations
         const blinds = await db.query.blindsProducts.findMany({
             where: whereCondition,
-            // Select only necessary columns for the table grid
+            // ✅ FIXED: Tanggal ang false values, explicit true lang lahat
             columns: {
                 id: true,
                 productCode: true,
@@ -334,21 +310,17 @@ export const getAllBlinds = async (c: Context) => {
                 thickness: true,
                 status: true,
                 unitPrice: true,
+                stock: true,       // ✅ stock included
+                collection: true,
                 createdAt: true,
-                // Explicitly excluding bulky or unused text
-                description: false,
-                characteristic: false,
-                updatedAt: false,
             },
             with: {
-                // Fetch colors for display tags/swatches
                 colors: {
                     columns: {
                         name: true,
                         imageUrl: true
                     }
                 },
-                // Fetch only the first image as the primary thumbnail
                 images: {
                     limit: 1,
                     columns: {
@@ -363,7 +335,6 @@ export const getAllBlinds = async (c: Context) => {
             offset,
         });
 
-        // 6. Return Structured Response
         return c.json({
             success: true,
             blinds,
@@ -391,14 +362,10 @@ export const getAllBlinds = async (c: Context) => {
         );
     }
 };
-
-
-
 export const getDetailsBlindByProductId = async (ctx: Context) => {
     try {
         const productId = ctx.req.param("productId");
 
-        // 1. Validation: Null, Undefined, or Empty String
         if (!productId || productId.trim() === "" || productId === "undefined" || productId === "null") {
             return ctx.json({
                 success: false,
@@ -406,7 +373,6 @@ export const getDetailsBlindByProductId = async (ctx: Context) => {
             }, 400);
         }
 
-        // 2. Fetch data with relations
         const product = await db.query.blindsProducts.findFirst({
             where: eq(blindsProducts.id, productId),
             with: {
@@ -415,7 +381,6 @@ export const getDetailsBlindByProductId = async (ctx: Context) => {
             },
         });
 
-        // 3. Validation: Check if product exists in DB
         if (!product) {
             return ctx.json({
                 success: false,
@@ -423,7 +388,6 @@ export const getDetailsBlindByProductId = async (ctx: Context) => {
             }, 404);
         }
 
-        // 4. Return complete details
         return ctx.json({
             success: true,
             data: product,
@@ -432,7 +396,6 @@ export const getDetailsBlindByProductId = async (ctx: Context) => {
     } catch (error: any) {
         console.error("[GET_BLINDS_DETAILS_ERROR]:", error);
 
-        // Handle malformed UUID errors specifically if using Postgres UUID type
         if (error.message?.includes("invalid input syntax for type uuid")) {
             return ctx.json({
                 success: false,
@@ -445,9 +408,7 @@ export const getDetailsBlindByProductId = async (ctx: Context) => {
             message: "Internal server error occurred while fetching product details."
         }, 500);
     }
-}
-
-
+};
 
 export const getAllBestSeller = async (c: Context) => {
     try {
@@ -485,18 +446,8 @@ export const getAllBestSeller = async (c: Context) => {
                 createdAt: true,
             },
             with: {
-                colors: {
-                    columns: {
-                        name: true,
-                        imageUrl: true
-                    }
-                },
-                images: {
-                    limit: 1,
-                    columns: {
-                        imageUrl: true
-                    }
-                }
+                colors: { columns: { name: true, imageUrl: true } },
+                images: { limit: 1, columns: { imageUrl: true } }
             },
             orderBy: (fields, { desc }) => [desc(fields.createdAt)],
             limit,
@@ -507,22 +458,16 @@ export const getAllBestSeller = async (c: Context) => {
             success: true,
             blinds,
             pagination: {
-                page,
-                limit,
-                total,
-                totalPages,
+                page, limit, total, totalPages,
                 hasNextPage: page < totalPages,
                 hasPrevPage: page > 1,
             }
         });
     } catch (error) {
         console.error("Failed to get best sellers:", error);
-        return c.json(
-            { success: false, message: "Failed to fetch top seller products." },
-            500
-        );
+        return c.json({ success: false, message: "Failed to fetch top seller products." }, 500);
     }
-}
+};
 
 export const getAllNewArrival = async (c: Context) => {
     try {
@@ -560,18 +505,8 @@ export const getAllNewArrival = async (c: Context) => {
                 createdAt: true,
             },
             with: {
-                colors: {
-                    columns: {
-                        name: true,
-                        imageUrl: true
-                    }
-                },
-                images: {
-                    limit: 1,
-                    columns: {
-                        imageUrl: true
-                    }
-                }
+                colors: { columns: { name: true, imageUrl: true } },
+                images: { limit: 1, columns: { imageUrl: true } }
             },
             orderBy: (fields, { desc }) => [desc(fields.createdAt)],
             limit,
@@ -582,21 +517,98 @@ export const getAllNewArrival = async (c: Context) => {
             success: true,
             blinds,
             pagination: {
-                page,
-                limit,
-                total,
-                totalPages,
+                page, limit, total, totalPages,
                 hasNextPage: page < totalPages,
                 hasPrevPage: page > 1,
             }
         });
     } catch (error) {
         console.error("Failed to get new arrivals:", error);
-        return c.json(
-            { success: false, message: "Failed to fetch new arrival products." },
-            500
-        );
+        return c.json({ success: false, message: "Failed to fetch new arrival products." }, 500);
     }
-}
+};
 
-// No export default needed when using named exports
+// ✅ NEW — Update stock only (for Inventory Management)
+export const updateBlindStock = async (ctx: Context) => {
+    try {
+        const productId = ctx.req.param("productId");
+
+        if (!productId) {
+            return ctx.json({ success: false, message: "Missing product ID" }, 400);
+        }
+
+        const body = await ctx.req.json();
+        const { stock } = body;
+
+        if (typeof stock !== "number" || !Number.isInteger(stock) || stock < 0) {
+            return ctx.json({ success: false, message: "Invalid stock value" }, 400);
+        }
+
+        const [existing] = await db
+            .select({ id: blindsProducts.id })
+            .from(blindsProducts)
+            .where(eq(blindsProducts.id, productId))
+            .limit(1);
+
+        if (!existing) {
+            return ctx.json({ success: false, message: "Product not found" }, 404);
+        }
+
+        await db
+            .update(blindsProducts)
+            .set({ stock, updatedAt: new Date() })
+            .where(eq(blindsProducts.id, productId));
+
+        return ctx.json({ success: true, message: "Stock updated successfully" });
+
+    } catch (error) {
+        console.error("[updateBlindStock]", error);
+        return ctx.json({ success: false, message: "Internal server error" }, 500);
+    }
+};
+
+export const deleteBlindsById = async (ctx: Context) => {
+    try {
+        const productId = ctx.req.param("productId");
+
+        if (!productId) {
+            return ctx.json({ success: false, message: "Missing product ID" }, 400);
+        }
+
+        const [existing] = await db
+            .select({ id: blindsProducts.id, productCode: blindsProducts.productCode })
+            .from(blindsProducts)
+            .where(eq(blindsProducts.id, productId))
+            .limit(1);
+
+        if (!existing) {
+            return ctx.json({ success: false, message: "Product not found" }, 404);
+        }
+
+        await db.transaction(async (tx) => {
+            await tx
+                .delete(blindsProductImages)
+                .where(eq(blindsProductImages.productId, productId));
+
+            await tx
+                .delete(blindsProductColors)
+                .where(eq(blindsProductColors.productId, productId));
+
+            await tx
+                .delete(blindsProducts)
+                .where(eq(blindsProducts.id, productId));
+        });
+
+        // Try to create activity log, but don't fail the request if it fails since there's no userId provided by default for DELETE in this context.
+        // It's better to bypass or pass a default "SYSTEM" if user is missing, but keeping it simple for now.
+
+        return ctx.json({
+            success: true,
+            message: "Product deleted successfully",
+        });
+
+    } catch (error) {
+        console.error("[deleteBlindsById]", error);
+        return ctx.json({ success: false, message: "Internal server error" }, 500);
+    }
+};

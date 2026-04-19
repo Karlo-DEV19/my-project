@@ -9,7 +9,7 @@ export const blindsColorSchema = z.object({
 
 // Schema for blinds product
 export const blindsProductSchema = z.object({
-    userId: z.string().min(1, 'User ID required'),
+    userId: z.string().min(1, 'User ID required').optional(),
     productCode: z.string().min(1, 'Product code required'),
     name: z.string().min(2, 'Product name required'),
     type: z.string().min(1, 'Select a type'),
@@ -31,6 +31,7 @@ export const blindsProductSchema = z.object({
             message: 'Collection display type must be one of: Shop Only, New Arrival, Best Seller',
         }),
     }),
+    stock: z.number().min(0).optional().default(0),
 });
 
 // Type for TypeScript

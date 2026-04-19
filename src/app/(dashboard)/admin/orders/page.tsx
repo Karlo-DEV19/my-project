@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Search,
   Eye,
@@ -18,6 +19,7 @@ import AdminPageHeader from '@/components/pages/admin/components/admin-page-head
 import OrderStatusBadge, {
   type OrderStatus,
 } from '@/components/pages/admin/components/order-status-badge';
+import { OrdersHeader, type OrderFilters } from '@/components/pages/admin/orders/orders-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -130,7 +132,6 @@ function normalisePaymentStatus(raw: string): PaymentStatus {
   return PAYMENT_STATUS_MAP[raw.toLowerCase()] ?? 'Unpaid';
 }
 
-const ALL_STATUSES: Array<OrderStatus | 'All'> = ['All', 'Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'];
 const ALL_PAYMENT_STATUSES: Array<PaymentStatus | 'All'> = ['All', 'Paid', 'Unpaid', 'Refunded', 'Failed'];
 const PER_PAGE_OPTIONS = [5, 10, 20];
 
@@ -287,7 +288,18 @@ function TablePagination({
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const selectedId = searchParams.get('id');
   const [activeTab, setActiveTab] = useState<Tab>('orders');
+
+  // ── Step 3: auto-scroll to highlighted row ───────────────────────────────
+  useEffect(() => {
+    if (!selectedId) return;
+    const element = document.getElementById(selectedId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedId]);
 
   // Orders state
   const [query, setQuery] = useState('');
@@ -421,6 +433,16 @@ export default function OrdersPage() {
     setActiveTab(tab);
   }
 
+  // ── Orders header state helpers ──────────────────────────────────────────
+
+  const filters: OrderFilters = { query, statusFilter, dateFilter };
+
+  function handleFiltersChange(changed: Partial<OrderFilters>) {
+    if (changed.query !== undefined) { setQuery(changed.query); setPage(1); }
+    if (changed.statusFilter !== undefined) { setStatusFilter(changed.statusFilter); setPage(1); }
+    if (changed.dateFilter !== undefined) { setDateFilter(changed.dateFilter); setPage(1); }
+  }
+
   return (
     // ── Full-width page wrapper ──────────────────────────────────────────
     <div className="w-full min-h-screen bg-background">
@@ -457,45 +479,11 @@ export default function OrdersPage() {
           <div className="space-y-5">
 
             {/* Filters row */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-
-                {/* Search */}
-                <div className="relative w-full sm:w-72">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={query}
-                    onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                    placeholder="Search by ID or customer…"
-                    className="h-9 rounded-none pl-10 text-sm"
-                  />
-                </div>
-
-                {/* Status filter */}
-                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as OrderStatus | 'All'); setPage(1); }}>
-                  <SelectTrigger className="h-9 w-full rounded-none border-border bg-transparent text-sm sm:w-44">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-none border-border">
-                    {ALL_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s} className="rounded-none text-sm">{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Date filter */}
-                <Input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => { setDateFilter(e.target.value); setPage(1); }}
-                  className="h-9 w-full rounded-none border-border bg-transparent text-sm sm:w-44"
-                />
-              </div>
-
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                {filteredOrders.length} order{filteredOrders.length === 1 ? '' : 's'}
-              </p>
-            </div>
+            <OrdersHeader
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              totalItems={filteredOrders.length}
+            />
 
             {/* Orders table */}
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -542,8 +530,18 @@ export default function OrdersPage() {
                         const customer = `${o.customerFirstName} ${o.customerLastName}`;
                         const total = parseFloat(o.totalAmount);
                         const date = o.createdAt;
+                        const isHighlighted = o.id === selectedId;
                         return (
-                          <TableRow key={o.id} className="hover:bg-muted/40 transition-colors">
+                          <TableRow
+                            id={o.id}
+                            key={o.id}
+                            className={cn(
+                              'transition-colors',
+                              isHighlighted
+                                ? 'bg-amber-50 dark:bg-amber-950/30 ring-1 ring-inset ring-amber-300/60 hover:bg-amber-100/80 dark:hover:bg-amber-950/50'
+                                : 'hover:bg-muted/40'
+                            )}
+                          >
                             <TableCell className="px-5 py-3.5 font-mono text-xs text-muted-foreground">
                               {o.trackingNumber}
                             </TableCell>

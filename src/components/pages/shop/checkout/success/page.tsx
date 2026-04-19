@@ -1,4 +1,5 @@
 
+import React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { useGetOrderDetailsStatus } from "@/app/api/hooks/use-order"
@@ -36,7 +37,7 @@ export default function CheckoutSuccess() {
   )
 
   const order = data?.data?.order
-  const payment = data?.data?.payment
+  const payment = data?.data?.payments?.[0]
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-6 py-12">
@@ -159,10 +160,10 @@ export default function CheckoutSuccess() {
 
                 <div className="space-y-2">
                   <Row label="Amount Paid">
-                    <span className="text-xs font-mono">{formatCurrency(payment.amountPaid)}</span>
+                    <span className="text-xs font-mono">{formatCurrency(payment.amountPaid ?? "0")}</span>
                   </Row>
                   <Row label="Net Amount">
-                    <span className="text-xs font-mono">{formatCurrency(payment.netAmount)}</span>
+                    <span className="text-xs font-mono">{formatCurrency(payment.netAmount ?? "0")}</span>
                   </Row>
                   <Row label="Paid At">
                     <span className="text-xs font-mono text-muted-foreground">

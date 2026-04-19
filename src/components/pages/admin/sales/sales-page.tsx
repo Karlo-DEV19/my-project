@@ -31,22 +31,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useGetMonthlySales, useGetAllOrders } from "@/app/api/hooks/use-order";
 
 type SalesPoint = {
   date: string;
   revenue: number;
   orders: number;
 };
-
-const MOCK_SALES: SalesPoint[] = [
-  { date: "Mar 12", revenue: 18200, orders: 5 },
-  { date: "Mar 13", revenue: 24600, orders: 7 },
-  { date: "Mar 14", revenue: 12100, orders: 3 },
-  { date: "Mar 15", revenue: 30800, orders: 9 },
-  { date: "Mar 16", revenue: 26500, orders: 8 },
-  { date: "Mar 17", revenue: 19800, orders: 6 },
-  { date: "Mar 18", revenue: 35200, orders: 10 },
-];
 
 type TransactionStatus = "Paid" | "Refunded" | "Pending";
 
@@ -59,40 +50,19 @@ type Transaction = {
   method: string;
 };
 
-const MOCK_TX: Transaction[] = [
-  {
-    id: "TX-7801",
-    customer: "Jane Doe",
-    date: "2026-03-18",
-    amount: 24500,
-    status: "Paid",
-    method: "GCash",
-  },
-  {
-    id: "TX-7800",
-    customer: "John Smith",
-    date: "2026-03-17",
-    amount: 18200,
-    status: "Paid",
-    method: "Bank Transfer",
-  },
-  {
-    id: "TX-7799",
-    customer: "MJ Interiors",
-    date: "2026-03-17",
-    amount: 72900,
-    status: "Pending",
-    method: "Maya",
-  },
-  {
-    id: "TX-7798",
-    customer: "Andrea Cruz",
-    date: "2026-03-16",
-    amount: 9950,
-    status: "Refunded",
-    method: "Card",
-  },
-];
+/** Map DB paymentStatus → display TransactionStatus */
+function toTxStatus(paymentStatus: string): TransactionStatus {
+  if (paymentStatus === "paid" || paymentStatus === "downpaid") return "Paid";
+  if (paymentStatus === "refunded") return "Refunded";
+  return "Pending";
+}
+
+/** Map DB paymentMethod → display label */
+function toMethodLabel(method: string): string {
+  if (method === "gcash") return "GCash";
+  if (method === "paymaya") return "Maya";
+  return method.charAt(0).toUpperCase() + method.slice(1);
+}
 
 const statusStyles: Record<TransactionStatus, string> = {
   Paid: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -125,12 +95,34 @@ export default function SalesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const totalRevenue = MOCK_SALES.reduce((sum, p) => sum + p.revenue, 0);
-  const totalOrders = MOCK_SALES.reduce((sum, p) => sum + p.orders, 0);
+  // ── Real data ─────────────────────────────────────────────────────────────
+  const { data: monthlySalesData, isPending: isSalesLoading } = useGetMonthlySales(12);
+  const { data: ordersData, isPending: isOrdersLoading } = useGetAllOrders({ limit: 20 });
+
+  // Chart data: map monthly entries to SalesPoint shape
+  const salesData: SalesPoint[] = (monthlySalesData?.monthlySales ?? []).map((m) => ({
+    date: m.label,
+    revenue: m.total,
+    orders: 0,
+  }));
+
+  // Stat totals from monthly sales (completed orders only)
+  const totalRevenue = monthlySalesData?.grandTotal ?? 0;
+  const totalOrders = ordersData?.pagination?.total ?? 0;
   const totalSales = totalRevenue;
 
+  // Transactions table: map real orders to Transaction shape
+  const transactions: Transaction[] = (ordersData?.data ?? []).map((o) => ({
+    id: o.trackingNumber,
+    customer: `${o.customerFirstName} ${o.customerLastName}`,
+    date: o.createdAt ? o.createdAt.slice(0, 10) : "",
+    amount: parseFloat(o.totalAmount ?? "0"),
+    status: toTxStatus(o.paymentStatus),
+    method: toMethodLabel(o.paymentMethod),
+  }));
+
   const filteredTransactions = useMemo(() => {
-    let result = MOCK_TX;
+    let result = transactions;
 
     if (statusFilter !== "All") {
       result = result.filter((tx) => tx.status === statusFilter);
@@ -147,38 +139,38 @@ export default function SalesPage() {
     }
 
     return result;
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, transactions]);
 
   return (
     <section className="flex min-h-screen w-full flex-col bg-background/60">
       <div className="flex flex-1 flex-col gap-8 px-6 py-6 xl:px-10">
         <AdminPageHeader
           title="Sales"
-          description="Mock analytics for sales performance and recent transactions."
+          description="Live analytics for sales performance and recent transactions."
         />
 
         {/* Stat Cards */}
         <section className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard
             title="Total Sales"
-            value={formatCurrency(totalSales)}
+            value={isSalesLoading ? "…" : formatCurrency(totalSales)}
             icon={<DollarSign className="h-5 w-5" />}
             href="/admin/sales"
-            subtitle="Last 7 days (mock)"
+            subtitle="All time (completed orders)"
           />
           <StatCard
             title="Total Orders"
-            value={totalOrders}
+            value={isOrdersLoading ? "…" : totalOrders}
             icon={<ShoppingCart className="h-5 w-5" />}
             href="/admin/orders"
-            subtitle="Last 7 days (mock)"
+            subtitle="All time"
           />
           <StatCard
             title="Revenue"
-            value={formatCurrency(totalRevenue)}
+            value={isSalesLoading ? "…" : formatCurrency(totalRevenue)}
             icon={<Receipt className="h-5 w-5" />}
             href="/admin/sales"
-            subtitle="Gross revenue (mock)"
+            subtitle="Gross paid revenue"
           />
         </section>
 
@@ -188,7 +180,7 @@ export default function SalesPage() {
           <div className="flex flex-col rounded-xl border border-border bg-card/80 p-5 shadow-sm lg:col-span-3">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Sales (Last 7 Days)
+                Monthly Sales
               </h2>
               <span className="text-[11px] text-muted-foreground">
                 Revenue (PHP)
@@ -201,7 +193,7 @@ export default function SalesPage() {
             >
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  data={MOCK_SALES}
+                  data={isSalesLoading ? [] : salesData}
                   margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
                 >
                   <defs>
@@ -259,7 +251,7 @@ export default function SalesPage() {
             </div>
 
             <p className="mt-3 text-[11px] text-muted-foreground">
-              Replace with real sales aggregation once backend analytics is connected.
+              Showing real monthly revenue from completed orders.
             </p>
           </div>
 
@@ -271,7 +263,7 @@ export default function SalesPage() {
                   Recent Transactions
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Latest payments and refunds (mock)
+                  Latest payments and refunds
                 </p>
               </div>
               <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">

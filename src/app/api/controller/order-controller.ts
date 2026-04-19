@@ -1,15 +1,15 @@
 import { Context } from "hono"
 import { z } from "zod"
-import { inArray, eq, ilike, or, and, desc, sql } from "drizzle-orm"
+import { inArray, eq, ilike, or, and, desc, sql, gte } from "drizzle-orm"
 import { db } from "@/lib/supabase/db"
 import { blindsProducts } from "@/schema/products/blinds/blinds-product"
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
 import { orderItems, orders } from "@/schema/orders/orders"
 import { paymentHistory } from "@/schema/orders/payment-history/payment-history"
 import { notifications } from "@/schema/notifications/notifications.schema"
-import { createOrderPaymentSession } from "../services/nodemailer/paymongo/order-checkout-payment"
 import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image"
 import { sendOrderStatusEmail } from "../services/nodemailer/send-order-status-service"
+import { createOrderPaymentSession } from "../services/paymongo/order-checkout-payment"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -127,6 +127,7 @@ export const checkoutOrder = async (ctx: Context) => {
                 productCode: blindsProducts.productCode,
                 unitPrice: blindsProducts.unitPrice, // integer — whole pesos
                 status: blindsProducts.status,
+                stock: blindsProducts.stock,
             })
             .from(blindsProducts)
             .where(inArray(blindsProducts.id, productIds))
@@ -144,6 +145,12 @@ export const checkoutOrder = async (ctx: Context) => {
             if (product.status !== "active") {
                 return ctx.json(
                     { success: false, message: `Product "${product.name}" is no longer available` },
+                    400
+                )
+            }
+            if ((product.stock ?? 0) < item.quantity) {
+                return ctx.json(
+                    { success: false, message: `Insufficient stock for "${product.name}". Available: ${product.stock ?? 0}` },
                     400
                 )
             }
@@ -374,6 +381,16 @@ export const checkoutOrder = async (ctx: Context) => {
                 message: "A new customer has placed an order",
                 isRead: false,
             })
+
+            // ── Deduct stock for each ordered item ─────────────────────────
+            for (const item of computedItems) {
+                const product = productMap.get(item.productId)!
+                const newStock = (product.stock ?? 0) - item.quantity
+                await tx
+                    .update(blindsProducts)
+                    .set({ stock: newStock, updatedAt: new Date() })
+                    .where(eq(blindsProducts.id, item.productId))
+            }
         })
 
         // ── 10. Create PayMongo checkout session ───────────────────────────────
@@ -749,9 +766,195 @@ export const updateOrderStatus = async (ctx: Context) => {
     }
 };
 
+// ─── Monthly Sales ────────────────────────────────────────────────────────────
+
+export const getMonthlySales = async (ctx: Context) => {
+    try {
+        const months = Number(ctx.req.query('months') ?? 12)
+        const safeMonths = Math.min(24, Math.max(1, months))
+
+        // Build the start-of-window date (first day of the earliest month)
+        const now = new Date()
+        const windowStart = new Date(now.getFullYear(), now.getMonth() - (safeMonths - 1), 1)
+
+        const rows = await db
+            .select({
+                month: sql<string>`to_char(date_trunc('month', ${orders.createdAt}), 'YYYY-MM')`,
+                total: sql<string>`coalesce(sum(${orders.totalAmount}), 0)`,
+            })
+            .from(orders)
+            .where(
+                and(
+                    gte(orders.createdAt, windowStart),
+                    eq(orders.status, 'completed')
+                )
+            )
+            .groupBy(sql`date_trunc('month', ${orders.createdAt})`)
+            .orderBy(sql`date_trunc('month', ${orders.createdAt})`)
+
+        // Build a full month array filling gaps with 0
+        const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+        const monthlySales = Array.from({ length: safeMonths }, (_, i) => {
+            const d = new Date(windowStart.getFullYear(), windowStart.getMonth() + i, 1)
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            const hit = rows.find((r) => r.month === key)
+            return {
+                month: key,
+                label: MONTH_LABELS[d.getMonth()],
+                total: parseFloat(hit?.total ?? '0'),
+            }
+        })
+
+        const grandTotal = monthlySales.reduce((s, m) => s + m.total, 0)
+
+        return ctx.json({
+            success: true,
+            data: {
+                monthlySales,
+                grandTotal,
+            },
+        })
+    } catch (error) {
+        console.error('getMonthlySales error:', error)
+        return ctx.json({ success: false, message: 'Failed to fetch monthly sales.' }, 500)
+    }
+}
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+
+export const getDashboardStats = async (ctx: Context) => {
+    try {
+        // ── 1. Total Products ────────────────────────────────────────────────
+        const [productCountResult] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(blindsProducts)
+
+        const totalProducts = Number(productCountResult?.count ?? 0)
+
+        // ── 2. Total Orders ──────────────────────────────────────────────────
+        const [orderCountResult] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(orders)
+
+        const totalOrders = Number(orderCountResult?.count ?? 0)
+
+        // ── 3. Total Customers (unique emails) ───────────────────────────────
+        const [customerCountResult] = await db
+            .select({ count: sql<number>`count(distinct ${orders.customerEmail})` })
+            .from(orders)
+
+        const totalCustomers = Number(customerCountResult?.count ?? 0)
+
+        // ── 4. Total Revenue (sum of totalAmount for completed orders) ───────
+        const [revenueResult] = await db
+            .select({ total: sql<string>`coalesce(sum(${orders.totalAmount}), 0)` })
+            .from(orders)
+            .where(eq(orders.status, 'completed'))
+
+        const totalRevenue = parseFloat(revenueResult?.total ?? '0')
+
+        // ── 5. Last 7 days — orders per day ──────────────────────────────────
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+        sevenDaysAgo.setHours(0, 0, 0, 0)
+
+        const chartRows = await db
+            .select({
+                day: sql<string>`date_trunc('day', ${orders.createdAt})`,
+                count: sql<number>`count(*)`,
+            })
+            .from(orders)
+            .where(gte(orders.createdAt, sevenDaysAgo))
+            .groupBy(sql`date_trunc('day', ${orders.createdAt})`)
+            .orderBy(sql`date_trunc('day', ${orders.createdAt})`)
+
+        // Build a full 7-day array (fill gaps with 0)
+        const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+        const ordersPerDay = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(sevenDaysAgo)
+            d.setDate(sevenDaysAgo.getDate() + i)
+            const iso = d.toISOString().slice(0, 10)
+            const hit = chartRows.find((r) => r.day.slice(0, 10) === iso)
+            return {
+                label: dayLabels[d.getDay()],
+                value: Number(hit?.count ?? 0),
+            }
+        })
+
+        const totalOrdersThisWeek = ordersPerDay.reduce((s, d) => s + d.value, 0)
+
+        // ── 6. Recent 5 Orders ────────────────────────────────────────────────
+        const recentOrderRows = await db
+            .select({
+                id: orders.id,
+                trackingNumber: orders.trackingNumber,
+                customerFirstName: orders.customerFirstName,
+                customerLastName: orders.customerLastName,
+                totalAmount: orders.totalAmount,
+                status: orders.status,
+                createdAt: orders.createdAt,
+            })
+            .from(orders)
+            .orderBy(desc(orders.createdAt))
+            .limit(5)
+
+        const recentOrders = recentOrderRows.map((o) => ({
+            id: o.trackingNumber,
+            customer: `${o.customerFirstName} ${o.customerLastName}`,
+            total: `₱${parseFloat(o.totalAmount ?? '0').toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+            status: o.status,
+            createdAt: o.createdAt
+                ? new Date(o.createdAt).toISOString().slice(0, 10)
+                : '',
+        }))
+
+        // ── 7. Recent 5 Products ──────────────────────────────────────────────
+        const recentProductRows = await db
+            .select({
+                id: blindsProducts.id,
+                productCode: blindsProducts.productCode,
+                name: blindsProducts.name,
+                type: blindsProducts.type,
+                createdAt: blindsProducts.createdAt,
+            })
+            .from(blindsProducts)
+            .orderBy(desc(blindsProducts.createdAt))
+            .limit(5)
+
+        const recentProducts = recentProductRows.map((p) => ({
+            id: p.productCode,
+            name: p.name,
+            category: p.type ?? 'Blinds',
+            createdAt: p.createdAt
+                ? new Date(p.createdAt).toISOString().slice(0, 10)
+                : '',
+        }))
+
+        return ctx.json({
+            success: true,
+            data: {
+                totalProducts,
+                totalOrders,
+                totalCustomers,
+                totalRevenue,
+                ordersPerDay,
+                totalOrdersThisWeek,
+                recentOrders,
+                recentProducts,
+            },
+        })
+    } catch (error) {
+        console.error('getDashboardStats error:', error)
+        return ctx.json({ success: false, message: 'Failed to fetch dashboard stats.' }, 500)
+    }
+}
+
 export default {
     getOrderDetailsStatus,
     getAllOrders,
     checkoutOrder,
-    updateOrderStatus
+    updateOrderStatus,
+    getDashboardStats,
+    getMonthlySales,
 }

@@ -1,5 +1,14 @@
 import { Hono } from "hono";
-import { createNewBlinds, getAllBestSeller, getAllBlinds, getAllNewArrival, getDetailsBlindByProductId, updateBlindsById } from "@/app/api/controller/product-blinds-controller";
+import {
+    createNewBlinds,
+    getAllBestSeller,
+    getAllBlinds,
+    getAllNewArrival,
+    getDetailsBlindByProductId,
+    updateBlindsById,
+    updateBlindStock,
+    deleteBlindsById,
+} from "@/app/api/controller/product-blinds-controller";
 
 // =========================
 // PRODUCT BLINDS ROUTER
@@ -11,6 +20,12 @@ productBlindsRoute.post("/", createNewBlinds);
 
 // UPDATE a product blinds
 productBlindsRoute.put("/:productId/update", updateBlindsById);
+
+// UPDATE stock only (inventory) ✅ ADDED
+productBlindsRoute.patch("/:productId", updateBlindStock);
+
+// DELETE a product blinds
+productBlindsRoute.delete("/:productId", deleteBlindsById);
 
 // GET all product blinds
 productBlindsRoute.get("/", getAllBlinds);

@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Pencil, Check, X, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { axiosApiClient } from "@/app/api/axiosApiClient";
 import AdminPageHeader from "@/components/pages/admin/components/admin-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,9 +51,14 @@ type BlindProduct = {
   stock: number | null;
 };
 
-// ✅ FIXED: was "data", API actually returns "blinds"
 type ProductsApiResponse = {
   blinds: BlindProduct[];
+  pagination: {
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
 };
 
 const ITEMS_PER_PAGE = 5;
@@ -75,25 +81,31 @@ function mapToInventoryItem(product: BlindProduct): InventoryItem {
   };
 }
 
+// ✅ FIXED: fetch ALL products with a high limit so inventory shows everything
 async function fetchInventory(): Promise<InventoryItem[]> {
-  const res = await fetch("/api/v1/product-blinds");
+  const res = await fetch("/api/v1/product-blinds?limit=1000&page=1");
   if (!res.ok) {
     throw new Error(`Failed to fetch inventory (${res.status} ${res.statusText})`);
   }
   const json: ProductsApiResponse = await res.json();
-  // ✅ FIXED: was json.data, API actually returns json.blinds
   return json.blinds.map(mapToInventoryItem);
 }
 
 async function patchStock(id: string, stock: number): Promise<void> {
-  const res = await fetch(`/api/v1/product-blinds/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stock }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { message?: string };
-    throw new Error(err.message ?? `Failed to update stock (${res.status})`);
+  try {
+    await axiosApiClient.patch(`/product-blinds/${id}`, {
+      stock,
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function deleteInventoryItem(id: string): Promise<void> {
+  try {
+    await axiosApiClient.delete(`/product-blinds/${id}`);
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -217,9 +229,7 @@ function StockEditor({ item, onSave, isSaving }: StockEditorProps) {
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
-      {error && (
-        <p className="text-[11px] text-rose-500">{error}</p>
-      )}
+      {error && <p className="text-[11px] text-rose-500">{error}</p>}
     </div>
   );
 }
@@ -255,6 +265,34 @@ export default function InventoryPage() {
   const { mutate: updateStock, isPending: isUpdating } = useMutation({
     mutationFn: ({ id, stock }: { id: string; stock: number }) =>
       patchStock(id, stock),
+    // ✅ Optimistic update — agad na nagbabago ang UI bago pa mag-refetch
+    onMutate: async ({ id, stock }) => {
+      await queryClient.cancelQueries({ queryKey: ["inventory"] });
+      const previous = queryClient.getQueryData<InventoryItem[]>(["inventory"]);
+      queryClient.setQueryData<InventoryItem[]>(["inventory"], (old = []) =>
+        old.map((item) =>
+          item.id === id
+            ? { ...item, stockQty: stock, status: deriveStatus(stock) }
+            : item
+        )
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      // ✅ I-rollback kung may error
+      if (context?.previous) {
+        queryClient.setQueryData(["inventory"], context.previous);
+      }
+    },
+    onSettled: () => {
+      // ✅ I-refetch para masync sa DB
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+  });
+
+  // ── Delete mutation ────────────────────────────────────────────────────────
+  const { mutate: deleteItem, isPending: isDeleting } = useMutation({
+    mutationFn: (id: string) => deleteInventoryItem(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
     },
@@ -292,6 +330,12 @@ export default function InventoryPage() {
     setPage(1);
   }
 
+  function handleDelete(id: string) {
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      deleteItem(id);
+    }
+  }
+
   const maxStock = useMemo(
     () => Math.max(1, ...inventory.map((i) => i.stockQty)),
     [inventory]
@@ -326,8 +370,6 @@ export default function InventoryPage() {
             {/* ── Filters row ── */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-
-                {/* Search */}
                 <div className="relative w-full sm:w-72">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -338,7 +380,6 @@ export default function InventoryPage() {
                   />
                 </div>
 
-                {/* Status filter */}
                 <Select value={statusFilter} onValueChange={handleStatusChange}>
                   <SelectTrigger className="h-9 w-full rounded-none border-border bg-transparent text-sm sm:w-44">
                     <SelectValue placeholder="All statuses" />
@@ -362,7 +403,6 @@ export default function InventoryPage() {
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <div className="w-full overflow-x-auto">
                 <Table className="min-w-[700px] w-full">
-
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       {["Product", "Stock Qty", "Status", "Actions"].map((h) => (
@@ -420,13 +460,25 @@ export default function InventoryPage() {
                           <InventoryStatusBadge status={item.status} />
                         </TableCell>
 
-                        {/* Edit stock */}
+                        {/* Edit stock and delete */}
                         <TableCell className="px-5 py-3.5">
-                          <StockEditor
-                            item={item}
-                            isSaving={isUpdating}
-                            onSave={(id, stock) => updateStock({ id, stock })}
-                          />
+                          <div className="flex items-center gap-2">
+                            <StockEditor
+                              item={item}
+                              isSaving={isUpdating}
+                              onSave={(id, stock) => updateStock({ id, stock })}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 gap-1.5 rounded-none px-2 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                              onClick={() => handleDelete(item.id)}
+                              disabled={isDeleting}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -447,14 +499,12 @@ export default function InventoryPage() {
                       </TableRow>
                     )}
                   </TableBody>
-
                 </Table>
               </div>
 
               {/* ── Pagination Footer ── */}
               {pagination.total > 0 && (
                 <div className="flex items-center justify-between border-t border-border px-5 py-3.5">
-
                   <p className="text-xs text-muted-foreground">
                     Showing{" "}
                     <span className="font-semibold text-foreground">
@@ -514,7 +564,6 @@ export default function InventoryPage() {
             </div>
           </>
         )}
-
       </div>
     </div>
   );

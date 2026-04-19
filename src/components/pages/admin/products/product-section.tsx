@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { Eye, Trash2, Edit3, MoreVertical, Package } from "lucide-react"
 
@@ -34,10 +35,21 @@ const ProductSection = () => {
     const [status, setStatus] = useState<string | null>(null)
 
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const selectedId = searchParams.get("id")
 
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    // ── Step 3: auto-scroll to highlighted card ──────────────────────────────
+    useEffect(() => {
+        if (!selectedId) return
+        const element = document.getElementById(selectedId)
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+    }, [selectedId])
 
     const { blinds, pagination, isPending } = useGetBlindsProducts({
         page,
@@ -63,10 +75,17 @@ const ProductSection = () => {
                 <InventorySkeleton />
             ) : blinds && blinds.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {blinds.map((product) => (
+                    {blinds.map((product) => {
+                        const isHighlighted = product.id === selectedId
+                        return (
                         <div
+                            id={product.id}
                             key={product.id}
-                            className="group relative flex flex-col rounded-2xl border border-border/60 bg-card p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
+                            className={`group relative flex flex-col rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+                                isHighlighted
+                                    ? 'border-amber-400/70 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-300/50 hover:border-amber-400'
+                                    : 'border-border/60 bg-card hover:border-primary/30'
+                            }`}
                         >
                             {/* PREMIUM INSET IMAGE SECTION */}
                             <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/50">
@@ -170,7 +189,8 @@ const ProductSection = () => {
                                 </div>
                             </div>
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-dashed border-border/60 bg-card/50">

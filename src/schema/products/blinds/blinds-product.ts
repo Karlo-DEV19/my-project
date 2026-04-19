@@ -15,6 +15,7 @@ export const blindsProducts = pgTable(
         thickness: varchar("thickness", { length: 50 }),
         status: varchar("status", { length: 50 }).default("active").notNull(),
         unitPrice: integer("unit_price").notNull(),
+        stock: integer("stock").default(0).notNull(),
         collection: varchar("collection", { length: 50 }).default("Shop Only").notNull(),
         createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
         updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

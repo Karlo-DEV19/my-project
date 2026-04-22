@@ -8,11 +8,16 @@ type AccountModalProps = {
   onClose: () => void;
   triggerRef?: React.RefObject<HTMLButtonElement>;
   children?: React.ReactNode;
+  /** Passed from Header to show contextual messages inside the form */
+  context?: 'default' | 'checkout';
 };
 
-export default function AccountModal({ isOpen, onClose, triggerRef, children }: AccountModalProps) {
+export default function AccountModal({ isOpen, onClose, triggerRef, children, context = 'default' }: AccountModalProps) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [visible, setVisible] = useState(false);
+  // true while the child AccountForm has the OTP modal open;
+  // backdrop click-to-close is suppressed during that window.
+  const [otpActive, setOtpActive] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Animate in/out
@@ -75,9 +80,10 @@ export default function AccountModal({ isOpen, onClose, triggerRef, children }: 
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-200 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
       style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-      onClick={handleClose}
+      // Suppress backdrop close while OTP modal is open — clicks must reach the Radix portal
+      onClick={otpActive ? undefined : handleClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="account-modal-title"
@@ -98,7 +104,7 @@ export default function AccountModal({ isOpen, onClose, triggerRef, children }: 
 
         {/* Header */}
         <div className="text-center mb-6">
-          <img src="/logo.png" alt="Logo" className="mx-auto h-10 object-contain mb-4" />
+          <img src="/logo pic/logo.png" alt="Logo" className="h-12 w-auto object-contain mx-auto mb-4" />
 
           <div className="flex justify-center gap-6 border-b border-border" role="tablist" aria-label="Account mode">
             <button
@@ -129,6 +135,10 @@ export default function AccountModal({ isOpen, onClose, triggerRef, children }: 
                 mode,
                 onModeChange: setMode,
                 onClose: handleClose,
+                // Lets AccountForm tell us when TwoFactorModal is open/closed
+                onOtpStateChange: setOtpActive,
+                // Pass checkout context so AccountForm can show a guided message
+                context,
               } as any);
             }
             return child;

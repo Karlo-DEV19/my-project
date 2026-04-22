@@ -2,10 +2,9 @@
 
 import { memo } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { GripVertical, Trash2 } from 'lucide-react';
-import { FormField, FormItem, FormControl, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Trash2 } from 'lucide-react';
+import { FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
+import { SearchableCombobox } from '@/components/ui/combobox';
 import type { FormValues } from './zod-product-schema';
 import { SwatchDropZone } from './swatch-drop-zone';
 
@@ -15,59 +14,92 @@ interface ColorRowProps {
     canRemove: boolean;
 }
 
+const COLOR_OPTIONS = [
+    { label: 'Ivory', value: 'Ivory' },
+    { label: 'Off White', value: 'Off White' },
+    { label: 'Cream', value: 'Cream' },
+    { label: 'Beige', value: 'Beige' },
+    { label: 'Sand', value: 'Sand' },
+    { label: 'Champagne', value: 'Champagne' },
+    { label: 'Light Gray', value: 'Light Gray' },
+    { label: 'Gray', value: 'Gray' },
+    { label: 'Deep Gray', value: 'Deep Gray' },
+    { label: 'Charcoal', value: 'Charcoal' },
+    { label: 'Black', value: 'Black' },
+    { label: 'White', value: 'White' },
+    { label: 'Brown', value: 'Brown' },
+    { label: 'Mocha', value: 'Mocha' },
+    { label: 'Caramel', value: 'Caramel' },
+    { label: 'Navy Blue', value: 'Navy Blue' },
+    { label: 'Sky Blue', value: 'Sky Blue' },
+    { label: 'Dusty Blue', value: 'Dusty Blue' },
+    { label: 'Forest Green', value: 'Forest Green' },
+    { label: 'Sage Green', value: 'Sage Green' },
+    { label: 'Terracotta', value: 'Terracotta' },
+    { label: 'Blush Pink', value: 'Blush Pink' },
+];
+
 export const ColorRow = memo(({ index, onRemove, canRemove }: ColorRowProps) => {
     const { control, formState: { errors } } = useFormContext<FormValues>();
     const rowErr = errors.availableColors?.[index];
 
     return (
-        <div className="flex items-start gap-3 rounded-lg border bg-card p-3 hover:border-primary/20 transition-colors">
-            <div className="mt-2.5 cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors">
-                <GripVertical className="h-4 w-4" />
-            </div>
+        <div className="flex w-full items-center gap-2">
 
-            {/* Swatch */}
+            {/* Swatch drop zone — fixed width, never grows */}
             <FormField
                 control={control}
                 name={`availableColors.${index}.file`}
                 render={({ field }) => (
-                    <FormItem className="m-0 shrink-0 space-y-1">
-                        <SwatchDropZone
-                            file={field.value as File | null}
-                            onChange={field.onChange}
-                            error={rowErr?.file?.message}
-                        />
+                    <FormItem className="m-0 shrink-0 space-y-0">
+                        <FormControl>
+                            <SwatchDropZone
+                                file={field.value as File | null}
+                                onChange={field.onChange}
+                                error={rowErr?.file?.message}
+                            />
+                        </FormControl>
                         {rowErr?.file?.message && (
-                            <p className="w-20 text-center text-[10px] text-destructive">{rowErr.file.message}</p>
+                            <p className="mt-0.5 text-center text-[10px] leading-tight text-destructive">
+                                {rowErr.file.message}
+                            </p>
                         )}
                     </FormItem>
                 )}
             />
 
-            {/* Name */}
-            <FormField
-                control={control}
-                name={`availableColors.${index}.name`}
-                render={({ field }) => (
-                    <FormItem className="flex-1 space-y-1">
-                        <FormLabel className="text-xs text-muted-foreground">Color Name</FormLabel>
-                        <FormControl>
-                            <Input placeholder="e.g. Ivory, Deep Gray…" className="h-9" {...field} />
-                        </FormControl>
-                        <FormMessage className="text-[11px]" />
-                    </FormItem>
-                )}
-            />
+            {/* Combobox — isolated stacking context (z-0) so delete button (z-10) always wins */}
+            <div className="w-[180px] shrink-0 relative z-0">
+                <FormField
+                    control={control}
+                    name={`availableColors.${index}.name`}
+                    render={({ field }) => (
+                        <FormItem className="space-y-0">
+                            <FormControl>
+                                <SearchableCombobox
+                                    options={COLOR_OPTIONS}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    placeholder="Color name…"
+                                />
+                            </FormControl>
+                            <FormMessage className="mt-0.5 text-[11px]" />
+                        </FormItem>
+                    )}
+                />
+            </div>
 
-            {canRemove && (
-                <Button
+            {/* Delete — relative z-10 guarantees it's always above the combobox (z-0) */}
+            {canRemove ? (
+                <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
                     onClick={onRemove}
-                    className="mt-6 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-red-300 hover:text-red-500"
                 >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
+                    <Trash2 className="h-3.5 w-3.5" />
+                </button>
+            ) : (
+                <div className="h-7 w-7 shrink-0" />
             )}
         </div>
     );

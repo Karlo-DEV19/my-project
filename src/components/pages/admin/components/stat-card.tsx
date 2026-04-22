@@ -42,7 +42,7 @@ export default function StatCard({
         ) : null}
       </div>
 
-      <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-border to-transparent" />
+      <div className="mt-4 h-px w-full bg-linear-to-r from-transparent via-border to-transparent" />
       <span className="mt-2 inline-flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary/80 group-hover:text-primary">
         Go to {title.toLowerCase()}
         <span className="ml-1 transition-transform duration-300 group-hover:translate-x-1">

@@ -25,9 +25,16 @@ interface TwoFactorModalProps {
     onVerify: (code: string) => Promise<void>
     // Displayed in the description so the user knows where the code was sent
     email: string
+    /**
+     * Controls dynamic copy inside the modal.
+     * - "login"  (default) → "Verify & Sign In"
+     * - "signup"           → "Verify & Continue"
+     * Omit for the admin 2FA flow — it defaults to "login" with no change.
+     */
+    mode?: "login" | "signup"
 }
 
-export function TwoFactorModal({ isOpen, onClose, onVerify, email }: TwoFactorModalProps) {
+export function TwoFactorModal({ isOpen, onClose, onVerify, email, mode = "login" }: TwoFactorModalProps) {
     const [otp, setOtp] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -90,6 +97,7 @@ export function TwoFactorModal({ isOpen, onClose, onVerify, email }: TwoFactorMo
                     rounded-2xl
                     bg-card border border-border/60
                     gap-0
+                    z-9999
                 "
                 // Block closing by clicking outside while a verification is in flight
                 onInteractOutside={(e) => { if (isLoading) e.preventDefault() }}
@@ -109,7 +117,10 @@ export function TwoFactorModal({ isOpen, onClose, onVerify, email }: TwoFactorMo
                             <Mail className="w-3 h-3" />
                             {maskedEmail}
                         </span>
-                        . Enter it below to sign in.
+                        .{" "}
+                        {mode === "signup"
+                            ? "Enter it below to verify your new account."
+                            : "Enter it below to sign in."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -160,6 +171,8 @@ export function TwoFactorModal({ isOpen, onClose, onVerify, email }: TwoFactorMo
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 Verifying...
                             </>
+                        ) : mode === "signup" ? (
+                            "Verify & Continue"
                         ) : (
                             "Verify & Sign In"
                         )}

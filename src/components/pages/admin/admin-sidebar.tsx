@@ -117,13 +117,20 @@ const AdminSidebar = () => {
 
     return (
         <Sidebar className="border-r border-border bg-background font-sans">
-            <SidebarHeader className="pt-8 pb-6 px-6 flex flex-col items-start gap-4 border-b border-border">
+            <SidebarHeader className="px-4 py-3 flex flex-col items-start gap-3 border-b border-border">
                 <div className="flex flex-col gap-2">
-                    <span className="font-serif text-2xl tracking-wide text-foreground">
-                        MJ Decors
-                    </span>
-                    <div className="w-8 h-px bg-border"></div>
-                    <span className="text-xs uppercase tracking-widest text-muted-foreground font-medium mt-2">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src="/logo pic/logo.png"
+                            alt="MJ Decors Logo"
+                            className="h-10 w-auto object-contain shrink-0"
+                        />
+                        <span className="font-serif text-lg tracking-wide">
+                            MJ DECORS
+                        </span>
+                    </div>
+                    <div className="w-8 h-px bg-border mt-1"></div>
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
                         {user?.role === 'admin' ? 'Admin Portal' : 'Staff Portal'}
                     </span>
                 </div>

@@ -16,7 +16,8 @@ export default defineConfig({
         "./src/schema/otp/otp-code.ts",
         "./src/schema/orders/orders.ts",
         "./src/schema/orders/payment-history/payment-history.ts",
-        "./src/schema/activity-logs/activity-logs.ts"
+        "./src/schema/activity-logs/activity-logs.ts",
+        "./src/schema/notifications/notifications.schema.ts"
     ],
     out: "./drizzle/migrations",
     dialect: "postgresql",

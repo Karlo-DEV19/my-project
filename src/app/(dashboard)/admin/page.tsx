@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DollarSign, Package, ShoppingCart, Users, TrendingUp, TrendingDown, Minus, ArrowUpRight, Search, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react';
@@ -19,13 +22,15 @@ function toOrderStatus(raw: string): OrderStatus {
   return (raw.charAt(0).toUpperCase() + raw.slice(1)) as OrderStatus;
 }
 
-type ForecastEntry = { month: string; value: number };
-type Trend = 'increasing' | 'decreasing' | 'stable';
+type ChartPoint = { date: string; historical?: number; forecast?: number };
+
+type SeasonalLabel = 'high-demand' | 'moderate-growth' | 'low-demand' | 'stable';
 type ForecastInsight = {
-  trend: Trend;
+  label: SeasonalLabel;
   lastHistorical: number;
-  firstForecast: number;
-  pctChange: number;
+  forecasts: number[];          // up to 3 forecast values
+  averageForecast: number;
+  pctChange: number;            // ((firstForecast - lastHistorical) / lastHistorical) * 100
 };
 
 const AdminDashboardPage = () => {
@@ -38,7 +43,7 @@ const AdminDashboardPage = () => {
   const perPage = 4;
 
   // ── ARIMA Forecast ──────────────────────────────────────────────────────────
-  const [forecastData, setForecastData] = useState<ForecastEntry[]>([]);
+  const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [forecastInsight, setForecastInsight] = useState<ForecastInsight | null>(null);
   const [forecastLoading, setForecastLoading] = useState(true);
   const [forecastError, setForecastError] = useState<string | null>(null);
@@ -52,32 +57,50 @@ const AdminDashboardPage = () => {
 
         if (json.error) throw new Error(json.error);
 
-        // ── Parse forecast entries ──────────────────────────────────────────
-        const forecastEntries: ForecastEntry[] = Object.entries(
-          json.forecast as Record<string, number>
-        )
-          .slice(0, 3)
-          .map(([dateStr, val]) => {
-            const d = new Date(dateStr);
-            const month = d.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
-            return { month, value: val };
-          });
+        // ── Build combined chart array ────────────────────────────────────────
+        const historical = json.historical as Record<string, number>;
+        const forecast = json.forecast as Record<string, number>;
 
-        setForecastData(forecastEntries);
+        const historicalPoints: ChartPoint[] = Object.entries(historical).map(
+          ([dateStr, val]) => ({ date: dateStr.slice(0, 7), historical: Math.round(val) })
+        );
+        const forecastPoints: ChartPoint[] = Object.entries(forecast).slice(0, 3).map(
+          ([dateStr, val]) => ({ date: dateStr.slice(0, 7), forecast: Math.round(val) })
+        );
 
-        // ── Derive trend insight ─────────────────────────────────────────────
-        const historicalValues = Object.values(json.historical as Record<string, number>);
-        if (historicalValues.length > 0 && forecastEntries.length > 0) {
-          const lastHistorical = historicalValues[historicalValues.length - 1];
-          const firstForecast = forecastEntries[0].value;
-          const pctChange = ((firstForecast - lastHistorical) / lastHistorical) * 100;
+        // Merge by date key — historical then forecast so overlapping dates keep both
+        const byDate: Record<string, ChartPoint> = {};
+        for (const p of historicalPoints) byDate[p.date] = { ...byDate[p.date], ...p };
+        for (const p of forecastPoints) byDate[p.date] = { ...byDate[p.date], ...p };
+        const combined = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
 
-          let trend: Trend;
-          if (pctChange > 1) trend = 'increasing';
-          else if (pctChange < -1) trend = 'decreasing';
-          else trend = 'stable';
+        setChartData(combined);
 
-          setForecastInsight({ trend, lastHistorical, firstForecast, pctChange });
+        // ── Seasonal decision logic ───────────────────────────────────────────
+        const historicalVals = Object.values(historical);
+        if (historicalVals.length > 0 && forecastPoints.length > 0) {
+          const lastHistorical = historicalVals[historicalVals.length - 1];
+
+          const forecasts = forecastPoints.map((p) => p.forecast!);
+          const [f1, f2 = f1, f3 = f2] = forecasts;
+          const averageForecast = Math.round((f1 + f2 + f3) / 3);
+          const pctChange = ((f1 - lastHistorical) / lastHistorical) * 100;
+
+          const trendUp = f1 < f2 && f2 < f3;
+          const trendDown = f1 > f2 && f2 > f3;
+
+          let label: SeasonalLabel;
+          if (averageForecast > lastHistorical * 1.1 && trendUp) {
+            label = 'high-demand';
+          } else if (averageForecast > lastHistorical) {
+            label = 'moderate-growth';
+          } else if (averageForecast < lastHistorical * 0.9) {
+            label = 'low-demand';
+          } else {
+            label = 'stable';
+          }
+
+          setForecastInsight({ label, lastHistorical, forecasts, averageForecast, pctChange });
         }
       } catch (err: unknown) {
         setForecastError(err instanceof Error ? err.message : 'Unknown error');
@@ -190,7 +213,7 @@ const AdminDashboardPage = () => {
             <p className="text-xs text-muted-foreground hidden sm:block">
               Last updated: {new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
-            <NotificationBell />
+            <NotificationBell role="admin" />
           </div>
         </div>
 
@@ -311,7 +334,7 @@ const AdminDashboardPage = () => {
                       {product.category} · {product.createdAt}
                     </p>
                   </div>
-                  <span className="ml-3 flex-shrink-0 font-mono text-[11px] text-muted-foreground">
+                  <span className="ml-3 shrink-0 font-mono text-[11px] text-muted-foreground">
                     {product.id}
                   </span>
                 </li>
@@ -579,13 +602,10 @@ const AdminDashboardPage = () => {
                 <BarChart2 className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Forecast (Next 3 Months)</h2>
-                <p className="text-[11px] text-muted-foreground mt-0.5">ARIMA model · predicted sales revenue</p>
+                <h2 className="text-sm font-semibold text-foreground">Sales Forecast</h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Historical vs. predicted revenue</p>
               </div>
             </div>
-            <span className="rounded-full border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-amber-600 dark:text-amber-400">
-              AI
-            </span>
           </div>
 
           <div className="px-5 py-5">
@@ -600,57 +620,108 @@ const AdminDashboardPage = () => {
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{forecastError}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">Make sure the ARIMA service is running: <code className="font-mono bg-muted px-1 rounded text-[10px]">uvicorn arima-service.main:app --reload</code></p>
               </div>
-            ) : forecastData.length === 0 ? (
+            ) : chartData.length === 0 ? (
               <p className="text-sm text-muted-foreground">No forecast data returned.</p>
             ) : (
               <div className="space-y-4">
-                {/* ── 3 forecast cards ── */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {forecastData.map((entry, idx) => (
-                    <div
-                      key={idx}
-                      className="group relative overflow-hidden rounded-xl border border-border bg-background px-5 py-4 transition-all duration-200 hover:border-amber-300/60 hover:shadow-md hover:-translate-y-0.5"
-                    >
-                      {/* Accent glow */}
-                      <div className="pointer-events-none absolute right-0 top-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full bg-amber-400/10 blur-2xl" />
-
-                      <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                        {entry.month}
-                      </p>
-                      <p className="mt-1.5 text-xl font-bold tabular-nums text-foreground">
-                        ₱{entry.value.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </p>
-                      <div className="mt-2 flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3 text-amber-500" />
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400">Predicted</span>
-                      </div>
-                    </div>
-                  ))}
+                {/* ── Combined Line Chart ── */}
+                <div className="w-full" style={{ height: 240 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: 'currentColor' }}
+                        className="text-muted-foreground"
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: 'currentColor' }}
+                        className="text-muted-foreground"
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`}
+                        width={52}
+                      />
+                      <Tooltip
+                        formatter={(value: number, name: string) => [
+                          `₱${value.toLocaleString('en-PH')}`,
+                          name === 'historical' ? 'Historical' : 'Forecast',
+                        ]}
+                        contentStyle={{
+                          fontSize: 11,
+                          borderRadius: 8,
+                          border: '1px solid hsl(var(--border))',
+                          background: 'hsl(var(--card))',
+                          color: 'hsl(var(--foreground))',
+                        }}
+                      />
+                      <Legend
+                        iconType="line"
+                        wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value) => value === 'historical' ? 'Historical' : 'Forecast'}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="historical"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                        activeDot={{ r: 5 }}
+                        connectNulls
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="forecast"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        strokeDasharray="5 4"
+                        dot={{ r: 3, fill: '#f59e0b' }}
+                        activeDot={{ r: 5 }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
 
                 {/* ── System Recommendation ── */}
                 {forecastInsight && (() => {
-                  const { trend, lastHistorical, firstForecast, pctChange } = forecastInsight;
+                  const { label, lastHistorical, averageForecast, pctChange } = forecastInsight;
 
-                  const config = {
-                    increasing: {
+                  const config: Record<SeasonalLabel, {
+                    border: string; bg: string; glow: string; badge: string;
+                    trendLabel: string; recommendation: string;
+                    Icon: React.ElementType; iconColor: string; titleColor: string;
+                  }> = {
+                    'high-demand': {
                       border: 'border-emerald-300/60',
                       bg: 'bg-emerald-50 dark:bg-emerald-950/20',
                       glow: 'bg-emerald-400/10',
                       badge: 'border-emerald-300/60 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400',
-                      trendLabel: 'Increasing Trend',
-                      recommendation: 'Sales are expected to increase. Consider increasing inventory.',
+                      trendLabel: 'HIGH DEMAND EXPECTED',
+                      recommendation: 'Upcoming months show strong seasonal demand. Increase inventory early.',
                       Icon: TrendingUp,
                       iconColor: 'text-emerald-500',
                       titleColor: 'text-emerald-700 dark:text-emerald-400',
                     },
-                    decreasing: {
+                    'moderate-growth': {
+                      border: 'border-blue-300/60',
+                      bg: 'bg-blue-50 dark:bg-blue-950/20',
+                      glow: 'bg-blue-400/10',
+                      badge: 'border-blue-300/60 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400',
+                      trendLabel: 'MODERATE GROWTH',
+                      recommendation: 'Sales are expected to improve. Prepare additional stock.',
+                      Icon: TrendingUp,
+                      iconColor: 'text-blue-500',
+                      titleColor: 'text-blue-700 dark:text-blue-400',
+                    },
+                    'low-demand': {
                       border: 'border-red-300/60',
                       bg: 'bg-red-50 dark:bg-red-950/20',
                       glow: 'bg-red-400/10',
                       badge: 'border-red-300/60 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400',
-                      trendLabel: 'Decreasing Trend',
-                      recommendation: 'Sales may decline. Reduce stock levels to avoid overstock.',
+                      trendLabel: 'LOW DEMAND',
+                      recommendation: 'Demand may slow down. Avoid overstocking.',
                       Icon: TrendingDown,
                       iconColor: 'text-red-500',
                       titleColor: 'text-red-700 dark:text-red-400',
@@ -660,28 +731,30 @@ const AdminDashboardPage = () => {
                       bg: 'bg-muted/30',
                       glow: 'bg-muted/20',
                       badge: 'border-border bg-muted text-muted-foreground',
-                      trendLabel: 'Stable Trend',
+                      trendLabel: 'STABLE DEMAND',
                       recommendation: 'Sales are stable. Maintain current inventory levels.',
                       Icon: Minus,
                       iconColor: 'text-muted-foreground',
                       titleColor: 'text-muted-foreground',
                     },
-                  }[trend];
+                  };
+
+                  const cfg = config[label];
 
                   const fmt = (v: number) =>
                     `₱${v.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
                   return (
-                    <div className={`relative overflow-hidden rounded-xl border ${config.border} ${config.bg}`}>
-                      <div className={`pointer-events-none absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full ${config.glow} blur-2xl`} />
+                    <div className={`relative overflow-hidden rounded-xl border ${cfg.border} ${cfg.bg}`}>
+                      <div className={`pointer-events-none absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full ${cfg.glow} blur-2xl`} />
 
                       {/* Section header */}
                       <div className="flex items-center justify-between border-b border-border/50 px-5 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                           System Recommendation
                         </p>
-                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${config.badge}`}>
-                          {config.trendLabel}
+                        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${cfg.badge}`}>
+                          {cfg.trendLabel}
                         </span>
                       </div>
 
@@ -689,27 +762,26 @@ const AdminDashboardPage = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4">
                         {/* Left: icon + recommendation */}
                         <div className="flex items-start gap-3">
-                          <div className={`mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border ${config.badge}`}>
-                            <config.Icon className={`h-4 w-4 ${config.iconColor}`} />
+                          <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${cfg.badge}`}>
+                            <cfg.Icon className={`h-4 w-4 ${cfg.iconColor}`} />
                           </div>
                           <div>
-                            <p className={`text-sm font-semibold ${config.titleColor}`}>
-                              {config.recommendation}
+                            <p className={`text-sm font-semibold ${cfg.titleColor}`}>
+                              {cfg.recommendation}
                             </p>
                             <p className="mt-1 text-[11px] text-muted-foreground">
-                              Based on ARIMA forecast · Last recorded:{' '}
+                              Based on seasonal sales patterns · Last:{' '}
                               <span className="font-medium text-foreground">{fmt(lastHistorical)}</span>
-                              {' → '}
-                              Next forecast:{' '}
-                              <span className="font-medium text-foreground">{fmt(firstForecast)}</span>
+                              {' → Avg Forecast: '}
+                              <span className="font-medium text-foreground">{fmt(averageForecast)}</span>
                             </p>
                           </div>
                         </div>
 
                         {/* Right: % change pill */}
-                        <div className="flex-shrink-0 self-end sm:self-auto">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold tabular-nums ${config.badge}`}>
-                            <config.Icon className="h-3 w-3" />
+                        <div className="shrink-0 self-end sm:self-auto">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold tabular-nums ${cfg.badge}`}>
+                            <cfg.Icon className="h-3 w-3" />
                             {pctChange >= 0 ? '+' : ''}{pctChange.toFixed(1)}%
                           </span>
                         </div>

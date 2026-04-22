@@ -203,7 +203,7 @@ function InstallationModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm px-3 py-4 md:px-6 md:py-6"
+      className="fixed inset-0 z-9999 flex items-center justify-center bg-black/90 backdrop-blur-sm px-3 py-4 md:px-6 md:py-6"
       style={{ paddingTop: "72px" }}
       onClick={onClose}
     >
@@ -213,7 +213,7 @@ function InstallationModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <div>
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-0.5">
               {currentIndex + 1} / {total}
@@ -228,7 +228,7 @@ function InstallationModal({
           <button
             onClick={onClose}
             aria-label="Close modal"
-            className="ml-4 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/60 hover:text-white transition-all duration-200"
+            className="ml-4 shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/60 hover:text-white transition-all duration-200"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -280,7 +280,7 @@ function InstallationModal({
           </div>
 
           {/* Details sidebar */}
-          <div className="w-full md:w-56 lg:w-64 flex-shrink-0 flex flex-col justify-center px-5 py-5 md:py-6 bg-[#0f0f0f] border-t border-white/10 md:border-t-0 md:border-l md:border-white/10 overflow-y-auto">
+          <div className="w-full md:w-56 lg:w-64 shrink-0 flex flex-col justify-center px-5 py-5 md:py-6 bg-[#0f0f0f] border-t border-white/10 md:border-t-0 md:border-l md:border-white/10 overflow-y-auto">
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/80 mb-4 font-medium">
               Installation Details
             </p>
@@ -411,7 +411,7 @@ const RecentInstallation = () => {
                 />
               </div>
 
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
 
               <div className="absolute inset-x-0 bottom-0 px-6 md:px-8 py-6 md:py-8 pointer-events-none">
                 <p className="text-[9px] tracking-[0.35em] uppercase text-white/50 mb-1.5 font-medium">
@@ -456,7 +456,7 @@ const RecentInstallation = () => {
                   key={inst.id}
                   onClick={() => goTo(i, i > currentIndex ? "right" : "left")}
                   aria-label={`View ${inst.title}`}
-                  className={`relative flex-shrink-0 rounded-md overflow-hidden transition-all duration-300 ${i === currentIndex
+                  className={`relative shrink-0 rounded-md overflow-hidden transition-all duration-300 ${i === currentIndex
                       ? "ring-2 ring-foreground/70 opacity-100"
                       : "opacity-40 hover:opacity-70"
                     }`}

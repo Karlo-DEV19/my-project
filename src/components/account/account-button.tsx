@@ -88,7 +88,7 @@ const AccountButton = React.forwardRef<HTMLButtonElement, AccountButtonProps>(
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 rounded-lg border border-border bg-background shadow-xl z-[300] animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-52 rounded-lg border border-border bg-background shadow-xl z-300 animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
 
               {/* Email — muted, non-interactive */}
               <div className="px-4 py-2.5">

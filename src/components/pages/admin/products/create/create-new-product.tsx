@@ -19,15 +19,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { SearchableCombobox } from '@/components/ui/combobox';
 import { uploadImage, uploadMultipleImages } from '@/lib/supabase/fileUpload';
 import {
     ArrowLeft,
@@ -272,16 +266,14 @@ export default function CreateNewProductPage() {
                                     <FormField control={control} name="type" render={({ field }) => (
                                         <FormItem className="sm:col-span-2">
                                             <FormLabel>Product Type <span className="text-destructive">*</span></FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl>
-                                                    <SelectTrigger><SelectValue placeholder="Select a type…" /></SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    {PRODUCT_TYPES.map((t) => (
-                                                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <FormControl>
+                                                <SearchableCombobox
+                                                    options={PRODUCT_TYPES.map((t) => ({ label: t, value: t }))}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="Select a type…"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />
@@ -329,7 +321,7 @@ export default function CreateNewProductPage() {
                                         <FormItem className="sm:col-span-2">
                                             <FormLabel>Stock Quantity <span className="text-destructive">*</span></FormLabel>
                                             <FormControl>
-                                                <Input 
+                                                <Input
                                                     type="number"
                                                     min={0}
                                                     placeholder="0"
@@ -397,7 +389,21 @@ export default function CreateNewProductPage() {
                                     <FormField control={control} name="composition" render={({ field }) => (
                                         <FormItem className="sm:col-span-2">
                                             <FormLabel>Composition <span className="text-destructive">*</span></FormLabel>
-                                            <FormControl><Input placeholder="e.g. POLYESTER 100%" {...field} /></FormControl>
+                                            <FormControl>
+                                                <SearchableCombobox
+                                                    options={[
+                                                        { label: 'POLYESTER 100%', value: 'POLYESTER 100%' },
+                                                        { label: 'POLYESTER 70% / LINEN 30%', value: 'POLYESTER 70% / LINEN 30%' },
+                                                        { label: 'POLYESTER 80% / COTTON 20%', value: 'POLYESTER 80% / COTTON 20%' },
+                                                        { label: 'PVC 100%', value: 'PVC 100%' },
+                                                        { label: 'FIBERGLASS 100%', value: 'FIBERGLASS 100%' },
+                                                        { label: 'COTTON 100%', value: 'COTTON 100%' },
+                                                    ]}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="e.g. POLYESTER 100%"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />
@@ -405,7 +411,26 @@ export default function CreateNewProductPage() {
                                     <FormField control={control} name="fabricWidth" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Fabric Width <span className="text-destructive">*</span></FormLabel>
-                                            <FormControl><Input placeholder="e.g. 280cm" {...field} /></FormControl>
+                                            <FormControl>
+                                                <SearchableCombobox
+                                                    options={[
+                                                        { label: '100cm', value: '100cm' },
+                                                        { label: '120cm', value: '120cm' },
+                                                        { label: '140cm', value: '140cm' },
+                                                        { label: '150cm', value: '150cm' },
+                                                        { label: '160cm', value: '160cm' },
+                                                        { label: '180cm', value: '180cm' },
+                                                        { label: '200cm', value: '200cm' },
+                                                        { label: '240cm', value: '240cm' },
+                                                        { label: '260cm', value: '260cm' },
+                                                        { label: '280cm', value: '280cm' },
+                                                        { label: '300cm', value: '300cm' },
+                                                    ]}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="e.g. 280cm"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />
@@ -413,15 +438,22 @@ export default function CreateNewProductPage() {
                                     <FormField control={control} name="thickness" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Thickness <span className="text-destructive">*</span></FormLabel>
-                                            <FormControl><Input placeholder="e.g. 0.54mm" {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )} />
-
-                                    <FormField control={control} name="packing" render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Packing <span className="text-destructive">*</span></FormLabel>
-                                            <FormControl><Input placeholder="e.g. 50m / Roll" {...field} /></FormControl>
+                                            <FormControl>
+                                                <SearchableCombobox
+                                                    options={[
+                                                        { label: '0.35mm', value: '0.35mm' },
+                                                        { label: '0.45mm', value: '0.45mm' },
+                                                        { label: '0.54mm', value: '0.54mm' },
+                                                        { label: '0.60mm', value: '0.60mm' },
+                                                        { label: '0.80mm', value: '0.80mm' },
+                                                        { label: '1.00mm', value: '1.00mm' },
+                                                        { label: '1.20mm', value: '1.20mm' },
+                                                    ]}
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    placeholder="e.g. 0.54mm"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />
@@ -429,7 +461,23 @@ export default function CreateNewProductPage() {
                                     <FormField control={control} name="characteristic" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Characteristic</FormLabel>
-                                            <FormControl><Input placeholder="e.g. Woodlook, fireproof…" {...field} /></FormControl>
+                                            <FormControl>
+                                                <SearchableCombobox
+                                                    options={[
+                                                        { label: 'Woodlook', value: 'Woodlook' },
+                                                        { label: 'Fireproof', value: 'Fireproof' },
+                                                        { label: 'Waterproof', value: 'Waterproof' },
+                                                        { label: 'Blackout', value: 'Blackout' },
+                                                        { label: 'Semi-Blackout', value: 'Semi-Blackout' },
+                                                        { label: 'Sunscreen', value: 'Sunscreen' },
+                                                        { label: 'Anti-UV', value: 'Anti-UV' },
+                                                        { label: 'Translucent', value: 'Translucent' },
+                                                    ]}
+                                                    value={field.value ?? ''}
+                                                    onChange={field.onChange}
+                                                    placeholder="e.g. Woodlook, Fireproof…"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />

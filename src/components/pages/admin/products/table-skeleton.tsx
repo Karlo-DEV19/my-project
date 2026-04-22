@@ -19,7 +19,7 @@ export function InventorySkeleton() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="rounded-xl border border-border bg-card p-0 overflow-hidden">
-                        <Skeleton className="aspect-[4/3] w-full rounded-none" />
+                        <Skeleton className="aspect-4/3 w-full rounded-none" />
                         <div className="p-5 space-y-4">
                             <div className="flex justify-between items-start gap-2">
                                 <Skeleton className="h-5 w-full" />

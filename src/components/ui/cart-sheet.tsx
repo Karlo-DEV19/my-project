@@ -9,7 +9,6 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { CartItem, useCartStore } from '@/lib/zustand/use-cart-store';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -152,7 +151,8 @@ const EmptyCart = () => (
 // ─── Cart Sheet ───────────────────────────────────────────────────────────────
 
 const CartSheet = () => {
-    const { items, isSheetOpen, closeCartSheet, clearCart, itemCount } = useCartStore();
+    const { items, isSheetOpen, closeCartSheet, clearCart, itemCount, _openAuthModal, setAuthModalContext } = useCartStore();
+    const router = useRouter();
 
     const grandTotal = items.reduce(
         (sum, item) => sum + item.order.priceBreakdown.total * item.quantity,
@@ -162,6 +162,29 @@ const CartSheet = () => {
     const handleOpenChange = useCallback((open: boolean) => {
         if (!open) closeCartSheet();
     }, [closeCartSheet]);
+
+    // ── Auth-aware checkout ────────────────────────────────────────
+    const handleCheckout = useCallback(() => {
+        let user = null;
+        try {
+            const stored = localStorage.getItem('user');
+            user = stored ? JSON.parse(stored) : null;
+        } catch { /* corrupted storage */ }
+
+        if (!user) {
+            // Save redirect target so the auth success handler can navigate there
+            localStorage.setItem('redirectAfterLogin', '/shop/checkout');
+            closeCartSheet();
+            // Signal checkout context so the modal shows the guided message
+            setAuthModalContext('checkout');
+            // Trigger the existing auth modal registered by Header
+            _openAuthModal?.();
+            return;
+        }
+
+        closeCartSheet();
+        router.push('/shop/checkout');
+    }, [_openAuthModal, closeCartSheet, router]);
 
     return (
         <Sheet open={isSheetOpen} onOpenChange={handleOpenChange}>
@@ -234,10 +257,13 @@ const CartSheet = () => {
                         </div>
 
                         {/* CTA */}
-                        <Link href="/shop/checkout" onClick={closeCartSheet} className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors">
+                        <button
+                            onClick={handleCheckout}
+                            className="flex items-center justify-center gap-2 h-12 w-full bg-foreground text-background text-xs uppercase tracking-widest font-medium hover:bg-foreground/90 transition-colors"
+                        >
                             Checkout Order
                             <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        </Link>
+                        </button>
                     </div>
                 )}
             </SheetContent>

@@ -412,7 +412,7 @@ export default function LocationPicker({
                 />
 
                 {isLoading && (
-                    <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-[1000]">
+                    <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-1000">
                         <div className="flex items-center gap-2.5 bg-background border border-border px-4 py-2 shadow-lg">
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             <span className="text-xs tracking-wide">Locating...</span>
@@ -431,7 +431,7 @@ export default function LocationPicker({
                         <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
                             Pinned Location
                         </p>
-                        <p className="text-xs font-medium text-foreground break-words leading-relaxed">
+                        <p className="text-xs font-medium text-foreground wrap-break-word leading-relaxed">
                             {address || (
                                 <span className="text-muted-foreground italic">Resolving address...</span>
                             )}

@@ -148,7 +148,7 @@ function ComboboxItem({
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        "data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -290,6 +290,261 @@ function useComboboxAnchor() {
   return React.useRef<HTMLDivElement | null>(null)
 }
 
+// ---------------------------------------------------------------------------
+// SearchableCombobox — searchable + creatable dropdown component
+// ---------------------------------------------------------------------------
+
+export interface SearchableComboboxOption {
+  label: string
+  value: string
+}
+
+export interface SearchableComboboxProps {
+  /** Initial list of options; component manages additions internally */
+  options: SearchableComboboxOption[]
+  /** Controlled selected value */
+  value?: string
+  /** Called whenever the user picks or creates an option */
+  onChange?: (value: string) => void
+  placeholder?: string
+  disabled?: boolean
+  className?: string
+}
+
+/** Converts a string to kebab-case, e.g. "Deep Gray" → "deep-gray" */
+function toKebabCase(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')   // strip non-alphanumeric (except spaces/hashes)
+    .replace(/\s+/g, '-')            // spaces → hyphens
+    .replace(/-+/g, '-')             // collapse consecutive hyphens
+}
+
+function SearchableCombobox({
+  options: initialOptions,
+  value: controlledValue,
+  onChange,
+  placeholder = "Select or type...",
+  disabled = false,
+  className,
+}: SearchableComboboxProps) {
+  // Local options state — allows dynamic additions
+  const [options, setOptions] = React.useState<SearchableComboboxOption[]>(initialOptions)
+
+  const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const [internalValue, setInternalValue] = React.useState<string | undefined>(undefined)
+
+  // Keep options in sync if the parent prop changes (e.g. async load)
+  React.useEffect(() => {
+    setOptions(initialOptions)
+  }, [initialOptions])
+
+  // Resolve which value is active (controlled takes precedence)
+  const isControlled = controlledValue !== undefined
+  const selectedValue = isControlled ? controlledValue : internalValue
+
+  const selectedLabel = options.find((o) => o.value === selectedValue)?.label ?? ""
+
+  const trimmedSearch = search.trim()
+
+  // Filter options by the current search query (case-insensitive)
+  const filtered = React.useMemo(() => {
+    const q = trimmedSearch.toLowerCase()
+    if (!q) return options
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        o.value.toLowerCase().includes(q)
+    )
+  }, [options, trimmedSearch])
+
+  // Show "Add" row only when there is a non-empty search with no exact match
+  const exactMatch = React.useMemo(
+    () =>
+      !!trimmedSearch &&
+      options.some(
+        (o) =>
+          o.label.toLowerCase() === trimmedSearch.toLowerCase() ||
+          o.value.toLowerCase() === trimmedSearch.toLowerCase()
+      ),
+    [options, trimmedSearch]
+  )
+  const showCreateRow = !!trimmedSearch && !exactMatch
+
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    if (!open) return
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch("")
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [open])
+
+  function handleSelect(option: SearchableComboboxOption) {
+    if (!isControlled) setInternalValue(option.value)
+    onChange?.(option.value)
+    setOpen(false)
+    setSearch("")
+  }
+
+  function handleCreate() {
+    const label = trimmedSearch
+    if (!label) return
+
+    const value = toKebabCase(label)
+
+    // Guard: no duplicates (case-insensitive on both label and kebab value)
+    const duplicate = options.some(
+      (o) =>
+        o.label.toLowerCase() === label.toLowerCase() ||
+        o.value === value
+    )
+    if (duplicate) return
+
+    const newOption: SearchableComboboxOption = { label, value }
+
+    // Add to local options state
+    setOptions((prev) => [...prev, newOption])
+
+    // TODO: save to DB
+
+    handleSelect(newOption)
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setSearch(e.target.value)
+    if (!open) setOpen(true)
+  }
+
+  function handleInputFocus() {
+    if (!disabled) setOpen(true)
+  }
+
+  function handleToggle() {
+    if (disabled) return
+    setOpen((prev) => !prev)
+    if (open) setSearch("")
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn("relative w-full", className)}
+      data-slot="searchable-combobox"
+    >
+      {/* Input row */}
+      <div
+        className={cn(
+          "dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50",
+          "flex h-9 w-full items-center overflow-hidden rounded-md border bg-transparent",
+          "px-3 text-sm shadow-xs transition-[color,box-shadow] focus-within:ring-[3px]",
+          disabled && "cursor-not-allowed opacity-50"
+        )}
+      >
+        <input
+          type="text"
+          disabled={disabled}
+          value={open ? search : selectedLabel}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+          placeholder={open || !selectedLabel ? placeholder : undefined}
+          className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          role="combobox"
+        />
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={disabled}
+          tabIndex={-1}
+          className="ml-1 shrink-0 text-muted-foreground transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+          aria-label="Toggle dropdown"
+        >
+          <ChevronDownIcon className="size-4" />
+        </button>
+      </div>
+
+      {/* Dropdown list */}
+      {open && (
+        <div
+          className={cn(
+            "bg-popover text-popover-foreground ring-foreground/10",
+            "absolute z-50 mt-1.5 w-full overflow-hidden rounded-md shadow-md ring-1",
+            "animate-in fade-in-0 zoom-in-95 duration-100"
+          )}
+          role="listbox"
+        >
+          <ul className="max-h-60 scroll-py-1 overflow-y-auto p-1">
+            {/* Existing / filtered options */}
+            {filtered.length === 0 && !showCreateRow ? (
+              <li className="text-muted-foreground w-full py-2 text-center text-sm">
+                No options found
+              </li>
+            ) : (
+              filtered.map((option) => {
+                const isSelected = option.value === selectedValue
+                return (
+                  <li
+                    key={option.value}
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => handleSelect(option)}
+                    className={cn(
+                      "relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm",
+                      "outline-hidden select-none transition-colors",
+                      isSelected
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    {option.label}
+                    {isSelected && (
+                      <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
+                        <CheckIcon className="size-4" />
+                      </span>
+                    )}
+                  </li>
+                )
+              })
+            )}
+
+            {/* Create new option row */}
+            {showCreateRow && (
+              <li
+                role="option"
+                aria-selected={false}
+                onClick={handleCreate}
+                className={cn(
+                  "flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pl-2 pr-3 text-sm",
+                  "text-primary outline-hidden select-none transition-colors",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  filtered.length > 0 && "mt-1 border-t border-border pt-2"
+                )}
+              >
+                <span className="text-base leading-none">➕</span>
+                <span>
+                  Add{" "}
+                  <span className="font-medium">&ldquo;{trimmedSearch}&rdquo;</span>
+                </span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export {
   Combobox,
   ComboboxInput,
@@ -307,4 +562,5 @@ export {
   ComboboxTrigger,
   ComboboxValue,
   useComboboxAnchor,
+  SearchableCombobox,
 }

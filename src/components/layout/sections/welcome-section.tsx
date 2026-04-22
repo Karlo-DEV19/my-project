@@ -23,7 +23,7 @@ const WelcomeSection = () => {
                     <h2 className="text-3xl md:text-4xl font-serif tracking-wide mb-4">
                         MJ DECOR 888 INC.
                     </h2>
-                    <div className="w-16 h-[1px] bg-foreground/20 mb-6"></div>
+                    <div className="w-16 h-px bg-foreground/20 mb-6"></div>
 
                     <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
                         We believe that every window is an opportunity to elevate your environment.
@@ -38,7 +38,7 @@ const WelcomeSection = () => {
 
                         {/* Tall Image */}
                         <div
-                            className={`col-span-1 row-span-2 relative overflow-hidden bg-muted mt-8 border border-border/50 hover:border-foreground transition-colors duration-300 cursor-pointer transform duration-500 ease-out
+                            className={`col-span-1 row-span-2 relative overflow-hidden bg-muted mt-8 border border-border/50 hover:border-foreground transition-all duration-500 ease-out cursor-pointer
                                 ${activeImage === "tall" ? "scale-[1.04] shadow-2xl shadow-black/30" : activeImage ? "scale-[0.97] opacity-70" : "scale-100"}`}
                             onClick={() => setActiveImage(prev => prev === "tall" ? null : "tall")}
                         >
@@ -48,9 +48,9 @@ const WelcomeSection = () => {
                                 fill
                                 className="object-cover transition-transform duration-700 ease-in-out group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
+                            <div className="absolute inset-0 bg-linear-to-t from-background/40 to-transparent" />
                             {activeImage === "tall" && (
-                                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-4 pb-4 pt-8 text-left">
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/70 via-black/30 to-transparent px-4 pb-4 pt-8 text-left">
                                     <p className="text-xs font-medium tracking-[0.2em] text-background/80 uppercase">
                                         Signature Look
                                     </p>
@@ -63,7 +63,7 @@ const WelcomeSection = () => {
 
                         {/* Top Right Image */}
                         <div
-                            className={`col-span-1 border border-border/50 hover:border-foreground transition-colors duration-300 relative overflow-hidden bg-muted cursor-pointer transform duration-500 ease-out
+                            className={`col-span-1 border border-border/50 hover:border-foreground transition-all duration-500 ease-out relative overflow-hidden bg-muted cursor-pointer
                                 ${activeImage === "top" ? "scale-[1.04] shadow-xl shadow-black/25" : activeImage ? "scale-[0.97] opacity-70" : "scale-100"}`}
                             onClick={() => setActiveImage(prev => prev === "top" ? null : "top")}
                         >
@@ -74,13 +74,13 @@ const WelcomeSection = () => {
                                 className="object-cover transition-transform duration-700 ease-in-out delay-100 group-hover:scale-105"
                             />
                             {activeImage === "top" && (
-                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-black/50 via-black/10 to-transparent" />
+                                <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-black/50 via-black/10 to-transparent" />
                             )}
                         </div>
 
                         {/* Bottom Right Image */}
                         <div
-                            className={`col-span-1 relative overflow-hidden bg-muted border border-border/50 hover:border-foreground transition-colors duration-300 cursor-pointer transform duration-500 ease-out
+                            className={`col-span-1 relative overflow-hidden bg-muted border border-border/50 hover:border-foreground transition-all duration-500 ease-out cursor-pointer
                                 ${activeImage === "bottom" ? "scale-[1.04] shadow-xl shadow-black/25" : activeImage ? "scale-[0.97] opacity-70" : "scale-100"}`}
                             onClick={() => setActiveImage(prev => prev === "bottom" ? null : "bottom")}
                         >
@@ -91,7 +91,7 @@ const WelcomeSection = () => {
                                 className="object-cover transition-transform duration-700 ease-in-out delay-200 group-hover:scale-105"
                             />
                             {activeImage === "bottom" && (
-                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/45 via-transparent to-transparent" />
+                                <div className="pointer-events-none absolute inset-0 bg-linear-to-tr from-black/45 via-transparent to-transparent" />
                             )}
                         </div>
                     </div>

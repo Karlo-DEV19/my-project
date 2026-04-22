@@ -18,7 +18,7 @@ interface NewArrivalProps {
 // Skeleton card for loading state
 const ProductSkeleton = () => (
     <div className="flex flex-col gap-4">
-        <div className="aspect-[4/5] w-full bg-muted border border-border animate-pulse" />
+        <div className="aspect-4/5 w-full bg-muted border border-border animate-pulse" />
         <div className="flex flex-col gap-2">
             <div className="h-3 w-24 bg-muted rounded animate-pulse" />
             <div className="h-5 w-36 bg-muted rounded animate-pulse" />
@@ -103,7 +103,7 @@ const NewArrival = ({ products = [], pagination, isLoading = false, onPageChange
                                     }}
                                 >
                                     {/* Image Container */}
-                                    <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted border border-border transition-colors duration-500 group-hover:border-foreground/50">
+                                    <div className="relative aspect-4/5 w-full overflow-hidden bg-muted border border-border transition-colors duration-500 group-hover:border-foreground/50">
 
                                         {/* COOL FEATURE: New Arrival Badge */}
                                         <div className="absolute top-4 left-4 z-20 overflow-hidden">
@@ -129,7 +129,7 @@ const NewArrival = ({ products = [], pagination, isLoading = false, onPageChange
                                         )}
 
                                         {/* Hover CTA */}
-                                        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-background/90 via-background/60 to-transparent opacity-0 translate-y-2 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center z-10">
+                                        <div className="absolute inset-x-0 bottom-0 p-4 bg-linear-to-t from-background/90 via-background/60 to-transparent opacity-0 translate-y-2 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center z-10">
                                             <span className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-medium shadow-lg w-full text-center hover:bg-foreground/90 transition-colors">
                                                 View Full Details
                                             </span>

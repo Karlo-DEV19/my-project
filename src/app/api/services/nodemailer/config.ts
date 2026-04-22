@@ -27,14 +27,10 @@ export const transporter = nodemailer.createTransport({
     },
 })
 
-// Verify transporter on initialization
-transporter.verify((error) => {
-    if (error) {
-        console.error("❌ SMTP Transporter Verification Failed:", error.message)
-    } else {
-        console.log("✅ SMTP Transporter is ready to send emails")
-    }
-})
+// Note: transporter verification is intentionally omitted here.
+// Calling transporter.verify() at module load time causes Next.js to open
+// an SMTP connection during route compilation, which results in ECONNRESET
+// errors on the /login page. Verification happens implicitly on first send.
 
 // Updated to match your Capstone project context
 export const defaultFrom = `"MJ Decor 888" <${email}>`

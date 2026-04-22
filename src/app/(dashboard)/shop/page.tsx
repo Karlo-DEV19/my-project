@@ -33,7 +33,7 @@ const ShopSkeleton = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-12 mb-8">
                 {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="flex flex-col gap-4">
-                        <div className="aspect-[4/5] w-full bg-muted border border-border/50"></div>
+                        <div className="aspect-4/5 w-full bg-muted border border-border/50"></div>
                         <div className="flex flex-col gap-2 mt-1">
                             <div className="h-2.5 w-24 bg-muted"></div>
                             <div className="h-5 w-48 bg-muted"></div>

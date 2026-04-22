@@ -50,6 +50,10 @@ interface CartState {
     isSheetOpen: boolean
     /** Becomes true after Zustand has rehydrated from localStorage on the client */
     _hydrated: boolean
+    /** True when a guest clicked "Checkout" — cleared after login redirect */
+    checkoutRedirectPending: boolean
+    /** Why the auth modal was opened — used to show contextual messages */
+    authModalContext: 'default' | 'checkout'
 }
 
 interface CartActions {
@@ -61,6 +65,11 @@ interface CartActions {
     openCartSheet: () => void
     closeCartSheet: () => void
     setHydrated: () => void
+    setCheckoutRedirectPending: (pending: boolean) => void
+    setAuthModalContext: (context: 'default' | 'checkout') => void
+    /** Registered by Header so CartSheet can open the auth modal without prop drilling */
+    _openAuthModal: (() => void) | null
+    registerOpenAuthModal: (fn: () => void) => void
 }
 
 type CartStore = CartState & CartActions
@@ -91,9 +100,15 @@ export const useCartStore = create<CartStore>()(
             itemCount: 0,
             isSheetOpen: false,
             _hydrated: false,
+            checkoutRedirectPending: false,
+            authModalContext: 'default',
+            _openAuthModal: null,
 
             // ── Actions ────────────────────────────────────────────────────
             setHydrated: () => set({ _hydrated: true }),
+            setCheckoutRedirectPending: (pending) => set({ checkoutRedirectPending: pending }),
+            setAuthModalContext: (context) => set({ authModalContext: context }),
+            registerOpenAuthModal: (fn) => set({ _openAuthModal: fn }),
 
             addToCart: (order) => {
                 const key = buildCartKey(order)
@@ -144,8 +159,8 @@ export const useCartStore = create<CartStore>()(
                 // Return a no-op storage on the server so persist doesn't crash
                 return {
                     getItem: () => null,
-                    setItem: () => {},
-                    removeItem: () => {},
+                    setItem: () => { },
+                    removeItem: () => { },
                 }
             }),
             // Only persist cart data — never persist UI state or _hydrated flag

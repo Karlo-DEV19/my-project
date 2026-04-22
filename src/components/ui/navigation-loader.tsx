@@ -12,7 +12,7 @@ export function NavigationLoader({ isVisible, title = "Navigating..." }: Navigat
     if (!isVisible) return null
 
     return (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm transition-opacity duration-300">
+        <div className="fixed inset-0 z-100 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm transition-opacity duration-300">
             <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-8 shadow-2xl">
                 {/* Native Tailwind Spinner */}
                 <div className="relative flex h-12 w-12 items-center justify-center">

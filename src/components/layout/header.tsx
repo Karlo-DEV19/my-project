@@ -4,12 +4,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import AccountButton from '@/components/account/account-button';
 import AccountModal from '@/components/account/account-modal';
 import AccountForm from '@/components/account/account-form';
+import { NotificationBell } from '@/components/ui/notification-bell';
 import Link from 'next/link';
 import { Home, Info, ShoppingBag, Search, X, Menu, ShoppingCart, Mail } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/lib/zustand/use-cart-store';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import ThemeToggle from '@/components/theme-toggle';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -98,12 +99,57 @@ const SearchBar = ({
 
 const Header = ({ isVisible, isFixed }: HeaderProps) => {
     const pathname = usePathname();
+    const router = useRouter();
     const [searchOpen, setSearchOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [accountModalOpen, setAccountModalOpen] = useState(false);
+    const { registerOpenAuthModal, authModalContext, setAuthModalContext } = useCartStore();
 
     const openSearch = useCallback(() => setSearchOpen(true), []);
     const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+    // Register openAuthModal into the cart store so CartSheet can call it
+    useEffect(() => {
+        registerOpenAuthModal(() => setAccountModalOpen(true));
+    }, [registerOpenAuthModal]);
+
+    // ── Reactive customer auth state ──────────────────────────────────────────
+    // Customers use localStorage (no Supabase Auth session).
+    // The storage event fires in the same tab via manual dispatch AND cross-tab.
+    const [loggedInUser, setLoggedInUser] = useState<{ id: string } | null>(null);
+
+    useEffect(() => {
+        // Initial read
+        try {
+            const stored = localStorage.getItem('user');
+            setLoggedInUser(stored ? JSON.parse(stored) : null);
+        } catch {
+            setLoggedInUser(null);
+        }
+
+        // Cross-tab + same-tab listener (account-form dispatches StorageEvent on login/logout)
+        function onStorage(e: StorageEvent) {
+            if (e.key !== 'user') return;
+            try {
+                setLoggedInUser(e.newValue ? JSON.parse(e.newValue) : null);
+            } catch {
+                setLoggedInUser(null);
+            }
+
+            // ── Post-login redirect ─────────────────────────────────────────
+            if (e.newValue) {
+                const redirect = localStorage.getItem('redirectAfterLogin');
+                if (redirect) {
+                    localStorage.removeItem('redirectAfterLogin');
+                    router.push(redirect);
+                }
+            }
+        }
+
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, [router]);
+
 
     const handleAboutClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
         if (pathname === '/') {
@@ -128,9 +174,9 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                 className={cn(
                     'font-sans',
                     isFixed
-                        ? 'sticky top-0 z-[99] bg-background/95 backdrop-blur-md border-b border-border'
+                        ? 'sticky top-0 z-99 bg-background/95 backdrop-blur-md border-b border-border'
                         : cn(
-                            'fixed top-0 left-0 right-0 z-[99] transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)]',
+                            'fixed top-0 left-0 right-0 z-99 transition-all duration-500 ease-[cubic-bezier(0.76,0,0.24,1)]',
                             isVisible
                                 ? 'translate-y-0 opacity-100'
                                 : '-translate-y-full opacity-0 pointer-events-none',
@@ -202,6 +248,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
 
                             <ThemeToggle />
                             <CartButton />
+                            {loggedInUser && <NotificationBell role="customer" userId={loggedInUser.id} />}
                             <AccountButton onClick={() => setAccountModalOpen(true)} />
                         </div>
 
@@ -224,6 +271,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
 
                                     <ThemeToggle className="w-9 h-9" />
                                     <CartButton />
+                                    {loggedInUser && <NotificationBell role="customer" userId={loggedInUser.id} />}
                                     <AccountButton onClick={() => setAccountModalOpen(true)} />
 
                                     {/* Mobile sheet menu */}
@@ -286,7 +334,14 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                 </div>
             </header>
 
-            <AccountModal isOpen={accountModalOpen} onClose={() => setAccountModalOpen(false)}>
+            <AccountModal
+                isOpen={accountModalOpen}
+                onClose={() => {
+                    setAccountModalOpen(false);
+                    setAuthModalContext('default'); // reset so next normal open has no context
+                }}
+                context={authModalContext}
+            >
                 <AccountForm />
             </AccountModal>
         </>

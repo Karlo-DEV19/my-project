@@ -83,9 +83,9 @@ const MOCK_CHATS: Chat[] = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<ChatStatus, { badge: string; dot: string; label: string }> = {
-  Active:  { dot: "bg-emerald-400", badge: "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40", label: "Active" },
-  Pending: { dot: "bg-amber-400",   badge: "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40",       label: "Pending" },
-  Closed:  { dot: "bg-slate-500",   badge: "bg-slate-500/20 text-slate-400 ring-1 ring-slate-500/40",       label: "Closed" },
+  Active: { dot: "bg-emerald-400", badge: "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40", label: "Active" },
+  Pending: { dot: "bg-amber-400", badge: "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40", label: "Pending" },
+  Closed: { dot: "bg-slate-500", badge: "bg-slate-500/20 text-slate-400 ring-1 ring-slate-500/40", label: "Closed" },
 };
 
 function getInitials(name: string) {
@@ -103,12 +103,12 @@ function getAvatarHue(name: string) {
 function Avatar({ name, size = "md", online = false }: { name: string; size?: "sm" | "md" | "lg"; online?: boolean }) {
   const hue = getAvatarHue(name);
   const sizes = { sm: "h-7 w-7 text-[9px]", md: "h-10 w-10 text-xs", lg: "h-11 w-11 text-sm" };
-  const dots  = { sm: "h-2 w-2 border",     md: "h-2.5 w-2.5 border-2", lg: "h-3 w-3 border-2" };
+  const dots = { sm: "h-2 w-2 border", md: "h-2.5 w-2.5 border-2", lg: "h-3 w-3 border-2" };
   return (
     <div className="relative shrink-0">
       <div
         className={cn("flex items-center justify-center rounded-full font-semibold text-white select-none", sizes[size])}
-        style={{ background: `linear-gradient(135deg, hsl(${hue},65%,58%), hsl(${(hue+40)%360},60%,45%))` }}
+        style={{ background: `linear-gradient(135deg, hsl(${hue},65%,58%), hsl(${(hue + 40) % 360},60%,45%))` }}
       >
         {getInitials(name)}
       </div>
@@ -154,8 +154,8 @@ function InfoPanel({ chat, onClose }: { chat: Chat; onClose: () => void }) {
       {/* Action shortcuts */}
       <div className="flex flex-col gap-1 border-b border-white/5 px-3 py-3">
         {[
-          { icon: Film,   label: "View Media" },
-          { icon: Pin,    label: "Pinned Messages" },
+          { icon: Film, label: "View Media" },
+          { icon: Pin, label: "Pinned Messages" },
           { icon: Search, label: "Search in Chat" },
         ].map(({ icon: Icon, label }) => (
           <button
@@ -194,13 +194,13 @@ function InfoPanel({ chat, onClose }: { chat: Chat; onClose: () => void }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminChatPage() {
-  const [query, setQuery]         = useState("");
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string>(MOCK_CHATS[0].id);
-  const [chats, setChats]         = useState<Chat[]>(MOCK_CHATS);
+  const [chats, setChats] = useState<Chat[]>(MOCK_CHATS);
   const [inputText, setInputText] = useState("");
-  const [showInfo, setShowInfo]   = useState(false);
-  const messagesEndRef            = useRef<HTMLDivElement>(null);
-  const fileInputRef              = useRef<HTMLInputElement>(null);
+  const [showInfo, setShowInfo] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredChats = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -244,6 +244,35 @@ export default function AdminChatPage() {
   }
 
   const isOnline = (s: ChatStatus) => s === "Active";
+
+  const isMaintenance = true;
+
+  if (isMaintenance) {
+    return (
+      <div className="flex h-screen w-full flex-col overflow-hidden bg-[#0f172a]">
+        <div className="shrink-0 border-b border-white/5 px-6 py-4">
+          <AdminPageHeader
+            title="Chat Management"
+            description="Track and manage all customer conversations in one place."
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="flex max-w-md flex-col items-center text-center rounded-2xl border border-white/10 bg-white/5 p-10 shadow-sm">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
+              <MessageSquare className="h-8 w-8 text-blue-400" />
+            </div>
+            <h2 className="mb-2 text-xl font-bold text-blue-100">Chat System Under Maintenance</h2>
+            <p className="mb-4 text-sm text-slate-400">
+              This feature is currently being improved. Please check back later.
+            </p>
+            <p className="text-xs text-slate-500">
+              We are working on real-time messaging and support features.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-[#0f172a]">
@@ -328,9 +357,9 @@ export default function AdminChatPage() {
               <div className="flex items-center gap-0.5">
                 <StatusBadge status={selectedChat.status} />
                 {[
-                  { Icon: Phone,  tip: "Call" },
-                  { Icon: Video,  tip: "Video" },
-                  { Icon: Info,   tip: "Info", action: () => setShowInfo((v) => !v) },
+                  { Icon: Phone, tip: "Call" },
+                  { Icon: Video, tip: "Video" },
+                  { Icon: Info, tip: "Info", action: () => setShowInfo((v) => !v) },
                 ].map(({ Icon, tip, action }) => (
                   <Button
                     key={tip}
@@ -359,23 +388,23 @@ export default function AdminChatPage() {
                 <div className="flex-1 overflow-y-auto px-5 py-5">
                   <div className="flex flex-col gap-0.5">
                     {selectedChat.messages.map((msg, idx) => {
-                      const msgs     = selectedChat.messages;
-                      const isAdmin  = msg.sender === "admin";
+                      const msgs = selectedChat.messages;
+                      const isAdmin = msg.sender === "admin";
                       const prevSame = idx > 0 && msgs[idx - 1].sender === msg.sender;
                       const nextSame = idx < msgs.length - 1 && msgs[idx + 1].sender === msg.sender;
-                      const isFirst  = !prevSame;
-                      const isLast   = !nextSame;
+                      const isFirst = !prevSame;
+                      const isLast = !nextSame;
 
                       const adminRound = cn(
                         "rounded-2xl",
                         isFirst && !isLast && "rounded-br-md",
-                        !isFirst && isLast  && "rounded-tr-md",
+                        !isFirst && isLast && "rounded-tr-md",
                         !isFirst && !isLast && "rounded-r-md"
                       );
                       const customerRound = cn(
                         "rounded-2xl",
                         isFirst && !isLast && "rounded-bl-md",
-                        !isFirst && isLast  && "rounded-tl-md",
+                        !isFirst && isLast && "rounded-tl-md",
                         !isFirst && !isLast && "rounded-l-md"
                       );
 

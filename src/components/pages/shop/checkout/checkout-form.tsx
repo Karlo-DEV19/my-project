@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
@@ -331,6 +331,26 @@ export function CheckoutForm({ items, clearCart, totals }: CheckoutFormProps) {
             // agreeTerms intentionally omitted — undefined until checkbox ticked
         },
     })
+
+    // ── Auto-fill from localStorage user (email + name) ──────────────────────
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('user')
+            if (!stored) return
+            const user: { name?: string; email?: string } = JSON.parse(stored)
+
+            if (user.email) {
+                form.setValue('email', user.email, { shouldValidate: true })
+            }
+            if (user.name) {
+                const parts = user.name.trim().split(/\s+/)
+                form.setValue('firstName', parts[0] ?? '', { shouldValidate: true })
+                form.setValue('lastName', parts.slice(1).join(' ') ?? '', { shouldValidate: true })
+            }
+        } catch {
+            // corrupted storage — silently skip
+        }
+    }, [form])
 
     // ── Location picker ───────────────────────────────────────────────────────
     const handleLocationSelect = useCallback((location: LocationData) => {

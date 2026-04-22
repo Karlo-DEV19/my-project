@@ -172,7 +172,12 @@ export async function createOrderPaymentSession(
         const currency = "PHP"
         const fullName = `${paymentData.customerFirstName} ${paymentData.customerLastName}`.trim()
         const formattedPhone = normalizePhone(paymentData.customerPhone)
-        const paymentMethodTypes = mapPaymentMethod(paymentData.paymentMethod)
+        const paymentMethodTypes =
+            process.env.PAYMONGO_TEST_ALL === "true"
+                ? ["gcash", "paymaya"]
+                : mapPaymentMethod(paymentData.paymentMethod)
+
+        console.log("[PayMongo] payment_method_types:", paymentMethodTypes)
 
         // Build line items — one entry per product, no separate VAT line.
         // amount is per-unit (VAT-inclusive downpayment share), quantity is the unit count.

@@ -1,7 +1,7 @@
 import { Context } from "hono"
 import { z } from "zod"
 import { inArray, eq, ilike, or, and, desc, sql, gte } from "drizzle-orm"
-import { db } from "@/lib/supabase/db"
+import { db, supabaseAdmin } from "@/lib/supabase/db"
 import { blindsProducts } from "@/schema/products/blinds/blinds-product"
 import { blindsProductColors } from "@/schema/products/blinds/blinds-product-colors"
 import { orderItems, orders } from "@/schema/orders/orders"
@@ -10,6 +10,7 @@ import { notifications } from "@/schema/notifications/notifications.schema"
 import { blindsProductImages } from "@/schema/products/blinds/blinds-product-image"
 import { sendOrderStatusEmail } from "../services/nodemailer/send-order-status-service"
 import { createOrderPaymentSession } from "../services/paymongo/order-checkout-payment"
+import { NotificationsService } from "../services/notification-service/notifications.service"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -375,10 +376,13 @@ export const checkoutOrder = async (ctx: Context) => {
                 amountDue: downpaymentAmount.toFixed(2),
             })
 
-            // ── Notification: new order placed ─────────────────────────────
+            // ── Notification: new order placed → admin only ────────────────
             await tx.insert(notifications).values({
                 title: "New Order",
                 message: "A new customer has placed an order",
+                type: "NEW_ORDER",
+                targetRole: "admin",
+                userId: null,
                 isRead: false,
             })
 
@@ -458,6 +462,29 @@ export const checkoutOrder = async (ctx: Context) => {
                 updatedAt: new Date(),
             })
             .where(eq(paymentHistory.orderId, newOrderId))
+
+        // ── Customer Notification: Order Confirmed ──────────────────────────────
+        // Fires AFTER PayMongo session is confirmed so we never notify for cancelled orders.
+        // Non-fatal — a failure must never block the checkout response.
+        try {
+            const { data: userData } = await supabaseAdmin
+                .from('users')
+                .select('id')
+                .eq('email', input.email.trim().toLowerCase())
+                .maybeSingle()
+
+            if (userData?.id) {
+                await NotificationsService.createNotification({
+                    userId: userData.id,
+                    title: "Order Confirmed",
+                    message: `Your order #${trackingNumber} has been placed and is being processed.`,
+                    type: "ORDER_CONFIRMED",
+                    targetRole: "customer",
+                })
+            }
+        } catch (notifErr) {
+            console.error("⚠️ Failed to create order notification:", notifErr)
+        }
 
         // ── 13. Send "Order Placed" Email ──
         try {
@@ -759,6 +786,37 @@ export const updateOrderStatus = async (ctx: Context) => {
             return ctx.json({ success: false, message: "Order not found" }, 404);
         }
 
+        // ── Notification: Delivery Update → customer ──────────────────────────────
+        // Fires only when the admin marks an order as "shipped".
+        if (parsed.data.status === 'shipped') {
+            try {
+                const [orderData] = await db
+                    .select({ customerEmail: orders.customerEmail })
+                    .from(orders)
+                    .where(eq(orders.id, updatedOrder.id));
+
+                if (orderData?.customerEmail) {
+                    const { data: userData } = await supabaseAdmin
+                        .from('users')
+                        .select('id')
+                        .eq('email', orderData.customerEmail.toLowerCase())
+                        .maybeSingle();
+
+                    if (userData?.id) {
+                        await NotificationsService.createNotification({
+                            userId: userData.id,
+                            title: "Delivery Update",
+                            message: "Great news! Your order is now out for delivery. Expect it soon!",
+                            type: "DELIVERY_UPDATE",
+                            targetRole: "customer",
+                        });
+                    }
+                }
+            } catch (notifErr) {
+                console.error("⚠️ Failed to create delivery notification:", notifErr);
+            }
+        }
+
         return ctx.json({ success: true, message: "Order status updated", data: updatedOrder });
     } catch (error) {
         console.error("Failed to update order status:", error);
@@ -950,6 +1008,106 @@ export const getDashboardStats = async (ctx: Context) => {
     }
 }
 
+// ─── Customer: Get My Orders ──────────────────────────────────────────────────
+
+export const getUserOrders = async (ctx: Context) => {
+    try {
+        const email = ctx.req.query('email')?.trim()
+        if (!email) {
+            return ctx.json({ success: false, message: 'email query param is required' }, 400)
+        }
+
+        const result = await db
+            .select({
+                id: orders.id,
+                trackingNumber: orders.trackingNumber,
+                referenceNumber: orders.referenceNumber,
+                status: orders.status,
+                paymentStatus: orders.paymentStatus,
+                totalAmount: orders.totalAmount,
+                downpaymentAmount: orders.downpaymentAmount,
+                balanceAmount: orders.balanceAmount,
+                createdAt: orders.createdAt,
+            })
+            .from(orders)
+            .where(eq(orders.customerEmail, email))
+            .orderBy(desc(orders.createdAt))
+
+        return ctx.json({ success: true, data: result })
+    } catch (error) {
+        console.error('getUserOrders error:', error)
+        return ctx.json({ success: false, message: 'Failed to fetch orders.' }, 500)
+    }
+}
+
+// ─── Customer: Get Single Order (with ownership check) ───────────────────────
+
+export const getOrderById = async (ctx: Context) => {
+    try {
+        const id    = ctx.req.param('id')
+        const email = ctx.req.query('email')?.trim()
+
+        if (!id)    return ctx.json({ success: false, message: 'Order ID is required' }, 400)
+        if (!email) return ctx.json({ success: false, message: 'email query param is required' }, 400)
+
+        const [order] = await db
+            .select({
+                id: orders.id,
+                trackingNumber: orders.trackingNumber,
+                referenceNumber: orders.referenceNumber,
+                status: orders.status,
+                paymentStatus: orders.paymentStatus,
+                paymentMethod: orders.paymentMethod,
+                orderType: orders.orderType,
+                customerFirstName: orders.customerFirstName,
+                customerLastName: orders.customerLastName,
+                customerEmail: orders.customerEmail,
+                customerPhone: orders.customerPhone,
+                deliveryFormattedAddress: orders.deliveryFormattedAddress,
+                deliveryNotes: orders.deliveryNotes,
+                subtotal: orders.subtotal,
+                vat: orders.vat,
+                deliveryFee: orders.deliveryFee,
+                totalAmount: orders.totalAmount,
+                downpaymentAmount: orders.downpaymentAmount,
+                downpaymentStatus: orders.downpaymentStatus,
+                balanceAmount: orders.balanceAmount,
+                createdAt: orders.createdAt,
+                confirmedAt: orders.confirmedAt,
+            })
+            .from(orders)
+            .where(eq(orders.id, id))
+            .limit(1)
+
+        if (!order) {
+            return ctx.json({ success: false, message: 'Order not found' }, 404)
+        }
+
+        // Security: verify ownership by matching customer email
+        if (order.customerEmail.toLowerCase() !== email.toLowerCase()) {
+            return ctx.json({ success: false, message: 'Unauthorized' }, 403)
+        }
+
+        const items = await db
+            .select({
+                id: orderItems.id,
+                productName: orderItems.productName,
+                productCode: orderItems.productCode,
+                colorName: orderItems.colorName,
+                quantity: orderItems.quantity,
+                unitPrice: orderItems.unitPrice,
+                subtotal: orderItems.subtotal,
+            })
+            .from(orderItems)
+            .where(eq(orderItems.orderId, id))
+
+        return ctx.json({ success: true, data: { order, items } })
+    } catch (error) {
+        console.error('getOrderById error:', error)
+        return ctx.json({ success: false, message: 'Failed to fetch order details.' }, 500)
+    }
+}
+
 export default {
     getOrderDetailsStatus,
     getAllOrders,
@@ -957,4 +1115,6 @@ export default {
     updateOrderStatus,
     getDashboardStats,
     getMonthlySales,
-}
+    getUserOrders,
+    getOrderById,
+}

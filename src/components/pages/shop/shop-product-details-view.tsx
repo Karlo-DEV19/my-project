@@ -378,7 +378,7 @@ const ShopProductDetailsView = ({ product }: Props) => {
                 {/* ── LEFT: Gallery ─────────────────────────────────── */}
                 <div className="flex flex-col gap-4 lg:sticky lg:top-24">
                     <div
-                        className="relative aspect-[4/5] w-full bg-muted border border-border overflow-hidden group cursor-zoom-in"
+                        className="relative aspect-4/5 w-full bg-muted border border-border overflow-hidden group cursor-zoom-in"
                         onClick={() => openLightbox(activeImageIdx)}
                         role="button"
                         tabIndex={0}

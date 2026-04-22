@@ -37,7 +37,7 @@ export const MainDropZone = memo(({ files, onChange, error }: MainDropZoneProps)
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
                 className={[
-                    'relative flex aspect-[4/3] w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-all',
+                    'relative flex aspect-4/3 w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-all',
                     dragging ? 'border-primary bg-primary/5'
                         : coverPreview ? 'border-transparent'
                             : error ? 'border-destructive/50'

@@ -21,11 +21,12 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-import { useGetBlindsProducts } from "@/app/api/hooks/use-product-blinds"
+import { useDeleteBlinds, useGetBlindsProducts } from "@/app/api/hooks/use-product-blinds"
 import { ProductsTableHeader } from "./products-table-header"
 import { InventorySkeleton } from "./table-skeleton"
 import DataPagination from "@/components/ui/data-pagination"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 const ProductSection = () => {
     const [mounted, setMounted] = useState(false)
@@ -33,13 +34,20 @@ const ProductSection = () => {
     const [perPage, setPerPage] = useState(12)
     const [search, setSearch] = useState("")
     const [status, setStatus] = useState<string | null>(null)
+    const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined)
 
     const router = useRouter()
+    const { deleteBlinds, isDeleting } = useDeleteBlinds()
     const searchParams = useSearchParams()
     const selectedId = searchParams.get("id")
 
+    // Fetch the signed-in admin's Supabase user ID once on mount
     useEffect(() => {
         setMounted(true)
+        createClient().then(async (supabase) => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user?.id) setCurrentUserId(user.id)
+        })
     }, [])
 
     // ── Step 3: auto-scroll to highlighted card ──────────────────────────────
@@ -93,7 +101,7 @@ const ProductSection = () => {
                                 <div className="absolute left-3 top-3 z-10">
                                     <Badge
                                         variant={product.status === "active" ? "default" : "secondary"}
-                                        className="bg-background/90 text-foreground backdrop-blur-md hover:bg-background/100 shadow-sm capitalize"
+                                        className="bg-background/90 text-foreground backdrop-blur-md hover:bg-background shadow-sm capitalize"
                                     >
                                         {product.status}
                                     </Badge>
@@ -141,8 +149,26 @@ const ProductSection = () => {
                                                 <Edit3 className="mr-2 h-4 w-4" /> Edit Details
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => { }} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                <Trash2 className="mr-2 h-4 w-4" /> Delete Product
+                                            <DropdownMenuItem
+                                                disabled={isDeleting}
+                                                onClick={async () => {
+                                                    const confirmed = window.confirm(
+                                                        `Are you sure you want to delete "${product.name}"? This cannot be undone.`
+                                                    )
+                                                    if (!confirmed) return
+                                                    try {
+                                                        await deleteBlinds({
+                                                            productId: product.id,
+                                                            userId: currentUserId,
+                                                        })
+                                                    } catch {
+                                                        alert("Failed to delete product. Please try again.")
+                                                    }
+                                                }}
+                                                className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                {isDeleting ? "Deleting…" : "Delete Product"}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>

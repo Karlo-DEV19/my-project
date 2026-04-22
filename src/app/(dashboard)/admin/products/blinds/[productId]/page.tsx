@@ -4,18 +4,18 @@ import React, { Suspense, use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Home, Package } from 'lucide-react';
-import { 
-    ProductViewDetails, 
-    ProductViewSkeleton 
+import {
+    ProductViewDetails,
+    ProductViewSkeleton
 } from '@/components/pages/admin/products/details/product-blind-details';
 import { NavigationLoader } from '@/components/ui/navigation-loader';
-import { 
-    Breadcrumb, 
-    BreadcrumbItem, 
-    BreadcrumbLink, 
-    BreadcrumbList, 
-    BreadcrumbPage, 
-    BreadcrumbSeparator 
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -30,7 +30,7 @@ export default function ViewBlindDetailsPage(props: { params: Params }) {
 
     const handleBackClick = () => {
         setIsNavigatingBack(true);
-        router.push('/admin/products/blinds');
+        router.push('/admin/products');
     };
 
     return (
@@ -65,10 +65,10 @@ export default function ViewBlindDetailsPage(props: { params: Params }) {
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8 rounded-full md:hidden" 
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full md:hidden"
                                     onClick={handleBackClick}
                                 >
                                     <ChevronLeft className="h-5 w-5" />
@@ -83,9 +83,9 @@ export default function ViewBlindDetailsPage(props: { params: Params }) {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={handleBackClick}
                                 className="hidden items-center gap-2 rounded-lg border-border bg-card shadow-sm hover:bg-accent md:flex"
                             >

@@ -12,7 +12,7 @@ interface ProductGridProps {
 // Skeleton card for loading state
 const ProductSkeleton = () => (
     <div className="flex flex-col gap-4">
-        <div className="aspect-[4/5] w-full bg-muted border border-border animate-pulse" />
+        <div className="aspect-4/5 w-full bg-muted border border-border animate-pulse" />
         <div className="flex flex-col gap-2">
             <div className="h-3 w-24 bg-muted rounded animate-pulse" />
             <div className="h-5 w-36 bg-muted rounded animate-pulse" />
@@ -76,7 +76,7 @@ const ProductGrid = ({ products, isLoading = false }: ProductGridProps) => {
                         }}
                     >
                         {/* Image Container */}
-                        <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted border border-border transition-colors duration-500 group-hover:border-foreground/50">
+                        <div className="relative aspect-4/5 w-full overflow-hidden bg-muted border border-border transition-colors duration-500 group-hover:border-foreground/50">
                             {primaryImage ? (
                                 <Image
                                     src={primaryImage}
@@ -105,7 +105,7 @@ const ProductGrid = ({ products, isLoading = false }: ProductGridProps) => {
                             )}
 
                             {/* Hover CTA */}
-                            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-background/90 via-background/60 to-transparent opacity-0 translate-y-2 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center">
+                            <div className="absolute inset-x-0 bottom-0 p-4 bg-linear-to-t from-background/90 via-background/60 to-transparent opacity-0 translate-y-2 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0 flex justify-center">
                                 <span className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-medium shadow-lg w-full text-center">
                                     View Full Details
                                 </span>

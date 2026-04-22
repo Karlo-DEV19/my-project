@@ -68,7 +68,7 @@ export const EditMainDropZone = memo(({ files, onChange, error }: EditMainDropZo
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
                 className={cn(
-                    'relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-all',
+                    'relative flex aspect-4/3 w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-all',
                     addMode === 'upload' && 'cursor-pointer',
                     dragging
                         ? 'border-primary bg-primary/5'

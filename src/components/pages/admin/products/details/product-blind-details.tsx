@@ -107,7 +107,7 @@ export const ProductViewDetails = ({ productId }: ProductViewDetailsProps) => {
                                     key={img.id}
                                     onClick={() => setFeaturedImage(img.imageUrl)}
                                     className={cn(
-                                        "relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all",
+                                        "relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border-2 transition-all",
                                         featuredImage === img.imageUrl ? "border-primary ring-2 ring-primary/10" : "border-border hover:border-muted-foreground/50"
                                     )}
                                 >

@@ -84,7 +84,7 @@ function ProductSkeleton() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
             <div className="space-y-4">
-                <Skeleton className="aspect-[4/3] rounded-2xl w-full" />
+                <Skeleton className="aspect-4/3 rounded-2xl w-full" />
                 <div className="grid grid-cols-3 gap-2">
                     {[...Array(3)].map((_, i) => (
                         <Skeleton key={i} className="aspect-square rounded-xl" />
@@ -382,7 +382,7 @@ export const EditProductDetailsBlindForm: React.FC<
                                                     <div className="flex flex-col gap-2">
                                                         {(field.value as string[]).length > 0 ? (
                                                             <>
-                                                                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border">
+                                                                <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl border">
                                                                     <img
                                                                         src={(field.value as string[])[0]}
                                                                         alt="Cover"
@@ -407,7 +407,7 @@ export const EditProductDetailsBlindForm: React.FC<
                                                                 )}
                                                             </>
                                                         ) : (
-                                                            <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
+                                                            <div className="flex aspect-4/3 items-center justify-center rounded-xl border border-dashed text-muted-foreground text-sm">
                                                                 No images
                                                             </div>
                                                         )}

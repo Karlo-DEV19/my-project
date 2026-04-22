@@ -11,7 +11,7 @@ const ProductDetailSkeleton = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 xl:gap-24 items-start animate-pulse">
         {/* Left — image stack */}
         <div className="flex flex-col gap-4">
-            <div className="aspect-[4/5] w-full bg-muted border border-border" />
+            <div className="aspect-4/5 w-full bg-muted border border-border" />
             <div className="grid grid-cols-5 gap-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="aspect-square bg-muted border border-border" />

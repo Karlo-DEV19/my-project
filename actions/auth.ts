@@ -194,7 +194,7 @@ export async function initiateSignIn(email: string, password: string): Promise<A
         })
 
         // Send the code via email
-        const emailResult = await sendOtpEmail(email, code)
+        const emailResult = await sendOtpEmail(email, code, "admin")
         if (!emailResult.success) {
             await supabase.auth.signOut()
             return { success: false, error: "Failed to send verification code. Please try again." }
@@ -278,3 +278,30 @@ export async function verifyOtpCode(email: string, code: string): Promise<Action
 // null after signOut), logs the LOGOUT event, then clears
 // all auth cookies and redirects to /login.
 // ─────────────────────────────────────────────────────────────
+export async function signOut(): Promise<void> {
+    const supabase = await createClient()
+
+    // Resolve userId before calling signOut (session is destroyed after)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Log LOGOUT — non-blocking
+    if (user?.id) {
+        await createActivityLog(db, {
+            userId: user.id,
+            action: ActivityAction.LOGOUT,
+            module: ActivityModule.AUTH,
+            description: `Logout for ${user.email}`,
+        })
+    }
+
+    // Sign out from Supabase
+    await supabase.auth.signOut()
+
+    // Clear 2FA and gatekeeper cookies
+    const cookieStore = await cookies()
+    cookieStore.delete("2fa_verified")
+    cookieStore.delete("gatekeeper_token")
+
+    revalidatePath("/", "layout")
+    redirect("/login")
+}

@@ -12,6 +12,7 @@ import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { Context } from "hono";
 import { z } from "zod";
 import { createActivityLog } from "./activity-logs";
+import { NotificationsService } from "@/app/api/services/notification-service/notifications.service";
 
 export const updateBlindsById = async (ctx: Context) => {
     try {
@@ -240,6 +241,23 @@ export const createNewBlinds = async (ctx: Context) => {
                 referenceId: insertedProduct.id,
                 description: `Created blinds product: ${parsedData.name} (${parsedData.productCode})`,
             });
+        }
+
+        // ── Notification: New Arrival global broadcast ───────────────────────────
+        // Intentionally ONLY on create — update/reactivation should NOT re-notify.
+        // userId = null → shown to every logged-in customer.
+        if (parsedData.collection === "New Arrival") {
+            try {
+                await NotificationsService.createNotification({
+                    userId: null,
+                    title: "New Arrival",
+                    message: `${parsedData.name} just landed in our New Arrivals collection!`,
+                    type: "NEW_ARRIVAL",
+                    targetRole: "customer",
+                });
+            } catch (notifErr) {
+                console.error("⚠️ Failed to create New Arrival notification:", notifErr);
+            }
         }
 
         return ctx.json({ success: true, product: insertedProduct });
@@ -576,7 +594,7 @@ export const deleteBlindsById = async (ctx: Context) => {
         }
 
         const [existing] = await db
-            .select({ id: blindsProducts.id, productCode: blindsProducts.productCode })
+            .select({ id: blindsProducts.id, productCode: blindsProducts.productCode, name: blindsProducts.name })
             .from(blindsProducts)
             .where(eq(blindsProducts.id, productId))
             .limit(1);
@@ -599,8 +617,18 @@ export const deleteBlindsById = async (ctx: Context) => {
                 .where(eq(blindsProducts.id, productId));
         });
 
-        // Try to create activity log, but don't fail the request if it fails since there's no userId provided by default for DELETE in this context.
-        // It's better to bypass or pass a default "SYSTEM" if user is missing, but keeping it simple for now.
+        // Optional activity log — userId passed as query param from the client.
+        // Silently skipped if missing; deletion must never fail because of logging.
+        const userId = ctx.req.query("userId");
+        if (userId) {
+            await createActivityLog(db, {
+                userId,
+                action: "DELETE" as ActivityActionType,
+                module: "BLINDS_PRODUCT" as ActivityModuleType,
+                referenceId: productId,
+                description: `Deleted product: ${existing.name} (${existing.productCode})`,
+            });
+        }
 
         return ctx.json({
             success: true,

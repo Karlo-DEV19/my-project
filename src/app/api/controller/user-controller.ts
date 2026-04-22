@@ -1,9 +1,54 @@
 import type { Context } from 'hono';
-import { supabaseAdmin } from '@/lib/supabase/db';
+import { and, eq, gt } from 'drizzle-orm';
+import { supabaseAdmin, db } from '@/lib/supabase/db';
+import { otpCodes } from '@/schema/otp/otp-code';
+import { sendOtpEmail } from '@/app/api/services/nodemailer/send-otp-code-service';
 import {
   adminAccountSchema,
   getUsersQuerySchema,
 } from '@/lib/validations/admin-account.schema';
+
+// ─── OTP Helper ───────────────────────────────────────────────────────────────
+// Now supports role-based email content
+
+async function issueOtp(
+  email: string,
+  role: "admin" | "customer"
+): Promise<{ success: true } | { success: false; error: string }> {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+  await db
+    .update(otpCodes)
+    .set({ isUsed: true })
+    .where(and(eq(otpCodes.email, email), eq(otpCodes.isUsed, false)));
+
+  await db.insert(otpCodes).values({ email, code, expiresAt, isUsed: false });
+
+  // ✅ PASS ROLE HERE
+  const emailResult = await sendOtpEmail(email, code, role);
+
+  if (!emailResult.success) {
+    return { success: false, error: 'Failed to send verification code. Please try again.' };
+  }
+
+  return { success: true };
+}
+
+// ─── syncUserProfile ──────────────────────────────────────────────────────────
+
+async function syncUserProfile(email: string, name?: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .upsert(
+      { email, name: name?.trim() || email },
+      { onConflict: 'email', ignoreDuplicates: true }
+    );
+
+  if (error) {
+    console.warn('[syncUserProfile] upsert warning:', error.message);
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,7 +63,6 @@ export type UserRow = {
 
 export async function getAllUsers(c: Context): Promise<Response> {
   try {
-    // ── Validate query params ──────────────────────────────────────────────────
     const parsed = getUsersQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json(
@@ -28,24 +72,21 @@ export async function getAllUsers(c: Context): Promise<Response> {
     }
 
     const search = parsed.data.search?.trim() ?? '';
-    const month  = parsed.data.month ?? 'all';
-    const page   = parsed.data.page  ?? 1;
-    const limit  = parsed.data.limit ?? 10;
-    const from   = (page - 1) * limit;
-    const to     = from + limit - 1;
+    const month = parsed.data.month ?? 'all';
+    const page = parsed.data.page ?? 1;
+    const limit = parsed.data.limit ?? 10;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    // ── Build query ───────────────────────────────────────────────────────────
     let query = supabaseAdmin
       .from('users')
       .select('id, name, email, created_at', { count: 'exact' })
       .order('created_at', { ascending: false });
 
-    // Case-insensitive search across name and email.
     if (search) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
     }
 
-    // Month filter — derive UTC date range boundaries and apply to created_at.
     if (month !== 'all') {
       const now = new Date();
       let start: Date;
@@ -53,11 +94,10 @@ export async function getAllUsers(c: Context): Promise<Response> {
 
       if (month === 'this_month') {
         start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-        end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
       } else {
-        // last_month
         start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-        end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       }
 
       query = query
@@ -65,7 +105,6 @@ export async function getAllUsers(c: Context): Promise<Response> {
         .lt('created_at', end.toISOString());
     }
 
-    // Paginate using Supabase range (inclusive on both ends).
     query = query.range(from, to);
 
     const { data, error, count } = await query;
@@ -127,34 +166,7 @@ export async function createUser(c: Context): Promise<Response> {
   }
 }
 
-// ─── DELETE /api/v1/users/:id ─────────────────────────────────────────────────
-
-export async function deleteUser(c: Context): Promise<Response> {
-  try {
-    const id = c.req.param('id');
-    if (!id) {
-      return c.json({ success: false, message: 'User ID is required.' }, 400);
-    }
-
-    const { error } = await supabaseAdmin
-      .from('users')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('[deleteUser]', error.message);
-      return c.json({ success: false, message: error.message }, 500);
-    }
-
-    return c.json({ success: true });
-  } catch (err) {
-    console.error('[deleteUser] unexpected error:', err);
-    return c.json({ success: false, message: 'Failed to delete user.' }, 500);
-  }
-}
-
 // ─── POST /api/v1/users/signup ────────────────────────────────────────────────
-// Customer-facing signup — inserts into the public users table.
 
 export async function signupUser(c: Context): Promise<Response> {
   try {
@@ -165,10 +177,12 @@ export async function signupUser(c: Context): Promise<Response> {
       return c.json({ success: false, message: 'Name and email are required.' }, 400);
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const { data: existing } = await supabaseAdmin
       .from('users')
       .select('id')
-      .eq('email', email.trim().toLowerCase())
+      .eq('email', normalizedEmail)
       .single();
 
     if (existing) {
@@ -177,7 +191,7 @@ export async function signupUser(c: Context): Promise<Response> {
 
     const { data: newUser, error } = await supabaseAdmin
       .from('users')
-      .insert([{ name: name.trim(), email: email.trim().toLowerCase() }])
+      .insert([{ name: name.trim(), email: normalizedEmail }])
       .select('id, name, email')
       .single();
 
@@ -186,7 +200,17 @@ export async function signupUser(c: Context): Promise<Response> {
       return c.json({ success: false, message: error.message }, 500);
     }
 
-    return c.json({ success: true, data: newUser }, 201);
+    // ✅ CUSTOMER ROLE
+    const otpResult = await issueOtp(newUser.email, "customer");
+
+    if (!otpResult.success) {
+      return c.json(
+        { success: false, message: 'Account created but verification email failed. Please try signing in to resend.' },
+        500
+      );
+    }
+
+    return c.json({ success: true, status: 'OTP_REQUIRED', email: newUser.email }, 201);
   } catch (err) {
     console.error('[signupUser] unexpected error:', err);
     return c.json({ success: false, message: 'Failed to create account.' }, 500);
@@ -194,7 +218,6 @@ export async function signupUser(c: Context): Promise<Response> {
 }
 
 // ─── POST /api/v1/users/login ─────────────────────────────────────────────────
-// Customer-facing login — looks up user by email in the public users table.
 
 export async function loginUser(c: Context): Promise<Response> {
   try {
@@ -205,17 +228,26 @@ export async function loginUser(c: Context): Promise<Response> {
       return c.json({ success: false, message: 'Email is required.' }, 400);
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('id, name, email')
-      .eq('email', email.trim().toLowerCase())
+      .eq('email', normalizedEmail)
       .single();
 
     if (error || !user) {
       return c.json({ success: false, message: 'No account found with that email address.' }, 404);
     }
 
-    return c.json({ success: true, data: user });
+    // ✅ CUSTOMER ROLE
+    const otpResult = await issueOtp(user.email, "customer");
+
+    if (!otpResult.success) {
+      return c.json({ success: false, message: otpResult.error }, 500);
+    }
+
+    return c.json({ success: true, status: 'OTP_REQUIRED', email: user.email });
   } catch (err) {
     console.error('[loginUser] unexpected error:', err);
     return c.json({ success: false, message: 'Login failed.' }, 500);

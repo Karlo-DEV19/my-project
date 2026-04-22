@@ -6,92 +6,92 @@ import { BestSellerProduct, BlindsProduct, BlindsProductDetailResponse, CreateBl
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface UpdateBlindsParams {
-  id: string;
-  payload: EditProductPayload;
+    id: string;
+    payload: EditProductPayload;
 }
 
 interface UpdateBlindsResponse {
-  success: boolean;
-  message: string;
-  data: {
-    id: string;
-    productCode: string;
-    name: string;
-    description: string | null;
-    type: string | null;
-    collection: string;
-    status: string;
-    composition: string | null;
-    fabricWidth: string | null;
-    thickness: string | null;
-    packing: string | null;
-    characteristic: string | null;
-    unitPrice: number;
-    createdAt: string;
-    updatedAt: string;
-    images: {
-      id: string;
-      productId: string;
-      imageUrl: string;
-      createdAt: string;
-    }[];
-    colors: {
-      id: string;
-      productId: string;
-      name: string;
-      imageUrl: string;
-      createdAt: string;
-    }[];
-  };
+    success: boolean;
+    message: string;
+    data: {
+        id: string;
+        productCode: string;
+        name: string;
+        description: string | null;
+        type: string | null;
+        collection: string;
+        status: string;
+        composition: string | null;
+        fabricWidth: string | null;
+        thickness: string | null;
+        packing: string | null;
+        characteristic: string | null;
+        unitPrice: number;
+        createdAt: string;
+        updatedAt: string;
+        images: {
+            id: string;
+            productId: string;
+            imageUrl: string;
+            createdAt: string;
+        }[];
+        colors: {
+            id: string;
+            productId: string;
+            name: string;
+            imageUrl: string;
+            createdAt: string;
+        }[];
+    };
 }
 
 // ─── API Request ──────────────────────────────────────────────────────────────
 
 const updateBlindsRequest = async ({
-  id,
-  payload,
+    id,
+    payload,
 }: UpdateBlindsParams): Promise<UpdateBlindsResponse> => {
     console.log("id", id);
     console.log("payload", payload);
-  const { data } = await axiosApiClient.put<UpdateBlindsResponse>(
-    `/product-blinds/${id}/update`,
-    payload
-  );
-  return data;
+    const { data } = await axiosApiClient.put<UpdateBlindsResponse>(
+        `/product-blinds/${id}/update`,
+        payload
+    );
+    return data;
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useUpdateBlindsById = () => {
-  const queryClient = useQueryClient();
+    const queryClient = useQueryClient();
 
-  // ✅ Fixed: added the missing < generic bracket
-  const mutation = useMutation<UpdateBlindsResponse, Error, UpdateBlindsParams>(
-    {
-      mutationFn: updateBlindsRequest,
-      onSuccess: (data, variables) => {
-        queryClient.invalidateQueries({ queryKey: ["blindsProducts"] });
-        queryClient.invalidateQueries({
-          queryKey: ["blinds-product", variables.id],
-        });
-        queryClient.setQueryData(["blinds-product", variables.id], data.data);
-      },
-      onError: (error) => {
-        console.error("[useUpdateBlindsById] Error:", error);
-      },
-    }
-  );
+    // ✅ Fixed: added the missing < generic bracket
+    const mutation = useMutation<UpdateBlindsResponse, Error, UpdateBlindsParams>(
+        {
+            mutationFn: updateBlindsRequest,
+            onSuccess: (data, variables) => {
+                queryClient.invalidateQueries({ queryKey: ["blindsProducts"] });
+                queryClient.invalidateQueries({
+                    queryKey: ["blinds-product", variables.id],
+                });
+                queryClient.setQueryData(["blinds-product", variables.id], data.data);
+            },
+            onError: (error) => {
+                console.error("[useUpdateBlindsById] Error:", error);
+            },
+        }
+    );
 
-  return {
-    updateBlinds: mutation.mutate,
-    updateBlindsAsync: mutation.mutateAsync,
-    isUpdating: mutation.isPending,
-    isSuccess: mutation.isSuccess,
-    isError: mutation.isError,
-    error: mutation.error,
-    data: mutation.data,
-    reset: mutation.reset,
-  };
+    return {
+        updateBlinds: mutation.mutate,
+        updateBlindsAsync: mutation.mutateAsync,
+        isUpdating: mutation.isPending,
+        isSuccess: mutation.isSuccess,
+        isError: mutation.isError,
+        error: mutation.error,
+        data: mutation.data,
+        reset: mutation.reset,
+    };
 };
 
 export function useCreateNewBlinds() {
@@ -232,6 +232,34 @@ export function useGetAllNewArrival({
         blinds: query.data?.blinds ?? ([] as NewArrivalProduct[]),
         pagination: query.data?.pagination,
         ...query,
+    };
+}
+
+// -------------------- Delete Hook --------------------
+export function useDeleteBlinds() {
+    const queryClient = useQueryClient();
+
+    const mutation = useMutation<
+        { success: boolean; message: string },
+        Error,
+        { productId: string; userId?: string }
+    >({
+        mutationFn: async ({ productId, userId }) => {
+            const params = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+            const { data } = await axiosApiClient.delete(`/product-blinds/${productId}${params}`);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["blindsProducts"] });
+        },
+        onError: (error) => {
+            console.error("[useDeleteBlinds] Error:", error);
+        },
+    });
+
+    return {
+        deleteBlinds: mutation.mutateAsync,
+        isDeleting: mutation.isPending,
     };
 }
 

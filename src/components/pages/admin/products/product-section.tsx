@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/tooltip"
 
 import { useDeleteBlinds, useGetBlindsProducts } from "@/app/api/hooks/use-product-blinds"
+import { ApiError } from "@/app/api/axiosApiClient"
+import { toast } from "sonner"
 import { ProductsTableHeader } from "./products-table-header"
 import { InventorySkeleton } from "./table-skeleton"
 import DataPagination from "@/components/ui/data-pagination"
@@ -86,135 +88,142 @@ const ProductSection = () => {
                     {blinds.map((product) => {
                         const isHighlighted = product.id === selectedId
                         return (
-                        <div
-                            id={product.id}
-                            key={product.id}
-                            className={`group relative flex flex-col rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                                isHighlighted
-                                    ? 'border-amber-400/70 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-300/50 hover:border-amber-400'
-                                    : 'border-border/60 bg-card hover:border-primary/30'
-                            }`}
-                        >
-                            {/* PREMIUM INSET IMAGE SECTION */}
-                            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/50">
-                                {/* Status Badge - Moved to top left of image for clear visibility */}
-                                <div className="absolute left-3 top-3 z-10">
-                                    <Badge
-                                        variant={product.status === "active" ? "default" : "secondary"}
-                                        className="bg-background/90 text-foreground backdrop-blur-md hover:bg-background shadow-sm capitalize"
-                                    >
-                                        {product.status}
-                                    </Badge>
+                            <div
+                                id={product.id}
+                                key={product.id}
+                                className={`group relative flex flex-col rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${isHighlighted
+                                        ? 'border-amber-400/70 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-300/50 hover:border-amber-400'
+                                        : 'border-border/60 bg-card hover:border-primary/30'
+                                    }`}
+                            >
+                                {/* PREMIUM INSET IMAGE SECTION */}
+                                <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/50">
+                                    {/* Status Badge - Moved to top left of image for clear visibility */}
+                                    <div className="absolute left-3 top-3 z-10">
+                                        <Badge
+                                            variant={product.status === "active" ? "default" : "secondary"}
+                                            className="bg-background/90 text-foreground backdrop-blur-md hover:bg-background shadow-sm capitalize"
+                                        >
+                                            {product.status}
+                                        </Badge>
+                                    </div>
+
+                                    {product.images?.[0]?.imageUrl ? (
+                                        <Image
+                                            src={product.images[0].imageUrl}
+                                            alt={product.name}
+                                            fill
+                                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                            <Package className="h-10 w-10 opacity-20" />
+                                        </div>
+                                    )}
                                 </div>
 
-                                {product.images?.[0]?.imageUrl ? (
-                                    <Image
-                                        src={product.images[0].imageUrl}
-                                        alt={product.name}
-                                        fill
-                                        className="object-cover transition-transform duration-700 group-hover:scale-105"
-                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                                        <Package className="h-10 w-10 opacity-20" />
-                                    </div>
-                                )}
-                            </div>
+                                {/* STRUCTURED BODY SECTION */}
+                                <div className="flex flex-1 flex-col pt-4 px-1 pb-1">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                {product.productCode} • {product.type}
+                                            </p>
+                                            <h3 className="line-clamp-1 text-base font-bold tracking-tight text-foreground">
+                                                {product.name}
+                                            </h3>
+                                        </div>
 
-                            {/* STRUCTURED BODY SECTION */}
-                            <div className="flex flex-1 flex-col pt-4 px-1 pb-1">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="space-y-1">
-                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                            {product.productCode} • {product.type}
-                                        </p>
-                                        <h3 className="line-clamp-1 text-base font-bold tracking-tight text-foreground">
-                                            {product.name}
-                                        </h3>
-                                    </div>
-
-                                    {/* CLEAN ACTIONS MENU */}
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground">
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                                            <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}`) }} className="cursor-pointer">
-                                                <Eye className="mr-2 h-4 w-4" /> View Details
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}/edit`) }} className="cursor-pointer">
-                                                <Edit3 className="mr-2 h-4 w-4" /> Edit Details
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                disabled={isDeleting}
-                                                onClick={async () => {
-                                                    const confirmed = window.confirm(
-                                                        `Are you sure you want to delete "${product.name}"? This cannot be undone.`
-                                                    )
-                                                    if (!confirmed) return
-                                                    try {
-                                                        await deleteBlinds({
-                                                            productId: product.id,
-                                                            userId: currentUserId,
-                                                        })
-                                                    } catch {
-                                                        alert("Failed to delete product. Please try again.")
-                                                    }
-                                                }}
-                                                className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                            >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                {isDeleting ? "Deleting…" : "Delete Product"}
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-
-                                {/* FOOTER (Price & Colors) */}
-                                <div className="mt-auto flex items-end justify-between pt-6">
-                                    <div className="flex flex-col">
-                                        <span className="text-[11px] font-medium text-muted-foreground">Price (sq.ft)</span>
-                                        <span className="text-lg font-bold text-foreground">
-                                            ₱{product.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </span>
+                                        {/* CLEAN ACTIONS MENU */}
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                                <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}`) }} className="cursor-pointer">
+                                                    <Eye className="mr-2 h-4 w-4" /> View Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}/edit`) }} className="cursor-pointer">
+                                                    <Edit3 className="mr-2 h-4 w-4" /> Edit Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    disabled={isDeleting}
+                                                    onClick={async () => {
+                                                        const confirmed = window.confirm(
+                                                            `Are you sure you want to delete "${product.name}"? This cannot be undone.`
+                                                        )
+                                                        if (!confirmed) return
+                                                        try {
+                                                            await deleteBlinds({
+                                                                productId: product.id,
+                                                                userId: currentUserId,
+                                                            })
+                                                            toast.success(`"${product.name}" deleted successfully.`)
+                                                        } catch (err: any) {
+                                                            if (err instanceof ApiError && err.status === 400) {
+                                                                // Business rule block — show exact backend reason
+                                                                toast.error(err.message)
+                                                            } else {
+                                                                // Unexpected failure (500, network, etc.)
+                                                                console.error('[delete product]', err)
+                                                                toast.error('Failed to delete product. Please try again.')
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    {isDeleting ? "Deleting…" : "Delete Product"}
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
 
-                                    <div className="flex items-center">
-                                        <div className="flex -space-x-2">
-                                            <TooltipProvider delayDuration={100}>
-                                                {product.colors?.slice(0, MAX_COLORS_DISPLAY).map((color, idx) => (
-                                                    <Tooltip key={idx}>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="relative h-8 w-8 rounded-full border-2 border-card ring-1 ring-border/50 overflow-hidden bg-muted shadow-sm transition-transform hover:z-10 hover:scale-110">
-                                                                <Image
-                                                                    src={color.imageUrl as string}
-                                                                    alt={color.name}
-                                                                    fill
-                                                                    className="object-cover"
-                                                                />
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent side="top" className="text-xs font-medium">
-                                                            {color.name}
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                ))}
-                                            </TooltipProvider>
+                                    {/* FOOTER (Price & Colors) */}
+                                    <div className="mt-auto flex items-end justify-between pt-6">
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-medium text-muted-foreground">Price (sq.ft)</span>
+                                            <span className="text-lg font-bold text-foreground">
+                                                ₱{product.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
 
-                                            {product.colors && product.colors.length > MAX_COLORS_DISPLAY && (
-                                                <div className="relative z-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-[10px] font-bold text-secondary-foreground ring-1 ring-border/50">
-                                                    +{product.colors.length - MAX_COLORS_DISPLAY}
-                                                </div>
-                                            )}
+                                        <div className="flex items-center">
+                                            <div className="flex -space-x-2">
+                                                <TooltipProvider delayDuration={100}>
+                                                    {product.colors?.slice(0, MAX_COLORS_DISPLAY).map((color, idx) => (
+                                                        <Tooltip key={idx}>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="relative h-8 w-8 rounded-full border-2 border-card ring-1 ring-border/50 overflow-hidden bg-muted shadow-sm transition-transform hover:z-10 hover:scale-110">
+                                                                    <Image
+                                                                        src={color.imageUrl as string}
+                                                                        alt={color.name}
+                                                                        fill
+                                                                        className="object-cover"
+                                                                    />
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top" className="text-xs font-medium">
+                                                                {color.name}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    ))}
+                                                </TooltipProvider>
+
+                                                {product.colors && product.colors.length > MAX_COLORS_DISPLAY && (
+                                                    <div className="relative z-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-[10px] font-bold text-secondary-foreground ring-1 ring-border/50">
+                                                        +{product.colors.length - MAX_COLORS_DISPLAY}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         )
                     })}
                 </div>

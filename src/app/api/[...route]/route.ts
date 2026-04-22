@@ -9,6 +9,8 @@ import orderRoute from "./routes/order-controller";
 import activityLogsRoute from "./routes/activity-logs-route";
 import notificationsRoute from "./routes/notification-route";
 import userRoute from "./routes/user-route";
+import compositionRoute from "./routes/composition-route";
+import { createOptionsRoute } from "./routes/product-options-route";
 
 const app = new Hono().basePath("/api/v1");
 
@@ -20,6 +22,11 @@ app.route("/orders", orderRoute);
 app.route("/activity-logs", activityLogsRoute);
 app.route("/notifications", notificationsRoute);
 app.route("/users", userRoute);
+app.route("/compositions", compositionRoute);
+app.route("/product-type", createOptionsRoute("product-type"));
+app.route("/fabric-widths", createOptionsRoute("fabric-widths"));
+app.route("/thickness", createOptionsRoute("thickness"));
+app.route("/characteristics", createOptionsRoute("characteristics"));
 
 
 // Export for Next.js (Edge/Node)

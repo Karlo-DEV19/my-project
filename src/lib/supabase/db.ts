@@ -14,6 +14,8 @@ import { admins } from "@/schema/admin/admins"
 import { employees } from "@/schema/employees/employees"
 import { employeesRelations } from "@/schema/employees/employees"
 import { otpCodes } from "@/schema/otp/otp-code"
+import { compositions } from "@/schema/compositions/compositions"
+import { productOptions } from "@/schema/product-options/product-options"
 
 // ─────────────────────────────────────────────────────────────
 // Postgres client
@@ -41,6 +43,10 @@ export const db = drizzle(client, {
 
     // OTP
     otpCodes,
+
+    // Lookup tables
+    compositions,
+    productOptions,
   },
 })
 

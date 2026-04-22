@@ -1,19 +1,34 @@
+/**
+ * One-shot script: runs the product_options migration directly.
+ * Usage: node scripts/run-migration.mjs
+ */
 import postgres from 'postgres';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import { config } from 'dotenv';
 
-const DATABASE_URL = 'postgresql://postgres.zhafnwjqkhhoorzpxvhs:YusXuAyKgM3KJeDC@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, '../.env.local') });
 
-const sql = postgres(DATABASE_URL, { max: 1 });
+const sql = postgres(process.env.DATABASE_URL, { ssl: 'require' });
+
+const migrationSQL = readFileSync(
+  resolve(__dirname, '../drizzle/migrations/0006_add_product_options_table.sql'),
+  'utf8'
+);
 
 try {
-  console.log('Adding target_role column to notifications...');
-  await sql`
-    ALTER TABLE "notifications"
-    ADD COLUMN IF NOT EXISTS "target_role" text NOT NULL DEFAULT 'customer'
-  `;
-  console.log('✅ Done! target_role column added (or already existed).');
+  console.log('▶ Running migration 0006...');
+  await sql.unsafe(migrationSQL);
+  console.log('✅ Migration applied: product_options table created.');
 } catch (err) {
-  console.error('❌ Migration failed:', err.message);
-  process.exit(1);
+  if (err.code === '42P07') {
+    console.log('ℹ️  Table already exists — skipping.');
+  } else {
+    console.error('❌ Migration failed:', err.message);
+    process.exit(1);
+  }
 } finally {
   await sql.end();
 }

@@ -19,7 +19,7 @@ const permits = [
   {
     id: 3,
     title: "Award & Certificate",
-    description: "",
+    description: "Certified for excellence and compliance.",
     image: "/permit/permit3.png",
   },
 ];
@@ -28,7 +28,6 @@ export default function PermitSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
 
-  // AUTO SLIDE (pause pag zoom)
   useEffect(() => {
     if (isZoomed) return;
 
@@ -51,64 +50,97 @@ export default function PermitSection() {
 
   return (
     <>
-      <section className="py-24 bg-background text-foreground">
+      <section className="py-28 bg-background">
         <div className="container mx-auto max-w-5xl px-4">
 
-          {/* IMAGE */}
+          {/* 🔥 PREMIUM HEADER */}
+          <div className="text-center mb-16">
+
+            <p className="text-xs md:text-sm tracking-[0.4em] uppercase text-muted-foreground mb-4">
+              Permits & Certifications
+            </p>
+
+            <h2 className="text-3xl md:text-5xl font-serif font-medium tracking-tight leading-tight">
+              Legally Registered & Certified
+            </h2>
+
+            <p className="mt-6 text-muted-foreground max-w-2xl mx-auto leading-relaxed text-sm md:text-base">
+              We operate with full legal compliance, ensuring every project is backed
+              by verified permits and trusted standards.
+            </p>
+
+          </div>
+
+          {/* 🔥 HERO CARD */}
           <div
             onClick={() => setIsZoomed(true)}
-            className="relative w-full cursor-zoom-in overflow-hidden rounded-xl bg-muted"
+            className="relative w-full cursor-zoom-in overflow-hidden rounded-xl"
             style={{ aspectRatio: "16/9" }}
           >
+            {/* IMAGE */}
             <Image
               src={item.image}
-              alt=""
+              alt={item.title}
               fill
-              className="object-contain p-6 hover:scale-105 transition duration-500"
+              className="object-cover"
             />
+
+            {/* GRADIENT */}
+            <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
+            {/* TEXT BOTTOM LEFT */}
+            <div className="absolute bottom-6 left-6 z-10 text-white max-w-md">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/60">
+                Official Document
+              </p>
+
+              <h3 className="text-xl md:text-2xl font-semibold mt-1">
+                {item.title}
+              </h3>
+
+              {item.description && (
+                <p className="text-sm text-white/80 mt-1">
+                  {item.description}
+                </p>
+              )}
+            </div>
           </div>
+
         </div>
       </section>
 
-      {/* 🔥 FULL VIEW MODAL */}
+      {/* 🔥 MODAL */}
       {isZoomed && (
         <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
 
-          {/* CLOSE */}
           <button
             onClick={() => setIsZoomed(false)}
-            className="absolute top-6 right-6 text-white text-2xl"
+            className="absolute top-6 right-6 text-white text-3xl"
           >
             ✕
           </button>
 
-          {/* LEFT */}
           <button
             onClick={prev}
-            className="absolute left-4 text-white text-3xl px-3"
+            className="absolute left-4 text-white text-4xl px-3"
           >
             ‹
           </button>
 
-          {/* RIGHT */}
           <button
             onClick={next}
-            className="absolute right-4 text-white text-3xl px-3"
+            className="absolute right-4 text-white text-4xl px-3"
           >
             ›
           </button>
 
-          {/* IMAGE */}
           <div className="relative w-[90%] h-[85%] overflow-auto">
-
-            {/* 👉 REAL ZOOM USING CSS SCALE */}
             <div className="w-full h-full flex items-center justify-center">
               <img
                 src={item.image}
-                className="max-w-full max-h-full object-contain cursor-zoom-in hover:scale-150 transition duration-300"
+                alt={item.title}
+                className="max-w-full max-h-full object-contain hover:scale-150 transition duration-300"
               />
             </div>
-
           </div>
         </div>
       )}

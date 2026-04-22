@@ -1,4 +1,4 @@
-import { error } from 'console';
+
 import { z } from 'zod';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -38,7 +38,13 @@ export const PRODUCT_COLLECTIONS = ['Shop Only', 'New Arrival', 'Best Seller'] a
 
 export const productSchema = z.object({
     productCode: z.string().min(1, 'Product code required'),
-    name: z.string().min(2, 'Minimum 2 characters'),
+    name: z
+        .string()
+        .min(1, 'Product name is required')
+        .transform((val) => val.trim())
+        .refine((val) => val.length >= 2, 'Minimum 2 characters')
+        .refine((val) => val.length > 0, 'Product name cannot be only whitespace'),
+    slug: z.string().optional(),
     type: z.string().min(1, 'Select a type'),
     description: z.string().min(10, 'Minimum 10 characters'),
     unitPrice: z.coerce.number().positive('Must be a positive number'),
@@ -62,19 +68,12 @@ export const productSchema = z.object({
 
 export type FormValues = z.infer<typeof productSchema>;
 
-export const PRODUCT_TYPES = [
-    'Combi Shades',
-    'Triple Shades (Open Roman)',
-    'Rollscreen Blackout',
-    'Sunscreen',
-    'Roller Blinds',
-    'Roman Blinds',
-    'Venetian Blinds',
-] as const;
+// Product types are now managed dynamically via useDynamicOptions('product-type')
 
 export const DEFAULT_VALUES: Partial<FormValues> = {
     productCode: '',
     name: '',
+    slug: '',
     type: '',
     description: '',
     unitPrice: 0,
@@ -87,5 +86,16 @@ export const DEFAULT_VALUES: Partial<FormValues> = {
     availableColors: [{ name: '', file: undefined as unknown as File | string }],
     collection: 'Shop Only',
     stock: 0,
-
 };
+
+/** Converts a product name to a URL-friendly kebab-case slug.
+ * Example: "Cherry Blossom" → "cherry-blossom" */
+export function toSlug(name: string): string {
+    return name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')   // strip special chars
+        .replace(/\s+/g, '-')            // spaces → hyphens
+        .replace(/-+/g, '-')             // collapse multiple hyphens
+        .replace(/^-|-$/g, '');          // strip leading/trailing hyphens
+}

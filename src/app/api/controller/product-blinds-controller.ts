@@ -297,7 +297,9 @@ export const getAllBlinds = async (c: Context) => {
             );
         }
 
-        const whereCondition = filters.length > 0 ? and(...filters) : undefined;
+        // Always exclude soft-deleted products
+        filters.push(eq(blindsProducts.isDeleted, false));
+        const whereCondition = and(...filters);
 
         const [totalResult] = await db
             .select({ count: sql<number>`count(*)` })
@@ -392,7 +394,10 @@ export const getDetailsBlindByProductId = async (ctx: Context) => {
         }
 
         const product = await db.query.blindsProducts.findFirst({
-            where: eq(blindsProducts.id, productId),
+            where: and(
+                eq(blindsProducts.id, productId),
+                eq(blindsProducts.isDeleted, false)
+            ),
             with: {
                 images: true,
                 colors: true,
@@ -436,7 +441,8 @@ export const getAllBestSeller = async (c: Context) => {
 
         const whereCondition = and(
             eq(blindsProducts.status, "active"),
-            eq(blindsProducts.collection, "Best Seller")
+            eq(blindsProducts.collection, "Best Seller"),
+            eq(blindsProducts.isDeleted, false)
         );
 
         const [totalResult] = await db
@@ -495,7 +501,8 @@ export const getAllNewArrival = async (c: Context) => {
 
         const whereCondition = and(
             eq(blindsProducts.status, "active"),
-            eq(blindsProducts.collection, "New Arrival")
+            eq(blindsProducts.collection, "New Arrival"),
+            eq(blindsProducts.isDeleted, false)
         );
 
         const [totalResult] = await db
@@ -589,36 +596,35 @@ export const deleteBlindsById = async (ctx: Context) => {
     try {
         const productId = ctx.req.param("productId");
 
+        console.log("[deleteBlindsById] SOFT DELETE HIT — productId:", productId);
+
         if (!productId) {
             return ctx.json({ success: false, message: "Missing product ID" }, 400);
+        }
+
+        // Guard: reject non-UUID values before hitting the DB
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(productId)) {
+            return ctx.json({ success: false, message: "Invalid product ID format" }, 400);
         }
 
         const [existing] = await db
             .select({ id: blindsProducts.id, productCode: blindsProducts.productCode, name: blindsProducts.name })
             .from(blindsProducts)
-            .where(eq(blindsProducts.id, productId))
+            .where(and(eq(blindsProducts.id, productId), eq(blindsProducts.isDeleted, false)))
             .limit(1);
 
         if (!existing) {
             return ctx.json({ success: false, message: "Product not found" }, 404);
         }
 
-        await db.transaction(async (tx) => {
-            await tx
-                .delete(blindsProductImages)
-                .where(eq(blindsProductImages.productId, productId));
+        // Soft delete — mark as deleted without touching order_items FK
+        await db
+            .update(blindsProducts)
+            .set({ isDeleted: true, updatedAt: new Date() })
+            .where(eq(blindsProducts.id, productId));
 
-            await tx
-                .delete(blindsProductColors)
-                .where(eq(blindsProductColors.productId, productId));
-
-            await tx
-                .delete(blindsProducts)
-                .where(eq(blindsProducts.id, productId));
-        });
-
-        // Optional activity log — userId passed as query param from the client.
-        // Silently skipped if missing; deletion must never fail because of logging.
+        // Activity log — silently skipped if userId missing
         const userId = ctx.req.query("userId");
         if (userId) {
             await createActivityLog(db, {
@@ -626,7 +632,7 @@ export const deleteBlindsById = async (ctx: Context) => {
                 action: "DELETE" as ActivityActionType,
                 module: "BLINDS_PRODUCT" as ActivityModuleType,
                 referenceId: productId,
-                description: `Deleted product: ${existing.name} (${existing.productCode})`,
+                description: `Soft-deleted product: ${existing.name} (${existing.productCode})`,
             });
         }
 
@@ -635,7 +641,7 @@ export const deleteBlindsById = async (ctx: Context) => {
             message: "Product deleted successfully",
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("[deleteBlindsById]", error);
         return ctx.json({ success: false, message: "Internal server error" }, 500);
     }

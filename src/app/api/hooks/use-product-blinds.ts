@@ -245,6 +245,7 @@ export function useDeleteBlinds() {
         { productId: string; userId?: string }
     >({
         mutationFn: async ({ productId, userId }) => {
+            console.log("[useDeleteBlinds] Deleting product ID:", productId, "userId:", userId);
             const params = userId ? `?userId=${encodeURIComponent(userId)}` : "";
             const { data } = await axiosApiClient.delete(`/product-blinds/${productId}${params}`);
             return data;
@@ -252,7 +253,7 @@ export function useDeleteBlinds() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["blindsProducts"] });
         },
-        onError: (error) => {
+        onError: (error: any) => {
             console.error("[useDeleteBlinds] Error:", error);
         },
     });

@@ -13,7 +13,7 @@ export async function sendOtpEmail(
         const isAdmin = role === "admin"
 
         const title = isAdmin
-            ? "Staff Portal Access"
+            ? "Admin Portal Access"
             : "Account Security Verification"
 
         const subject = isAdmin

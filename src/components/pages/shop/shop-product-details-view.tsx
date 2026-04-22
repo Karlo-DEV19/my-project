@@ -63,7 +63,7 @@ const STANDARD_SIZES = [
 
 const MOUNTING_OPTIONS = ['Inside Mount', 'Outside Mount'] as const;
 const CONTROL_OPTIONS = ['Right Hand', 'Left Hand'] as const;
-const CONTROL_TYPE_OPTIONS = ['Cordless', 'Corded', 'Motorized'] as const;
+const CONTROL_TYPE_OPTIONS = ['Yarn', 'Beads',] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

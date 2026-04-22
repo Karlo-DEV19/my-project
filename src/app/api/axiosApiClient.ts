@@ -5,6 +5,22 @@ import { getApiErrorMessage } from '@/lib/utils';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 /**
+ * Structured API error — extends Error so existing catch(err).message code
+ * still works, while also carrying the HTTP status and raw response data.
+ */
+export class ApiError extends Error {
+    status: number;
+    data: any;
+
+    constructor(message: string, status: number, data?: any) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.data = data;
+    }
+}
+
+/**
  * Create a reusable Axios instance
  */
 export const axiosApiClient: AxiosInstance = axios.create({
@@ -17,16 +33,17 @@ export const axiosApiClient: AxiosInstance = axios.create({
 
 /**
  * Global Response Interceptor
- * This automatically extracts the error message from the backend response
- * so that we don't have to catch it manually in every hook.
+ * Converts Axios errors into ApiError so callers can inspect status + data
+ * while remaining fully backward-compatible with existing `err.message` usage.
  */
 axiosApiClient.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
         const message = getApiErrorMessage(error);
-        // Throw a clean error with the backend message
-        return Promise.reject(new Error(message));
+        const status  = error.response?.status ?? 0;
+        const data    = error.response?.data;
+        return Promise.reject(new ApiError(message, status, data));
     }
 );
 
-export type { AxiosRequestConfig, AxiosResponse };
+export type { AxiosRequestConfig, AxiosResponse };

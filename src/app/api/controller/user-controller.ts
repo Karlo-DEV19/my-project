@@ -253,3 +253,126 @@ export async function loginUser(c: Context): Promise<Response> {
     return c.json({ success: false, message: 'Login failed.' }, 500);
   }
 }
+
+// ─── DELETE /api/v1/users/:id ─────────────────────────────────────────────────
+
+export async function deleteUser(c: Context): Promise<Response> {
+  try {
+    const id = c.req.param('id');
+
+    if (!id) {
+      return c.json({ success: false, message: 'User ID is required.' }, 400);
+    }
+
+    const { error } = await supabaseAdmin
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[deleteUser]', error.message);
+      return c.json({ success: false, message: error.message }, 500);
+    }
+
+    return c.json({ success: true, message: 'User deleted successfully.' });
+  } catch (err) {
+    console.error('[deleteUser] unexpected error:', err);
+    return c.json({ success: false, message: 'Failed to delete user.' }, 500);
+  }
+}
+
+// ─── POST /api/v1/users/verify-otp ───────────────────────────────────────────
+
+export async function verifyUserOtp(c: Context): Promise<Response> {
+  try {
+    const body = await c.req.json();
+    const { email, code } = body as { email?: string; code?: string };
+
+    if (!email || !code) {
+      return c.json({ success: false, message: 'Email and code are required.' }, 400);
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const now = new Date();
+
+    const record = await db
+      .select()
+      .from(otpCodes)
+      .where(
+        and(
+          eq(otpCodes.email, normalizedEmail),
+          eq(otpCodes.code, code.trim()),
+          eq(otpCodes.isUsed, false),
+          gt(otpCodes.expiresAt, now)
+        )
+      )
+      .limit(1);
+
+    if (!record.length) {
+      return c.json({ success: false, message: 'Invalid or expired verification code.' }, 400);
+    }
+
+    // Mark OTP as used
+    await db
+      .update(otpCodes)
+      .set({ isUsed: true })
+      .where(eq(otpCodes.id, record[0].id));
+
+    // Fetch the user record to return
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email, created_at')
+      .eq('email', normalizedEmail)
+      .single();
+
+    if (error || !user) {
+      return c.json({ success: false, message: 'User not found.' }, 404);
+    }
+
+    return c.json({ success: true, data: user });
+  } catch (err) {
+    console.error('[verifyUserOtp] unexpected error:', err);
+    return c.json({ success: false, message: 'OTP verification failed.' }, 500);
+  }
+}
+
+// ─── PATCH /api/v1/users/profile ─────────────────────────────────────────────
+
+export async function updateUserProfile(c: Context): Promise<Response> {
+  try {
+    const body = await c.req.json();
+    const { email, name } = body as { email?: string; name?: string };
+
+    if (!email || !name) {
+      return c.json({ success: false, message: 'Email and name are required.' }, 400);
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      return c.json({ success: false, message: 'Name cannot be empty.' }, 400);
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('users')
+      .update({ name: trimmedName })
+      .eq('email', normalizedEmail)
+      .select('id, name, email, created_at')
+      .single();
+
+    if (error) {
+      console.error('[updateUserProfile]', error.message);
+      return c.json({ success: false, message: error.message }, 500);
+    }
+
+    if (!updated) {
+      return c.json({ success: false, message: 'User not found.' }, 404);
+    }
+
+    return c.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('[updateUserProfile] unexpected error:', err);
+    return c.json({ success: false, message: 'Failed to update profile.' }, 500);
+  }
+}

@@ -36,6 +36,27 @@
       "when": 1776789052812,
       "tag": "0004_add_target_role_to_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776866149405,
+      "tag": "0005_add_compositions_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776868431723,
+      "tag": "0006_add_product_options_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776875693633,
+      "tag": "0007_wealthy_imperial_guard",
+      "breakpoints": true
     }
   ]
 }

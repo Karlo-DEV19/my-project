@@ -295,6 +295,8 @@ function useComboboxAnchor() {
 // ---------------------------------------------------------------------------
 
 export interface SearchableComboboxOption {
+  /** Optional — required to enable delete functionality */
+  id?: string
   label: string
   value: string
 }
@@ -306,6 +308,17 @@ export interface SearchableComboboxProps {
   value?: string
   /** Called whenever the user picks or creates an option */
   onChange?: (value: string) => void
+  /**
+   * Called when the user clicks "Add '…'". Receives the raw label string.
+   * The parent is responsible for the API call + updating the options list.
+   * If omitted the component falls back to local-only creation.
+   */
+  onAdd?: (label: string) => Promise<void> | void
+  /**
+   * Called when the user clicks the × button on an option.
+   * Receives the option's `id`. Only rendered when `id` is present.
+   */
+  onDelete?: (id: string) => Promise<void> | void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -325,10 +338,14 @@ function SearchableCombobox({
   options: initialOptions,
   value: controlledValue,
   onChange,
+  onAdd,
+  onDelete,
   placeholder = "Select or type...",
   disabled = false,
   className,
 }: SearchableComboboxProps) {
+  // Track which ids are mid-delete so we can block double-clicks
+  const [deletingIds, setDeletingIds] = React.useState<Set<string>>(new Set())
   // Local options state — allows dynamic additions
   const [options, setOptions] = React.useState<SearchableComboboxOption[]>(initialOptions)
 
@@ -395,13 +412,13 @@ function SearchableCombobox({
     setSearch("")
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     const label = trimmedSearch
     if (!label) return
 
     const value = toKebabCase(label)
 
-    // Guard: no duplicates (case-insensitive on both label and kebab value)
+    // Guard: no duplicates
     const duplicate = options.some(
       (o) =>
         o.label.toLowerCase() === label.toLowerCase() ||
@@ -409,14 +426,34 @@ function SearchableCombobox({
     )
     if (duplicate) return
 
-    const newOption: SearchableComboboxOption = { label, value }
+    if (onAdd) {
+      // Parent owns the API call + state — just close the input
+      setOpen(false)
+      setSearch("")
+      await onAdd(label)
+    } else {
+      // Fallback: local-only creation (no backend)
+      const newOption: SearchableComboboxOption = { label, value }
+      setOptions((prev) => [...prev, newOption])
+      handleSelect(newOption)
+    }
+  }
 
-    // Add to local options state
-    setOptions((prev) => [...prev, newOption])
+  async function handleDeleteOption(e: React.MouseEvent, id: string) {
+    e.stopPropagation()
+    e.preventDefault()
+    if (deletingIds.has(id) || !onDelete) return
 
-    // TODO: save to DB
-
-    handleSelect(newOption)
+    setDeletingIds((prev) => new Set(prev).add(id))
+    try {
+      await onDelete(id)
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -493,21 +530,48 @@ function SearchableCombobox({
             ) : (
               filtered.map((option) => {
                 const isSelected = option.value === selectedValue
+                const isDeleting = !!option.id && deletingIds.has(option.id)
+                const canDelete = !!option.id && !!onDelete
                 return (
                   <li
                     key={option.value}
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleSelect(option)}
+                    onClick={() => !isDeleting && handleSelect(option)}
                     className={cn(
-                      "relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm",
+                      "group relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pl-2 text-sm",
                       "outline-hidden select-none transition-colors",
+                      // reserve right padding: wider when deletable to fit the X
+                      canDelete ? "pr-8" : "pr-8",
                       isSelected
                         ? "bg-accent text-accent-foreground font-medium"
-                        : "hover:bg-accent hover:text-accent-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground",
+                      isDeleting && "opacity-50 pointer-events-none"
                     )}
                   >
-                    {option.label}
+                    {/* Label — grows to fill available space */}
+                    <span className="flex-1 truncate">{option.label}</span>
+
+                    {/* Delete button — visible on hover, hidden when item is selected-checkmark slot */}
+                    {canDelete && !isSelected && (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => handleDeleteOption(e, option.id!)}
+                        disabled={isDeleting}
+                        className={cn(
+                          "absolute right-1.5 flex size-5 items-center justify-center rounded",
+                          "opacity-0 group-hover:opacity-100 transition-opacity",
+                          "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+                          "disabled:pointer-events-none"
+                        )}
+                        aria-label={`Remove ${option.label}`}
+                        tabIndex={-1}
+                      >
+                        <XIcon className="size-3" />
+                      </button>
+                    )}
+
+                    {/* Selected checkmark */}
                     {isSelected && (
                       <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
                         <CheckIcon className="size-4" />

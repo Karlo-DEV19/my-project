@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import {
     AlertDialog,
@@ -23,27 +24,32 @@ interface LogoutDialogProps {
 
 export const LogoutDialog = ({ children }: LogoutDialogProps) => {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     // ✅ OPTIMIZATION: useCallback prevents the function from being recreated on every render
     const handleLogout = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
-        // Prevent the dialog from closing instantly so we can show the loading state
         e.preventDefault();
 
         if (isLoggingOut) return;
         setIsLoggingOut(true);
 
         try {
-            // 1. Call your database/auth logout function here
             await signOut();
 
-            // 2. Redirect the user back to the login page
+            // Clear all React Query cache so auth-gated UI (notifications, user data) vanishes immediately
+            queryClient.clear();
+
+            // Revalidate Server Components with the now-logged-out session
+            router.refresh();
+
+            // Navigate to login
             router.push('/login');
         } catch (error) {
             console.error('Logout failed:', error);
-            setIsLoggingOut(false); // Only stop loading if it fails
+            setIsLoggingOut(false);
         }
-    }, [router, isLoggingOut]);
+    }, [router, queryClient, isLoggingOut]);
 
     return (
         <AlertDialog>

@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -34,8 +34,9 @@ import {
 import { ColorRow } from './color-row';
 import { PricePreviewTable } from './price-preview-table';
 import { MainDropZone } from './product-main-drop-zone';
-import { DEFAULT_VALUES, FormValues, PRODUCT_COLLECTIONS, PRODUCT_TYPES, productSchema } from './zod-product-schema';
+import { DEFAULT_VALUES, FormValues, PRODUCT_COLLECTIONS, productSchema, toSlug } from './zod-product-schema';
 import { useCreateNewBlinds } from '@/app/api/hooks/use-product-blinds';
+import { useDynamicOptions } from '@/app/api/hooks/use-dynamic-options';
 
 export default function CreateNewProductPage() {
     const form = useForm<FormValues>({
@@ -44,7 +45,10 @@ export default function CreateNewProductPage() {
         mode: 'onBlur',
     });
 
-    const { control, handleSubmit, reset, formState: { errors } } = form;
+    const { control, handleSubmit, reset, setValue, formState: { errors } } = form;
+
+    // Live-watch the name field to derive a slug preview
+    const watchedName = useWatch({ control, name: 'name' });
     const { fields, append, remove } = useFieldArray({ control, name: 'availableColors' });
 
     // Custom API Hook
@@ -53,6 +57,13 @@ export default function CreateNewProductPage() {
     // Local state to manage file uploading status before the API call
     const [isUploading, setIsUploading] = useState(false);
     const isPending = isUploading || isApiPending;
+
+    // ── Dynamic dropdown options ──────────────────────────────
+    const productType   = useDynamicOptions('product-type');
+    const composition   = useDynamicOptions('compositions');
+    const fabricWidth   = useDynamicOptions('fabric-widths');
+    const thickness     = useDynamicOptions('thickness');
+    const characteristic = useDynamicOptions('characteristics');
 
     const onSubmit = async (data: FormValues) => {
         try {
@@ -248,10 +259,34 @@ export default function CreateNewProductPage() {
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-1 gap-4 pt-0 sm:grid-cols-2">
                                     <FormField control={control} name="name" render={({ field }) => (
-                                        <FormItem>
+                                        <FormItem className="sm:col-span-2">
                                             <FormLabel>Product Name <span className="text-destructive">*</span></FormLabel>
-                                            <FormControl><Input placeholder="e.g. Cherry Blossom" {...field} /></FormControl>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="e.g. Cherry Blossom"
+                                                    {...field}
+                                                    onChange={(e) => {
+                                                        field.onChange(e.target.value);
+                                                        // Live-update the slug as the user types
+                                                        setValue('slug', toSlug(e.target.value), { shouldValidate: false });
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        // Trim whitespace on blur and re-sync slug
+                                                        const trimmed = e.target.value.trim();
+                                                        field.onChange(trimmed);
+                                                        field.onBlur();
+                                                        setValue('slug', toSlug(trimmed), { shouldValidate: false });
+                                                    }}
+                                                />
+                                            </FormControl>
                                             <FormMessage />
+                                            {/* Slug preview */}
+                                            {watchedName?.trim() && (
+                                                <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/50 px-3 py-1.5">
+                                                    <span className="select-none text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Slug</span>
+                                                    <span className="text-[12px] font-mono text-foreground/80">{toSlug(watchedName)}</span>
+                                                </div>
+                                            )}
                                         </FormItem>
                                     )} />
 
@@ -268,10 +303,20 @@ export default function CreateNewProductPage() {
                                             <FormLabel>Product Type <span className="text-destructive">*</span></FormLabel>
                                             <FormControl>
                                                 <SearchableCombobox
-                                                    options={PRODUCT_TYPES.map((t) => ({ label: t, value: t }))}
+                                                    options={productType.options}
                                                     value={field.value}
                                                     onChange={field.onChange}
-                                                    placeholder="Select a type…"
+                                                    placeholder={productType.isLoading ? 'Loading…' : 'Select or add a type…'}
+                                                    disabled={productType.isLoading}
+                                                    onAdd={async (label) => {
+                                                        const created = await productType.addOption(label);
+                                                        field.onChange(created?.value ?? label.toLowerCase().replace(/\s+/g, '-'));
+                                                    }}
+                                                    onDelete={async (id) => {
+                                                        const deleted = productType.options.find((o) => o.id === id);
+                                                        if (deleted && field.value === deleted.value) field.onChange('');
+                                                        await productType.deleteOption(id);
+                                                    }}
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -391,44 +436,46 @@ export default function CreateNewProductPage() {
                                             <FormLabel>Composition <span className="text-destructive">*</span></FormLabel>
                                             <FormControl>
                                                 <SearchableCombobox
-                                                    options={[
-                                                        { label: 'POLYESTER 100%', value: 'POLYESTER 100%' },
-                                                        { label: 'POLYESTER 70% / LINEN 30%', value: 'POLYESTER 70% / LINEN 30%' },
-                                                        { label: 'POLYESTER 80% / COTTON 20%', value: 'POLYESTER 80% / COTTON 20%' },
-                                                        { label: 'PVC 100%', value: 'PVC 100%' },
-                                                        { label: 'FIBERGLASS 100%', value: 'FIBERGLASS 100%' },
-                                                        { label: 'COTTON 100%', value: 'COTTON 100%' },
-                                                    ]}
+                                                    options={composition.options}
                                                     value={field.value}
                                                     onChange={field.onChange}
-                                                    placeholder="e.g. POLYESTER 100%"
+                                                    placeholder={composition.isLoading ? 'Loading…' : 'e.g. POLYESTER 100%'}
+                                                    disabled={composition.isLoading}
+                                                    onAdd={async (label) => {
+                                                        const created = await composition.addOption(label);
+                                                        field.onChange(created?.value ?? label.toLowerCase().replace(/\s+/g, '-'));
+                                                    }}
+                                                    onDelete={async (id) => {
+                                                        const deleted = composition.options.find((o) => o.id === id);
+                                                        if (deleted && field.value === deleted.value) field.onChange('');
+                                                        await composition.deleteOption(id);
+                                                    }}
                                                 />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />
 
+
                                     <FormField control={control} name="fabricWidth" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Fabric Width <span className="text-destructive">*</span></FormLabel>
                                             <FormControl>
                                                 <SearchableCombobox
-                                                    options={[
-                                                        { label: '100cm', value: '100cm' },
-                                                        { label: '120cm', value: '120cm' },
-                                                        { label: '140cm', value: '140cm' },
-                                                        { label: '150cm', value: '150cm' },
-                                                        { label: '160cm', value: '160cm' },
-                                                        { label: '180cm', value: '180cm' },
-                                                        { label: '200cm', value: '200cm' },
-                                                        { label: '240cm', value: '240cm' },
-                                                        { label: '260cm', value: '260cm' },
-                                                        { label: '280cm', value: '280cm' },
-                                                        { label: '300cm', value: '300cm' },
-                                                    ]}
+                                                    options={fabricWidth.options}
                                                     value={field.value}
                                                     onChange={field.onChange}
-                                                    placeholder="e.g. 280cm"
+                                                    placeholder={fabricWidth.isLoading ? 'Loading…' : 'e.g. 280cm'}
+                                                    disabled={fabricWidth.isLoading}
+                                                    onAdd={async (label) => {
+                                                        const created = await fabricWidth.addOption(label);
+                                                        field.onChange(created?.value ?? label.toLowerCase().replace(/\s+/g, '-'));
+                                                    }}
+                                                    onDelete={async (id) => {
+                                                        const deleted = fabricWidth.options.find((o) => o.id === id);
+                                                        if (deleted && field.value === deleted.value) field.onChange('');
+                                                        await fabricWidth.deleteOption(id);
+                                                    }}
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -440,18 +487,20 @@ export default function CreateNewProductPage() {
                                             <FormLabel>Thickness <span className="text-destructive">*</span></FormLabel>
                                             <FormControl>
                                                 <SearchableCombobox
-                                                    options={[
-                                                        { label: '0.35mm', value: '0.35mm' },
-                                                        { label: '0.45mm', value: '0.45mm' },
-                                                        { label: '0.54mm', value: '0.54mm' },
-                                                        { label: '0.60mm', value: '0.60mm' },
-                                                        { label: '0.80mm', value: '0.80mm' },
-                                                        { label: '1.00mm', value: '1.00mm' },
-                                                        { label: '1.20mm', value: '1.20mm' },
-                                                    ]}
+                                                    options={thickness.options}
                                                     value={field.value}
                                                     onChange={field.onChange}
-                                                    placeholder="e.g. 0.54mm"
+                                                    placeholder={thickness.isLoading ? 'Loading…' : 'e.g. 0.54mm'}
+                                                    disabled={thickness.isLoading}
+                                                    onAdd={async (label) => {
+                                                        const created = await thickness.addOption(label);
+                                                        field.onChange(created?.value ?? label.toLowerCase().replace(/\s+/g, '-'));
+                                                    }}
+                                                    onDelete={async (id) => {
+                                                        const deleted = thickness.options.find((o) => o.id === id);
+                                                        if (deleted && field.value === deleted.value) field.onChange('');
+                                                        await thickness.deleteOption(id);
+                                                    }}
                                                 />
                                             </FormControl>
                                             <FormMessage />
@@ -463,19 +512,20 @@ export default function CreateNewProductPage() {
                                             <FormLabel>Characteristic</FormLabel>
                                             <FormControl>
                                                 <SearchableCombobox
-                                                    options={[
-                                                        { label: 'Woodlook', value: 'Woodlook' },
-                                                        { label: 'Fireproof', value: 'Fireproof' },
-                                                        { label: 'Waterproof', value: 'Waterproof' },
-                                                        { label: 'Blackout', value: 'Blackout' },
-                                                        { label: 'Semi-Blackout', value: 'Semi-Blackout' },
-                                                        { label: 'Sunscreen', value: 'Sunscreen' },
-                                                        { label: 'Anti-UV', value: 'Anti-UV' },
-                                                        { label: 'Translucent', value: 'Translucent' },
-                                                    ]}
+                                                    options={characteristic.options}
                                                     value={field.value ?? ''}
                                                     onChange={field.onChange}
-                                                    placeholder="e.g. Woodlook, Fireproof…"
+                                                    placeholder={characteristic.isLoading ? 'Loading…' : 'e.g. Woodlook, Fireproof…'}
+                                                    disabled={characteristic.isLoading}
+                                                    onAdd={async (label) => {
+                                                        const created = await characteristic.addOption(label);
+                                                        field.onChange(created?.value ?? label.toLowerCase().replace(/\s+/g, '-'));
+                                                    }}
+                                                    onDelete={async (id) => {
+                                                        const deleted = characteristic.options.find((o) => o.id === id);
+                                                        if (deleted && field.value === deleted.value) field.onChange('');
+                                                        await characteristic.deleteOption(id);
+                                                    }}
                                                 />
                                             </FormControl>
                                             <FormMessage />

@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 
-const ARIMA_API_URL = 'http://127.0.0.1:8000/forecast';
-
 export async function GET() {
+  const arimaUrl = process.env.ARIMA_API_URL;
+
+  if (!arimaUrl) {
+    return NextResponse.json(
+      { error: 'ARIMA_API_URL is not configured.' },
+      { status: 503 }
+    );
+  }
+
   try {
-    const res = await fetch(ARIMA_API_URL, {
+    const res = await fetch(`${arimaUrl}/forecast`, {
       // No caching — always get a fresh forecast
       cache: 'no-store',
     });
@@ -20,7 +27,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
-      { error: 'Forecast service is unavailable. Make sure the ARIMA server is running on port 8000.' },
+      { error: 'Forecast service is unavailable.' },
       { status: 503 }
     );
   }

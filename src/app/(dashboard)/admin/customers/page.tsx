@@ -231,12 +231,12 @@ function CustomerDetailsModal({
                           {o.trackingNumber}
                         </TableCell>
                         <TableCell className="px-4 py-2.5">
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground capitalize">
+                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground">
                             {o.status}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-2.5">
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground capitalize">
+                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground">
                             {o.paymentStatus}
                           </span>
                         </TableCell>
@@ -282,7 +282,7 @@ function CustomerDetailsModal({
                             {p.paymentType}
                           </TableCell>
                           <TableCell className="px-4 py-2.5">
-                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground capitalize">
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground">
                               {p.status}
                             </span>
                           </TableCell>

@@ -45,7 +45,7 @@ const OurSystemWorks = () => {
                     <h2 className="text-3xl md:text-4xl font-serif tracking-wide mb-4">
                         Our System Works
                     </h2>
-                    <div className="w-16 h-[1px] bg-foreground/20 mb-6" />
+                    <div className="w-16 h-px bg-foreground/20 mb-6" />
                     <p className="text-base md:text-lg text-muted-foreground max-w-2xl leading-relaxed">
                         A simple, guided process from first measurement to final installation—
                         designed to make upgrading your blinds effortless.
@@ -77,7 +77,7 @@ const OurSystemWorks = () => {
                             </p>
 
                             {/* Divider line / accent */}
-                            <div className="mt-6 h-[1px] w-10 bg-foreground/30 group-hover:w-16 group-hover:bg-primary transition-all duration-300" />
+                            <div className="mt-6 h-px w-10 bg-foreground/30 group-hover:w-16 group-hover:bg-primary transition-all duration-300" />
                         </div>
                     ))}
                 </div>

@@ -82,7 +82,7 @@ const OurCustomerSays = () => {
                     <h2 className="text-3xl md:text-4xl font-serif tracking-wide mb-4">
                         Our Customer Says
                     </h2>
-                    <div className="w-16 h-[1px] bg-foreground/20 mb-8 md:mb-0"></div>
+                    <div className="w-16 h-px bg-foreground/20 mb-8 md:mb-0"></div>
 
                     {/* Custom Navigation Arrows (Desktop) - Positioned absolutely to top right for balance */}
                     <div className="hidden md:flex items-center gap-3 absolute right-0 top-0">

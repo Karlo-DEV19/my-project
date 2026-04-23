@@ -84,7 +84,9 @@ export default function PermitSection() {
               src={item.image}
               alt={item.title}
               fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 60vw"
               className="object-cover"
+              priority
             />
 
             {/* GRADIENT */}

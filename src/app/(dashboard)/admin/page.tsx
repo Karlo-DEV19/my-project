@@ -50,10 +50,18 @@ const AdminDashboardPage = () => {
 
   useEffect(() => {
     async function loadForecast() {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000); // 10 s max
+
       try {
-        const res = await fetch('/api/forecast');
-        if (!res.ok) throw new Error(`Status ${res.status}`);
+        console.log('[forecast] Fetching /api/forecast ...');
+        const res = await fetch('/api/forecast', { signal: controller.signal });
+        clearTimeout(timeout);
+        console.log('[forecast] Response status:', res.status);
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
+        console.log('[forecast] Payload:', json);
 
         if (json.error) throw new Error(json.error);
 
@@ -103,7 +111,12 @@ const AdminDashboardPage = () => {
           setForecastInsight({ label, lastHistorical, forecasts, averageForecast, pctChange });
         }
       } catch (err: unknown) {
-        setForecastError(err instanceof Error ? err.message : 'Unknown error');
+        clearTimeout(timeout);
+        const msg = err instanceof Error
+          ? (err.name === 'AbortError' ? 'Request timed out (10 s)' : err.message)
+          : 'Unknown error';
+        console.error('[forecast] Error:', msg);
+        setForecastError(msg);
       } finally {
         setForecastLoading(false);
       }

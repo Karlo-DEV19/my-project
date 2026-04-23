@@ -146,15 +146,26 @@ export default function LocationPicker({
     // ── Check geolocation support ─────────────────────────────
     useEffect(() => {
         if (typeof window === "undefined") return
-        const supported = !!navigator.geolocation && window.isSecureContext
+
+        // Only check for navigator.geolocation — do NOT gate on isSecureContext here.
+        // isSecureContext can return false on first load in some production environments
+        // even when the site is on HTTPS. We check it at call time instead.
+        const supported = !!navigator.geolocation
+        console.log('[geolocation] navigator.geolocation supported:', supported)
+        console.log('[geolocation] window.isSecureContext:', window.isSecureContext)
+        console.log('[geolocation] location.protocol:', window.location.protocol)
         setGeolocationSupported(supported)
 
         if (supported && navigator.permissions) {
             navigator.permissions
                 .query({ name: "geolocation" })
                 .then((perm) => {
+                    console.log('[geolocation] permission state on mount:', perm.state)
                     setPermissionDenied(perm.state === "denied")
-                    perm.onchange = () => setPermissionDenied(perm.state === "denied")
+                    perm.onchange = () => {
+                        console.log('[geolocation] permission changed:', perm.state)
+                        setPermissionDenied(perm.state === "denied")
+                    }
                 })
                 .catch(() => { })
         }
@@ -240,19 +251,34 @@ export default function LocationPicker({
 
     // ── Geolocation ───────────────────────────────────────────
     const handleGetCurrentLocation = useCallback(() => {
-        if (!navigator.geolocation || !window.isSecureContext) {
-            setStatus({ type: "error", message: "Geolocation requires a secure connection (HTTPS)." })
+        console.log('[geolocation] Button clicked')
+        console.log('[geolocation] navigator.geolocation:', !!navigator.geolocation)
+        console.log('[geolocation] window.isSecureContext:', window.isSecureContext)
+        console.log('[geolocation] protocol:', window.location.protocol)
+
+        if (!navigator.geolocation) {
+            console.error('[geolocation] navigator.geolocation is not available')
+            setStatus({ type: "error", message: "Geolocation is not supported by your browser." })
             return
         }
 
+        if (!window.isSecureContext) {
+            console.error('[geolocation] Not a secure context — geolocation blocked by browser')
+            setStatus({ type: "error", message: "Geolocation requires a secure connection (HTTPS). Please use the HTTPS version of this site." })
+            return
+        }
+
+        console.log('[geolocation] Calling getCurrentPosition...')
         setIsGettingLocation(true)
         setStatus(null)
 
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const { latitude: lat, longitude: lng, accuracy } = pos.coords
+                console.log('[geolocation] Success — lat:', lat, 'lng:', lng, 'accuracy:', accuracy)
 
                 if (!isWithinPH(lat, lng)) {
+                    console.warn('[geolocation] Location outside PH bounds')
                     setStatus({ type: "error", message: "Your location is outside the Philippines." })
                     setIsGettingLocation(false)
                     return
@@ -283,6 +309,7 @@ export default function LocationPicker({
                 )
             },
             (err) => {
+                console.error('[geolocation] Error code:', err.code, 'message:', err.message)
                 setIsGettingLocation(false)
                 const messages: Record<number, string> = {
                     1: "Location permission denied. Please enable it in your browser settings.",

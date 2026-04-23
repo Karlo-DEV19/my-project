@@ -10,7 +10,7 @@ export interface CreateBlindsResponse {
         characteristic?: string;
         composition: string;
         fabricWidth: string;
-        packing: string;
+
         thickness: string;
         unitPrice: number;
         createdAt: string;
@@ -41,7 +41,7 @@ export interface BlindsProduct {
     type: string;
     composition: string;
     fabricWidth: string;
-    packing: string;
+
     thickness: string;
     status: "active" | "inactive" | "draft" | string;
     unitPrice: number;
@@ -103,7 +103,7 @@ export interface BlindsProductDetailResponse {
         characteristic: string | null;
         composition: string | null;
         fabricWidth: string | null;
-        packing: string | null;
+
         thickness: string | null;
         status: "active" | "archived" | string;
         unitPrice: number;
@@ -129,7 +129,7 @@ export interface NewArrivalProduct {
     type: string
     composition: string
     fabricWidth: string
-    packing: string
+
     thickness: string
     status: string
     unitPrice: number
@@ -173,7 +173,7 @@ export interface BestSellerProduct {
     type: string
     composition: string
     fabricWidth: string
-    packing: string
+
     thickness: string
     status: string
     unitPrice: number
@@ -212,7 +212,7 @@ export interface EditProductPayload {
   composition: string;
   fabricWidth: string;
   thickness: string;
-  packing: string;
+
   characteristic: string;
   unitPrice: number;
   mainImages: string[]; // Array of URLs

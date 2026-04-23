@@ -59,7 +59,7 @@ export const editProductSchema = z.object({
     composition:   z.string().min(1, 'Composition is required'),
     fabricWidth:   z.string().min(1, 'Fabric width is required'),
     thickness:     z.string().min(1, 'Thickness is required'),
-    packing:       z.string().min(1, 'Packing is required'),
+
     characteristic: z.string().default(''),
     unitPrice:     z.coerce.number().min(0.01, 'Price must be greater than 0'),
     // mainImages: array of File (new) | string (existing URL)
@@ -81,7 +81,7 @@ export const EDIT_DEFAULT_VALUES: EditFormValues = {
     composition:     '',
     fabricWidth:     '',
     thickness:       '',
-    packing:         '',
+
     characteristic:  '',
     unitPrice:       0,
     mainImages:      [],

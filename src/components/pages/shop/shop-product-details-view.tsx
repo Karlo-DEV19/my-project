@@ -355,7 +355,6 @@ const ShopProductDetailsView = ({ product }: Props) => {
         { icon: Package, label: 'Composition', value: product.composition },
         { icon: Maximize2, label: 'Fabric Width', value: product.fabricWidth },
         { icon: Ruler, label: 'Thickness', value: product.thickness },
-        { icon: Package, label: 'Packing', value: product.packing },
         ...(product.characteristic ? [{ icon: Info, label: 'Characteristic', value: product.characteristic }] : []),
     ] as { icon: React.ElementType; label: string; value: string | null }[])
         .filter(r => !!r.value), [product]);

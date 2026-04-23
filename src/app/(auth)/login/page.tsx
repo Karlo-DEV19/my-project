@@ -134,7 +134,7 @@ function GatekeeperScreen({ onSuccess }: { onSuccess: () => void }) {
 //
 // Errors from either action are shown inline — never swallowed.
 // ─────────────────────────────────────────────────────────────
-function StaffLoginScreen() {
+function AdminLoginScreen() {
     const router = useRouter()
 
     // Stored after Step 1 so Step 2 (verifyOtpCode) knows the account
@@ -195,7 +195,7 @@ function StaffLoginScreen() {
                         </span>
                     </div>
                     <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-                        Staff Portal
+                        Admin Portal
                     </h1>
                     <p className="text-sm text-muted-foreground">
                         Sign in to manage your workspace.
@@ -311,7 +311,7 @@ export default function LoginPage() {
             {!isAuthorized ? (
                 <GatekeeperScreen onSuccess={() => setIsAuthorized(true)} />
             ) : (
-                <StaffLoginScreen />
+                <AdminLoginScreen />
             )}
         </div>
     )

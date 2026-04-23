@@ -33,7 +33,7 @@ export const updateBlindsById = async (ctx: Context) => {
             composition: z.string().trim().default(""),
             fabricWidth: z.string().trim().default(""),
             thickness: z.string().trim().default(""),
-            packing: z.string().trim().default(""),
+
             characteristic: z.string().trim().default(""),
             unitPrice: z.number().min(0),
             mainImages: z
@@ -61,7 +61,7 @@ export const updateBlindsById = async (ctx: Context) => {
         const {
             productCode, name, description, type,
             collection, status, composition, fabricWidth,
-            thickness, packing, characteristic, unitPrice,
+            thickness, characteristic, unitPrice,
             mainImages, availableColors,
         } = parsed.data;
 
@@ -101,7 +101,7 @@ export const updateBlindsById = async (ctx: Context) => {
                 .set({
                     productCode, name, description, type,
                     collection, status, composition, fabricWidth,
-                    thickness, packing, characteristic, unitPrice,
+                    thickness, characteristic, unitPrice,
                     updatedAt: new Date(),
                 })
                 .where(eq(blindsProducts.id, productId))
@@ -205,7 +205,7 @@ export const createNewBlinds = async (ctx: Context) => {
                 composition: parsedData.composition,
                 fabricWidth: parsedData.fabricWidth,
                 thickness: parsedData.thickness,
-                packing: parsedData.packing,
+
                 characteristic: parsedData.characteristic,
                 collection: parsedData.collection,
                 stock: parsedData.stock ?? 0,
@@ -326,7 +326,7 @@ export const getAllBlinds = async (c: Context) => {
                 type: true,
                 composition: true,
                 fabricWidth: true,
-                packing: true,
+
                 thickness: true,
                 status: true,
                 unitPrice: true,
@@ -462,7 +462,7 @@ export const getAllBestSeller = async (c: Context) => {
                 type: true,
                 composition: true,
                 fabricWidth: true,
-                packing: true,
+
                 thickness: true,
                 status: true,
                 unitPrice: true,
@@ -522,7 +522,7 @@ export const getAllNewArrival = async (c: Context) => {
                 type: true,
                 composition: true,
                 fabricWidth: true,
-                packing: true,
+
                 thickness: true,
                 status: true,
                 unitPrice: true,

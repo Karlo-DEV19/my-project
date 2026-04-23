@@ -43,6 +43,7 @@ export default function CreateNewProductPage() {
         resolver: zodResolver(productSchema) as any,
         defaultValues: DEFAULT_VALUES as FormValues,
         mode: 'onBlur',
+        reValidateMode: 'onChange',
     });
 
     const { control, handleSubmit, reset, setValue, formState: { errors } } = form;
@@ -64,6 +65,11 @@ export default function CreateNewProductPage() {
     const fabricWidth   = useDynamicOptions('fabric-widths');
     const thickness     = useDynamicOptions('thickness');
     const characteristic = useDynamicOptions('characteristics');
+
+    // Debug helper — surfaces silent Zod errors in the console
+    const onInvalidSubmit = (errs: any) => {
+        console.error('[CreateProduct] Validation failed — cannot submit:', errs);
+    };
 
     const onSubmit = async (data: FormValues) => {
         try {
@@ -98,7 +104,7 @@ export default function CreateNewProductPage() {
                 composition: data.composition,
                 fabricWidth: data.fabricWidth,
                 thickness: data.thickness,
-                packing: data.packing,
+
                 characteristic: data.characteristic ?? '',
                 mainImages: mainResults.successful.map((r) => r.url!),
                 availableColors,
@@ -171,7 +177,7 @@ export default function CreateNewProductPage() {
             <Form {...form}>
                 <form
                     id="create-product-form"
-                    onSubmit={handleSubmit(onSubmit)}
+                    onSubmit={handleSubmit(onSubmit, onInvalidSubmit)}
                     noValidate
                     className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden"
                 >
@@ -506,6 +512,7 @@ export default function CreateNewProductPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )} />
+
 
                                     <FormField control={control} name="characteristic" render={({ field }) => (
                                         <FormItem>

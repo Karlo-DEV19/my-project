@@ -51,7 +51,7 @@ export const productSchema = z.object({
     composition: z.string().min(1, 'Required'),
     fabricWidth: z.string().min(1, 'Required'),
     thickness: z.string().min(1, 'Required'),
-    packing: z.string().min(1, 'Required'),
+
     characteristic: z.string().optional(),
     mainImages: z
         .array(imageOrFileSchema)
@@ -80,7 +80,7 @@ export const DEFAULT_VALUES: Partial<FormValues> = {
     composition: '',
     fabricWidth: '',
     thickness: '',
-    packing: '',
+
     characteristic: '',
     mainImages: [],
     availableColors: [{ name: '', file: undefined as unknown as File | string }],

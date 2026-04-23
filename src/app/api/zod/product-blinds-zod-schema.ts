@@ -18,7 +18,7 @@ export const blindsProductSchema = z.object({
     composition: z.string().min(1, 'Required'),
     fabricWidth: z.string().min(1, 'Required'),
     thickness: z.string().min(1, 'Required'),
-    packing: z.string().min(1, 'Required'),
+
     characteristic: z.string().optional(),
     mainImages: z
         .array(z.string().url('Valid image URL required'))

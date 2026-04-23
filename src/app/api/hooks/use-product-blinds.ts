@@ -24,7 +24,7 @@ interface UpdateBlindsResponse {
         composition: string | null;
         fabricWidth: string | null;
         thickness: string | null;
-        packing: string | null;
+
         characteristic: string | null;
         unitPrice: number;
         createdAt: string;

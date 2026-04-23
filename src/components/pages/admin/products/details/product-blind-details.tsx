@@ -193,7 +193,7 @@ export const ProductViewDetails = ({ productId }: ProductViewDetailsProps) => {
                             <SpecItem label="Composition" value={product.composition} />
                             <SpecItem label="Fabric Width" value={product.fabricWidth ? `${product.fabricWidth}mm` : null} />
                             <SpecItem label="Thickness" value={product.thickness ? `${product.thickness}mm` : null} />
-                            <SpecItem label="Packing" value={product.packing} />
+
                             <div className="col-span-full bg-background p-5">
                                 <dt className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Characteristic</dt>
                                 <dd className="text-sm font-semibold text-foreground">{product.characteristic || "Not specified"}</dd>

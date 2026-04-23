@@ -125,7 +125,7 @@ export const EditProductDetailsBlindForm: React.FC<
             composition: product.composition ?? '',
             fabricWidth: product.fabricWidth ?? '',
             thickness: product.thickness ?? '',
-            packing: product.packing ?? '',
+
             characteristic: product.characteristic ?? '',
             unitPrice: product.unitPrice ?? 0,
             // Existing images arrive as string URLs — schema accepts string | File
@@ -216,7 +216,7 @@ export const EditProductDetailsBlindForm: React.FC<
                         composition: data.composition,
                         fabricWidth: data.fabricWidth,
                         thickness: data.thickness,
-                        packing: data.packing,
+
                         characteristic: data.characteristic ?? '',
                         unitPrice: data.unitPrice,
                         mainImages,
@@ -823,11 +823,7 @@ export const EditProductDetailsBlindForm: React.FC<
                                                 label: 'Thickness',
                                                 placeholder: 'e.g. 0.54mm',
                                             },
-                                            {
-                                                name: 'packing' as const,
-                                                label: 'Packing',
-                                                placeholder: 'e.g. 50m / Roll',
-                                            },
+
                                             {
                                                 name: 'characteristic' as const,
                                                 label: 'Characteristic',

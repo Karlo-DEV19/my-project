@@ -43,6 +43,7 @@ import {
     Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import { EDIT_DEFAULT_VALUES, EditFormValues, editProductSchema, PRODUCT_COLLECTIONS, PRODUCT_STATUSES, PRODUCT_TYPES } from './edit-product-blind-zod-schema';
 import { EditMainDropZone } from './edit-main-dropzone';
 import { PricePreviewTable } from '../create/price-preview-table';
@@ -136,6 +137,10 @@ export const EditProductDetailsBlindForm: React.FC<
                 name: c.name,
                 file: c.imageUrl as string,
             })),
+            // ── Promo ─────────────────────────────────────────────────────
+            enablePromo:   (product as any).enablePromo   ?? false,
+            discountType:  (product as any).discountType  ?? null,
+            discountValue: (product as any).discountValue ?? null,
         };
     }, [product]);
 
@@ -167,8 +172,21 @@ export const EditProductDetailsBlindForm: React.FC<
     } = useFieldArray({ control, name: 'availableColors' });
 
     // ── Watched values for read-only display ─────────────────────────────────
-    const watchedStatus = watch('status');
+    const watchedStatus     = watch('status');
     const watchedCollection = watch('collection');
+    const watchedUnitPrice   = watch('unitPrice');
+    const watchedEnablePromo = watch('enablePromo');
+    const watchedDiscountType  = watch('discountType');
+    const watchedDiscountValue = watch('discountValue');
+
+    /** Compute live promo price for the preview (edit mode) */
+    const promoPreviewPrice = (() => {
+        const price = Number(watchedUnitPrice);
+        const val   = Number(watchedDiscountValue);
+        if (!watchedEnablePromo || !watchedDiscountType || isNaN(price) || isNaN(val) || val <= 0) return null;
+        if (watchedDiscountType === 'percentage') return Math.max(0, price * (1 - val / 100));
+        return Math.max(0, price - val);
+    })();
 
     const onSubmit = useCallback(
         async (data: EditFormValues) => {
@@ -221,6 +239,10 @@ export const EditProductDetailsBlindForm: React.FC<
                         unitPrice: data.unitPrice,
                         mainImages,
                         availableColors,
+                        // ── Promo ───────────────────────────────────────────────
+                        enablePromo:   data.enablePromo ?? false,
+                        discountType:  data.enablePromo ? (data.discountType  ?? null) : null,
+                        discountValue: data.enablePromo ? (data.discountValue ?? null) : null,
                     },
                 });
 
@@ -794,7 +816,159 @@ export const EditProductDetailsBlindForm: React.FC<
 
                             <Separator />
 
-                            {/* 4. Technical Specifications */}
+                            {/* 4. Promotion */}
+                            <Card className="shadow-none">
+                                <CardHeader className="pb-3 pt-4">
+                                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                                            <Tag className="h-3 w-3" />
+                                        </span>
+                                        Promotion
+                                        <Badge variant="secondary" className="ml-1 text-[10px]">Optional</Badge>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-4 pt-0">
+                                    {/* Enable toggle */}
+                                    <FormField control={control} name="enablePromo" render={({ field }) => (
+                                        <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                                            <div className="space-y-0.5">
+                                                <FormLabel className="text-sm font-medium">Enable promotion</FormLabel>
+                                                <p className="text-[12px] text-muted-foreground">
+                                                    Show a discount badge and promo price on product cards.
+                                                </p>
+                                            </div>
+                                            <FormControl>
+                                                {isEditing ? (
+                                                    <Switch
+                                                        checked={field.value ?? false}
+                                                        onCheckedChange={(val) => {
+                                                            field.onChange(val);
+                                                            if (!val) {
+                                                                form.setValue('discountType',  null);
+                                                                form.setValue('discountValue', null);
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span className={`text-xs font-medium px-2 py-1 rounded ${field.value ? 'bg-rose-100 text-rose-700' : 'bg-muted text-muted-foreground'}`}>
+                                                        {field.value ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                )}
+                                            </FormControl>
+                                        </FormItem>
+                                    )} />
+
+                                    {watchedEnablePromo && (
+                                        <div className="flex flex-col gap-4 pl-1">
+                                            {/* Discount Type */}
+                                            <FormField control={control} name="discountType" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>
+                                                        Discount Type{isEditing && <span className="text-destructive"> *</span>}
+                                                    </FormLabel>
+                                                    {isEditing ? (
+                                                        <FormControl>
+                                                            <div className="flex gap-2">
+                                                                {(['percentage', 'fixed'] as const).map((t) => (
+                                                                    <button
+                                                                        key={t}
+                                                                        type="button"
+                                                                        onClick={() => field.onChange(t)}
+                                                                        className={`rounded-md border px-4 py-2 text-sm transition-colors ${
+                                                                            field.value === t
+                                                                                ? 'bg-primary border-primary text-primary-foreground font-medium shadow-sm'
+                                                                                : 'bg-background hover:bg-muted text-foreground'
+                                                                        }`}
+                                                                    >
+                                                                        {t === 'percentage' ? '% Percentage' : '₱ Fixed Amount'}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </FormControl>
+                                                    ) : (
+                                                        <p className="text-sm font-medium pt-1 capitalize">
+                                                            {field.value === 'percentage' ? '% Percentage' : field.value === 'fixed' ? '₱ Fixed Amount' : '—'}
+                                                        </p>
+                                                    )}
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )} />
+
+                                            {/* Discount Value */}
+                                            <FormField control={control} name="discountValue" render={({ field }) => (
+                                                <FormItem className="max-w-xs">
+                                                    <FormLabel>
+                                                        Discount Value{' '}
+                                                        <span className="text-muted-foreground font-normal">
+                                                            ({watchedDiscountType === 'percentage' ? '1–100 %' : '₱ per sq.ft'})
+                                                        </span>
+                                                        {isEditing && <span className="text-destructive"> *</span>}
+                                                    </FormLabel>
+                                                    <FormControl>
+                                                        {isEditing ? (
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">
+                                                                    {watchedDiscountType === 'percentage' ? '%' : '₱'}
+                                                                </span>
+                                                                <input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    max={watchedDiscountType === 'percentage' ? 100 : undefined}
+                                                                    step={0.01}
+                                                                    placeholder={watchedDiscountType === 'percentage' ? 'e.g. 25' : 'e.g. 30'}
+                                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 pl-7 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                                    {...field}
+                                                                    value={field.value ?? ''}
+                                                                    onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm font-medium pt-1">
+                                                                {field.value != null
+                                                                    ? (watchedDiscountType === 'percentage'
+                                                                        ? `${field.value}%`
+                                                                        : `₱${field.value.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`)
+                                                                    : '—'}
+                                                            </p>
+                                                        )}
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )} />
+
+                                            {/* Live price preview */}
+                                            {promoPreviewPrice !== null && (
+                                                <div className="flex items-center gap-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 px-4 py-3">
+                                                    <Tag className="h-4 w-4 text-rose-600 shrink-0" />
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-[11px] uppercase tracking-wider text-rose-700 dark:text-rose-400 font-semibold">
+                                                            {isEditing ? 'Promo Preview' : 'Current Promo'}
+                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm text-muted-foreground line-through">
+                                                                ₱{Number(watchedUnitPrice).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                            </span>
+                                                            <span className="text-base font-semibold text-rose-600">
+                                                                ₱{promoPreviewPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                            {watchedDiscountType === 'percentage' && watchedDiscountValue && (
+                                                                <span className="text-[11px] font-medium bg-rose-600 text-white px-1.5 py-0.5 rounded">
+                                                                    {watchedDiscountValue}% OFF
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Separator />
+
+                            {/* 5. Technical Specifications */}
+
                             <Card className="shadow-none">
                                 <CardHeader className="pb-3 pt-4">
                                     <CardTitle className="flex items-center gap-2 text-sm font-semibold">

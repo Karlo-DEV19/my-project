@@ -12,7 +12,7 @@ import {
 import { AccountRow, type Account } from './account-row';
 import { AccountsEmpty } from './accounts-empty';
 
-const COLUMNS = ['Name', 'Email', 'Created At', 'Actions'];
+const COLUMNS = ['Name', 'Email', 'Created At', 'Last Login', 'Logins', 'Actions'];
 
 type AccountsTableProps = {
   data: Account[];
@@ -23,7 +23,7 @@ export function AccountsTable({ data, onDelete }: AccountsTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="w-full overflow-x-auto">
-        <Table className="min-w-[700px] w-full">
+        <Table className="min-w-[960px] w-full">
           <TableHeader className="bg-muted/50">
             <TableRow>
               {COLUMNS.map((col) => (

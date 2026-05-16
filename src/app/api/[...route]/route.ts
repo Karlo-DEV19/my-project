@@ -11,6 +11,7 @@ import notificationsRoute from "./routes/notification-route";
 import userRoute from "./routes/user-route";
 import compositionRoute from "./routes/composition-route";
 import { createOptionsRoute } from "./routes/product-options-route";
+import magicLinkRoute from "./routes/magic-link-route";
 
 const app = new Hono().basePath("/api/v1");
 
@@ -23,6 +24,10 @@ app.route("/activity-logs", activityLogsRoute);
 app.route("/notifications", notificationsRoute);
 app.route("/users", userRoute);
 app.route("/compositions", compositionRoute);
+// ── Customer auth ─────────────────────────────────────────────
+app.route("/auth/magic-link", magicLinkRoute);
+
+// ── Lookup tables ──────────────────────────────────────────────
 app.route("/product-type", createOptionsRoute("product-type"));
 app.route("/fabric-widths", createOptionsRoute("fabric-widths"));
 app.route("/thickness", createOptionsRoute("thickness"));

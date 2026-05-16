@@ -3,7 +3,22 @@
 import React, { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { Eye, Trash2, Edit3, MoreVertical, Package } from "lucide-react"
+import { Eye, Trash2, Edit3, MoreVertical, Package, Tag } from "lucide-react"
+
+// ─── Promo helpers ────────────────────────────────────────────────────────────
+
+function computePromoPrice(
+    unitPrice: number,
+    discountType: 'percentage' | 'fixed',
+    discountValue: number,
+): number {
+    if (discountType === 'percentage') return unitPrice * (1 - discountValue / 100);
+    return Math.max(0, unitPrice - discountValue);
+}
+
+function fmtUnitPrice(n: number): string {
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -98,7 +113,7 @@ const ProductSection = () => {
                             >
                                 {/* PREMIUM INSET IMAGE SECTION */}
                                 <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/50">
-                                    {/* Status Badge - Moved to top left of image for clear visibility */}
+                                    {/* Status Badge — top left */}
                                     <div className="absolute left-3 top-3 z-10">
                                         <Badge
                                             variant={product.status === "active" ? "default" : "secondary"}
@@ -107,6 +122,18 @@ const ProductSection = () => {
                                             {product.status}
                                         </Badge>
                                     </div>
+
+                                    {/* Promo badge — top right */}
+                                    {product.enablePromo && product.discountType && product.discountValue != null && (
+                                        <div className="absolute right-3 top-3 z-10">
+                                            <span className="inline-flex items-center gap-1 rounded-sm bg-rose-600 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-white shadow-sm">
+                                                <Tag className="h-2.5 w-2.5" strokeWidth={2} />
+                                                {product.discountType === 'percentage'
+                                                    ? `${product.discountValue}% OFF`
+                                                    : `₱${product.discountValue} OFF`}
+                                            </span>
+                                        </div>
+                                    )}
 
                                     {product.images?.[0]?.imageUrl ? (
                                         <Image
@@ -187,9 +214,20 @@ const ProductSection = () => {
                                     <div className="mt-auto flex items-end justify-between pt-6">
                                         <div className="flex flex-col">
                                             <span className="text-[11px] font-medium text-muted-foreground">Price (sq.ft)</span>
-                                            <span className="text-lg font-bold text-foreground">
-                                                ₱{product.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </span>
+                                            {product.enablePromo && product.discountType && product.discountValue != null ? (
+                                                <>
+                                                    <span className="text-xs text-muted-foreground line-through leading-none">
+                                                        ₱{fmtUnitPrice(product.unitPrice)}
+                                                    </span>
+                                                    <span className="text-lg font-bold text-rose-600 leading-tight">
+                                                        ₱{fmtUnitPrice(computePromoPrice(product.unitPrice, product.discountType, product.discountValue))}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="text-lg font-bold text-foreground">
+                                                    ₱{fmtUnitPrice(product.unitPrice)}
+                                                </span>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center">

@@ -66,6 +66,25 @@ export const editProductSchema = z.object({
     mainImages:    z.array(editImageSchema).min(1, 'At least one image is required').max(6, 'Max 6 images'),
     // colors: array of color objects with id, name, file (File | string)
     availableColors: z.array(editColorSchema).min(1, 'At least one color is required'),
+
+    // ── Promo / Discount (optional) ───────────────────────────────────────────
+    enablePromo:   z.boolean().default(false),
+    discountType:  z.enum(['percentage', 'fixed']).nullable().optional(),
+    discountValue: z.coerce.number().nullable().optional(),
+}).superRefine((data, ctx) => {
+    if (!data.enablePromo) return;
+    if (!data.discountType) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['discountType'], message: 'Select a discount type' });
+    }
+    if (data.discountValue === undefined || data.discountValue === null || data.discountValue <= 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['discountValue'], message: 'Enter a valid discount value greater than 0' });
+    }
+    if (data.discountType === 'percentage' && data.discountValue != null && data.discountValue > 100) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['discountValue'], message: 'Percentage cannot exceed 100%' });
+    }
+    if (data.discountType === 'fixed' && data.discountValue != null && data.discountValue >= data.unitPrice) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['discountValue'], message: 'Fixed discount must be less than the unit price' });
+    }
 });
 
 export type EditFormValues = z.infer<typeof editProductSchema>;
@@ -86,4 +105,8 @@ export const EDIT_DEFAULT_VALUES: EditFormValues = {
     unitPrice:       0,
     mainImages:      [],
     availableColors: [],
+    // ── Promo defaults ────────────────────────────────────────────────────────
+    enablePromo:     false,
+    discountType:    null,
+    discountValue:   null,
 };

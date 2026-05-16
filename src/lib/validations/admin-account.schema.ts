@@ -25,3 +25,16 @@ export const getUsersQuerySchema = z.object({
 });
 
 export type GetUsersQuery = z.infer<typeof getUsersQuerySchema>;
+
+// ─── POST /api/v1/users/sync ──────────────────────────────────────────────────
+// Used after Magic Link login — upserts a customer by email.
+// id:   Supabase auth user UUID — used as the row PK on insert.
+// name: optional, sourced from Supabase user_metadata when available.
+
+export const syncUserSchema = z.object({
+  id:    z.string().uuid().optional(),
+  email: z.string().email('Invalid email address'),
+  name:  z.string().min(1).optional(),
+});
+
+export type SyncUserPayload = z.infer<typeof syncUserSchema>;

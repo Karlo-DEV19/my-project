@@ -9,6 +9,8 @@ export type UserRecord = {
   name: string;
   email: string;
   created_at: string;
+  last_login: string | null;
+  login_count: number;
 };
 
 export type UsersPagination = {
@@ -97,5 +99,31 @@ export function useDeleteUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
+  });
+}
+
+// ─── POST /api/v1/users/sync ──────────────────────────────────────────────────
+// Upserts the current customer after a magic link sign-in.
+// Invalidates the users list cache so admin views stay fresh.
+
+type SyncUserPayload = { email: string; name?: string };
+
+type SyncUserResponse =
+  | { success: true;  data: UserRecord; created: boolean }
+  | { success: false; message: string };
+
+export function useSyncUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation<SyncUserResponse, Error, SyncUserPayload>({
+    mutationKey: ['users', 'sync'],
+    mutationFn: async (payload) => {
+      const { data } = await axiosApiClient.post<SyncUserResponse>('/users/sync', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    retry: false, // Never silently retry auth-related mutations
   });
 }

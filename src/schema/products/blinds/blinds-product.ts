@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, real, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const blindsProducts = pgTable(
     "blinds_products",
@@ -17,6 +17,11 @@ export const blindsProducts = pgTable(
         unitPrice: integer("unit_price").notNull(),
         stock: integer("stock").default(0).notNull(),
         collection: varchar("collection", { length: 50 }).default("Shop Only").notNull(),
+        // ── Promo / Discount ──────────────────────────────────────────────────
+        enablePromo:    boolean("enable_promo").default(false).notNull(),
+        discountType:   varchar("discount_type", { length: 20 }),        // 'percentage' | 'fixed' | null
+        discountValue:  real("discount_value"),                           // nullable numeric
+        // ─────────────────────────────────────────────────────────────────────
         isDeleted: boolean("is_deleted").default(false).notNull(),
         createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
         updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

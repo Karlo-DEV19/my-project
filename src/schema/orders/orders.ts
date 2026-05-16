@@ -7,6 +7,7 @@ import {
     decimal,
     uniqueIndex,
     integer,
+    real,
 } from "drizzle-orm/pg-core"
 import { blindsProductColors } from "../products/blinds/blinds-product-colors"
 import { blindsProducts } from "../products/blinds/blinds-product"
@@ -134,6 +135,11 @@ export const orderItems = pgTable("order_items", {
 
     quantity: integer("quantity").notNull(),
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+    // unitPrice = effectiveUnitPrice (after promo) at time of order
+
+    /** Original regular unit price before any promo discount. NULL for legacy orders (no promo). */
+    regularUnitPrice: decimal("regular_unit_price", { precision: 10, scale: 2 }),
+
     subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
     // subtotal = unitPrice × quantity (100% snapshot)
 
@@ -141,6 +147,10 @@ export const orderItems = pgTable("order_items", {
         onDelete: "set null",
     }),
     colorName: varchar("color_name", { length: 120 }),
+
+    // ── Promo snapshot (NULL for non-promo or legacy orders) ────────────────────
+    discountType: varchar("discount_type", { length: 20 }),  // 'percentage' | 'fixed' | null
+    discountValue: real("discount_value"),                    // nullable numeric
 
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 })

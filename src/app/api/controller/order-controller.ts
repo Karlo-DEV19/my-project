@@ -126,9 +126,13 @@ export const checkoutOrder = async (ctx: Context) => {
                 id: blindsProducts.id,
                 name: blindsProducts.name,
                 productCode: blindsProducts.productCode,
-                unitPrice: blindsProducts.unitPrice, // integer — whole pesos
+                unitPrice: blindsProducts.unitPrice, // integer — whole pesos (regular price)
                 status: blindsProducts.status,
                 stock: blindsProducts.stock,
+                // Promo fields — used to compute effectiveUnitPrice server-side
+                enablePromo: blindsProducts.enablePromo,
+                discountType: blindsProducts.discountType,
+                discountValue: blindsProducts.discountValue,
             })
             .from(blindsProducts)
             .where(inArray(blindsProducts.id, productIds))
@@ -254,18 +258,50 @@ export const checkoutOrder = async (ctx: Context) => {
         const downpaymentAmount = clientDownpay
         const balanceAmount = round2(fullTotal - downpaymentAmount)
 
-        // ── 6. Build order item snapshots (full-price, for DB) ─────────────────
+        // ── 6. Build order item snapshots (promo-aware) ───────────────────────
+        //
+        // effectiveUnitPrice = discounted price if promo is valid, otherwise regularUnitPrice.
+        // This mirrors the helper in shop-product-details-view.tsx exactly.
+        function resolveEffectiveUnitPrice(
+            unitPrice: number,
+            enablePromo: boolean,
+            discountType: string | null,
+            discountValue: number | null,
+        ): number {
+            if (!enablePromo || !discountType || discountValue == null) return unitPrice
+            if (discountValue <= 0) return unitPrice
+            if (discountType === 'percentage' && discountValue > 100) return unitPrice
+            if (discountType === 'fixed' && discountValue >= unitPrice) return unitPrice
+            if (discountType === 'percentage') return Math.max(0, unitPrice * (1 - discountValue / 100))
+            return Math.max(0, unitPrice - discountValue)
+        }
+
         const computedItems = input.items.map((item) => {
             const product = productMap.get(item.productId)!
+            const regularPrice = product.unitPrice          // always integer (whole pesos)
+            const effectivePrice = resolveEffectiveUnitPrice(
+                regularPrice,
+                product.enablePromo,
+                product.discountType ?? null,
+                product.discountValue ?? null,
+            )
+            const hasPromo = effectivePrice !== regularPrice
+
             return {
                 productId: product.id,
                 productName: product.name,
                 productCode: product.productCode,
                 quantity: item.quantity,
-                unitPrice: product.unitPrice,
-                subtotal: round2(product.unitPrice * item.quantity),
+                // snapshot: effective (promo) unit price
+                unitPrice: effectivePrice,
+                // snapshot: original regular price (null when no promo — saves space)
+                regularUnitPrice: hasPromo ? regularPrice : null,
+                subtotal: round2(effectivePrice * item.quantity),
                 colorId: item.colorId ?? null,
                 colorName: item.colorId ? (colorMap.get(item.colorId)?.name ?? null) : null,
+                // promo snapshot
+                discountType: hasPromo ? (product.discountType ?? null) : null,
+                discountValue: hasPromo ? (product.discountValue ?? null) : null,
             }
         })
 
@@ -361,9 +397,14 @@ export const checkoutOrder = async (ctx: Context) => {
                     productCode: item.productCode,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice.toFixed(2),
+                    regularUnitPrice: item.regularUnitPrice != null
+                        ? item.regularUnitPrice.toFixed(2)
+                        : null,
                     subtotal: item.subtotal.toFixed(2),
                     colorId: item.colorId,
                     colorName: item.colorName,
+                    discountType: item.discountType,
+                    discountValue: item.discountValue,
                 }))
             )
 
@@ -1108,6 +1149,102 @@ export const getOrderById = async (ctx: Context) => {
     }
 }
 
+// ─── Admin: Get Single Order Full Details (no ownership check) ───────────────
+
+export const getAdminOrderById = async (ctx: Context) => {
+    try {
+        const id = ctx.req.param('id')
+        if (!id) return ctx.json({ success: false, message: 'Order ID is required' }, 400)
+
+        const [order] = await db
+            .select({
+                id: orders.id,
+                trackingNumber: orders.trackingNumber,
+                referenceNumber: orders.referenceNumber,
+                status: orders.status,
+                paymentStatus: orders.paymentStatus,
+                paymentMethod: orders.paymentMethod,
+                orderType: orders.orderType,
+
+                // Customer
+                customerFirstName: orders.customerFirstName,
+                customerLastName: orders.customerLastName,
+                customerEmail: orders.customerEmail,
+                customerPhone: orders.customerPhone,
+                customerPhoneSecondary: orders.customerPhoneSecondary,
+
+                // Delivery address
+                deliveryUnitFloor: orders.deliveryUnitFloor,
+                deliveryStreet: orders.deliveryStreet,
+                deliveryBarangay: orders.deliveryBarangay,
+                deliveryCity: orders.deliveryCity,
+                deliveryProvince: orders.deliveryProvince,
+                deliveryZipCode: orders.deliveryZipCode,
+                deliveryFormattedAddress: orders.deliveryFormattedAddress,
+                deliveryNotes: orders.deliveryNotes,
+
+                // Financials
+                subtotal: orders.subtotal,
+                vat: orders.vat,
+                deliveryFee: orders.deliveryFee,
+                totalAmount: orders.totalAmount,
+                downpaymentAmount: orders.downpaymentAmount,
+                downpaymentStatus: orders.downpaymentStatus,
+                downpaymentPaidAt: orders.downpaymentPaidAt,
+                balanceAmount: orders.balanceAmount,
+                balancePaidAt: orders.balancePaidAt,
+
+                // Timestamps
+                confirmedAt: orders.confirmedAt,
+                cancelledAt: orders.cancelledAt,
+                cancellationReason: orders.cancellationReason,
+                createdAt: orders.createdAt,
+                updatedAt: orders.updatedAt,
+            })
+            .from(orders)
+            .where(eq(orders.id, id))
+            .limit(1)
+
+        if (!order) return ctx.json({ success: false, message: 'Order not found' }, 404)
+
+        const items = await db
+            .select({
+                id: orderItems.id,
+                productName: orderItems.productName,
+                productCode: orderItems.productCode,
+                colorName: orderItems.colorName,
+                quantity: orderItems.quantity,
+                unitPrice: orderItems.unitPrice,
+                regularUnitPrice: orderItems.regularUnitPrice,
+                subtotal: orderItems.subtotal,
+                discountType: orderItems.discountType,
+                discountValue: orderItems.discountValue,
+            })
+            .from(orderItems)
+            .where(eq(orderItems.orderId, id))
+
+        const payments = await db
+            .select({
+                id: paymentHistory.id,
+                paymentType: paymentHistory.paymentType,
+                status: paymentHistory.status,
+                paymentMethod: paymentHistory.paymentMethod,
+                amountDue: paymentHistory.amountDue,
+                amountPaid: paymentHistory.amountPaid,
+                paidAt: paymentHistory.paidAt,
+                createdAt: paymentHistory.createdAt,
+            })
+            .from(paymentHistory)
+            .where(eq(paymentHistory.orderId, id))
+            .orderBy(paymentHistory.createdAt)
+
+        return ctx.json({ success: true, data: { order, items, payments } })
+    } catch (error) {
+        console.error('getAdminOrderById error:', error)
+        return ctx.json({ success: false, message: 'Failed to fetch order details.' }, 500)
+    }
+}
+
 export default {
     getOrderDetailsStatus,
     getAllOrders,
@@ -1117,4 +1254,5 @@ export default {
     getMonthlySales,
     getUserOrders,
     getOrderById,
+    getAdminOrderById,
 }

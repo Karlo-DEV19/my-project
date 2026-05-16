@@ -66,10 +66,11 @@ export async function updateSession(request: NextRequest) {
         (p) => pathname === p || pathname.startsWith(p + '/')
     )
 
-    // If it's a general protected route (like /dashboard) and they aren't logged in
+    // If it's a protected route (like /dashboard or /backoffice) and the user isn't logged in,
+    // redirect to the admin login page.
     if (!user && isInProtectedGroup) {
         const url = request.nextUrl.clone()
-        url.pathname = '/login' // Kick them to the general customer login
+        url.pathname = '/login'
         url.search = ''
         return NextResponse.redirect(url)
     }

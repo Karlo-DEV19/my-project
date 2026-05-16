@@ -45,6 +45,10 @@ export const updateBlindsById = async (ctx: Context) => {
                     imageUrl: z.string().min(1),
                 }))
                 .default([]),
+            // ── Promo / Discount ─────────────────────────────────────────────
+            enablePromo:   z.boolean().default(false),
+            discountType:  z.enum(['percentage', 'fixed']).nullable().optional(),
+            discountValue: z.number().nullable().optional(),
         });
 
         const body = await ctx.req.json();
@@ -63,6 +67,7 @@ export const updateBlindsById = async (ctx: Context) => {
             collection, status, composition, fabricWidth,
             thickness, characteristic, unitPrice,
             mainImages, availableColors,
+            enablePromo, discountType, discountValue,
         } = parsed.data;
 
         const [existing] = await db
@@ -102,6 +107,10 @@ export const updateBlindsById = async (ctx: Context) => {
                     productCode, name, description, type,
                     collection, status, composition, fabricWidth,
                     thickness, characteristic, unitPrice,
+                    // ── Promo ──────────────────────────────────────────────
+                    enablePromo,
+                    discountType:  enablePromo ? (discountType  ?? null) : null,
+                    discountValue: enablePromo ? (discountValue ?? null) : null,
                     updatedAt: new Date(),
                 })
                 .where(eq(blindsProducts.id, productId))
@@ -209,6 +218,10 @@ export const createNewBlinds = async (ctx: Context) => {
                 characteristic: parsedData.characteristic,
                 collection: parsedData.collection,
                 stock: parsedData.stock ?? 0,
+                // ── Promo ──────────────────────────────────────────────────
+                enablePromo:   parsedData.enablePromo  ?? false,
+                discountType:  parsedData.enablePromo  ? (parsedData.discountType  ?? null) : null,
+                discountValue: parsedData.enablePromo  ? (parsedData.discountValue ?? null) : null,
             })
             .returning();
 
@@ -318,7 +331,6 @@ export const getAllBlinds = async (c: Context) => {
 
         const blinds = await db.query.blindsProducts.findMany({
             where: whereCondition,
-            // ✅ FIXED: Tanggal ang false values, explicit true lang lahat
             columns: {
                 id: true,
                 productCode: true,
@@ -330,9 +342,13 @@ export const getAllBlinds = async (c: Context) => {
                 thickness: true,
                 status: true,
                 unitPrice: true,
-                stock: true,       // ✅ stock included
+                stock: true,
                 collection: true,
                 createdAt: true,
+                // ── Promo ────────────────────────────────────────────────
+                enablePromo:   true,
+                discountType:  true,
+                discountValue: true,
             },
             with: {
                 colors: {
@@ -468,6 +484,10 @@ export const getAllBestSeller = async (c: Context) => {
                 unitPrice: true,
                 collection: true,
                 createdAt: true,
+                // ── Promo ────────────────────────────────────────────────
+                enablePromo:   true,
+                discountType:  true,
+                discountValue: true,
             },
             with: {
                 colors: { columns: { name: true, imageUrl: true } },
@@ -528,6 +548,10 @@ export const getAllNewArrival = async (c: Context) => {
                 unitPrice: true,
                 collection: true,
                 createdAt: true,
+                // ── Promo ────────────────────────────────────────────────
+                enablePromo:   true,
+                discountType:  true,
+                discountValue: true,
             },
             with: {
                 colors: { columns: { name: true, imageUrl: true } },

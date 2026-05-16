@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
     Ruler, ShieldCheck, Wrench, Scissors, ChevronDown, Info,
     MapPin, Phone, Mail, ShoppingCart, X, ZoomIn, ChevronLeft, ChevronRight,
-    Package, Layers, Maximize2,
+    Package, Layers, Maximize2, Tag,
 } from 'lucide-react';
 import { useCartStore, type BlindOrderFields } from '@/lib/zustand/use-cart-store';
 import { BlindsProductDetailResponse } from '@/lib/types/product-blinds-type';
@@ -85,6 +85,42 @@ function php(n: number) {
     return new Intl.NumberFormat('en-PH', {
         style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
     }).format(n);
+}
+
+/** Computes the discounted unit price per sq.ft */
+function computePromoUnitPrice(
+    unitPrice: number,
+    discountType: 'percentage' | 'fixed',
+    discountValue: number,
+): number {
+    if (discountType === 'percentage') return unitPrice * (1 - discountValue / 100);
+    return Math.max(0, unitPrice - discountValue);
+}
+
+function fmtPromoLabel(
+    discountType: 'percentage' | 'fixed',
+    discountValue: number,
+): string {
+    return discountType === 'percentage'
+        ? `${discountValue}% OFF`
+        : `₱${discountValue.toLocaleString()} OFF`;
+}
+
+/**
+ * Returns the effective unit price to use in calculations.
+ * Falls back to regularUnitPrice if promo is disabled or fields are invalid.
+ */
+function resolveEffectiveUnitPrice(
+    unitPrice: number,
+    enablePromo: boolean,
+    discountType: 'percentage' | 'fixed' | null,
+    discountValue: number | null,
+): number {
+    if (!enablePromo || !discountType || discountValue == null) return unitPrice;
+    if (discountValue <= 0) return unitPrice;
+    if (discountType === 'percentage' && discountValue > 100) return unitPrice;
+    if (discountType === 'fixed' && discountValue >= unitPrice) return unitPrice;
+    return Math.max(0, computePromoUnitPrice(unitPrice, discountType, discountValue));
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -260,12 +296,23 @@ const ShopProductDetailsView = ({ product }: Props) => {
 
     const isReady = !!widthCm && !!heightCm && Number(widthCm) > 0 && Number(heightCm) > 0;
 
+    const effectiveUnitPrice = useMemo(
+        () => resolveEffectiveUnitPrice(
+            product.unitPrice,
+            product.enablePromo,
+            product.discountType,
+            product.discountValue,
+        ),
+        [product.unitPrice, product.enablePromo, product.discountType, product.discountValue],
+    );
+    const hasActivePromo = effectiveUnitPrice !== product.unitPrice;
+
     const price = useMemo<PriceBreakdown | null>(() => {
         const w = Number(widthCm);
         const h = Number(heightCm);
         if (!w || !h || w <= 0 || h <= 0) return null;
-        return calcPrice(w, h, product.unitPrice, panels);
-    }, [widthCm, heightCm, panels, product.unitPrice]);
+        return calcPrice(w, h, effectiveUnitPrice, panels);
+    }, [widthCm, heightCm, panels, effectiveUnitPrice]);
 
     const handlePresetSelect = useCallback((preset: typeof STANDARD_SIZES[number]) => {
         setSelectedPreset(preset);
@@ -338,7 +385,13 @@ const ShopProductDetailsView = ({ product }: Props) => {
             controlType,
             notes: notes.trim() || undefined,
             branch: branch.id,
-            priceBreakdown: price,
+            priceBreakdown: {
+                ...price,
+                regularUnitPrice: product.unitPrice,
+                enablePromo: product.enablePromo,
+                discountType: product.discountType,
+                discountValue: product.discountValue,
+            },
         };
 
         addToCart(payload);
@@ -478,12 +531,33 @@ const ShopProductDetailsView = ({ product }: Props) => {
                         {product.description && (
                             <p className="text-sm text-muted-foreground leading-relaxed">{product.description}</p>
                         )}
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="font-serif text-2xl text-foreground font-medium tracking-wide">
-                                {php(product.unitPrice)}
-                            </span>
-                            <span className="text-xs text-muted-foreground">/ sq·ft</span>
-                        </div>
+                        {/* Price block — promo-aware */}
+                        {product.enablePromo && product.discountType && product.discountValue != null ? (
+                            <div className="flex flex-col gap-1 mt-1">
+                                {/* Promo badge */}
+                                <span className="inline-flex items-center gap-1.5 self-start text-[9px] font-semibold uppercase tracking-widest px-2.5 py-1 bg-rose-600 text-white">
+                                    <Tag className="w-2.5 h-2.5" strokeWidth={2} />
+                                    {fmtPromoLabel(product.discountType, product.discountValue)}
+                                </span>
+                                {/* Prices */}
+                                <div className="flex items-baseline gap-3 flex-wrap">
+                                    <span className="font-serif text-2xl text-rose-600 font-medium tracking-wide">
+                                        {php(computePromoUnitPrice(product.unitPrice, product.discountType, product.discountValue))}
+                                    </span>
+                                    <span className="text-base text-muted-foreground line-through">
+                                        {php(product.unitPrice)}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">/ sq·ft</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="font-serif text-2xl text-foreground font-medium tracking-wide">
+                                    {php(product.unitPrice)}
+                                </span>
+                                <span className="text-xs text-muted-foreground">/ sq·ft</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Color selector */}
@@ -655,7 +729,7 @@ const ShopProductDetailsView = ({ product }: Props) => {
                                     { label: 'Dimensions', value: `${price.widthCm} × ${price.heightCm} cm`, sub: null, shaded: true },
                                     { label: 'Area', value: `${price.sqFt.toFixed(3)} sq/ft`, sub: '(W÷100) × (H÷100) × 10.76', shaded: false },
                                     { label: 'Chargeable', value: `${price.chargeableSqFt.toFixed(3)} sq/ft`, sub: price.minimumApplied ? `Min. ${MIN_SQFT} sq/ft applied` : null, shaded: true },
-                                    { label: 'Unit Price', value: `${php(price.unitPrice)} / sq/ft`, sub: null, shaded: false },
+                                    { label: 'Unit Price', value: `${php(price.unitPrice)} / sq/ft`, sub: hasActivePromo ? `was ${php(product.unitPrice)} / sq/ft` : null, shaded: false },
                                     { label: 'Per Panel', value: php(price.subTotalPerPanel), sub: `${php(price.unitPrice)} × ${price.chargeableSqFt.toFixed(3)}`, shaded: true },
                                     { label: 'Panels', value: `× ${price.panels}`, sub: null, shaded: false },
                                 ] as { label: string; value: string; sub: string | null; shaded: boolean }[]).map(({ label, value, sub, shaded }) => (
@@ -677,6 +751,12 @@ const ShopProductDetailsView = ({ product }: Props) => {
                                 <p className="px-4 py-2.5 text-[10px] text-muted-foreground bg-accent/20 leading-relaxed">
                                     Estimate only. Final price confirmed upon official measurement and order conforme.
                                 </p>
+                                {hasActivePromo && (
+                                    <p className="px-4 py-2.5 text-[10px] text-rose-600 bg-rose-50/60 dark:bg-rose-950/20 leading-relaxed flex items-start gap-1.5">
+                                        <Tag className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={2} />
+                                        Promo discount applied — estimate uses {product.discountType === 'percentage' ? `${product.discountValue}% off` : `₱${product.discountValue} off`} the regular unit price.
+                                    </p>
+                                )}
                             </div>
                         ) : null}
                     </div>

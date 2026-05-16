@@ -42,6 +42,8 @@ function SkeletonRow() {
       <div className="h-3.5 w-32 animate-pulse rounded bg-muted" />
       <div className="h-3.5 w-48 animate-pulse rounded bg-muted" />
       <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+      <div className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+      <div className="h-3.5 w-12 animate-pulse rounded bg-muted" />
       <div className="h-7 w-7 animate-pulse rounded bg-muted" />
     </div>
   );
@@ -51,7 +53,7 @@ function SkeletonTable() {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="flex items-center gap-6 border-b border-border bg-muted/50 px-5 py-3">
-        {['w-16', 'w-20', 'w-24', 'w-16'].map((w, i) => (
+        {['w-16', 'w-20', 'w-24', 'w-20', 'w-14', 'w-16'].map((w, i) => (
           <div key={i} className={`h-2.5 animate-pulse rounded bg-muted-foreground/20 ${w}`} />
         ))}
       </div>
@@ -201,12 +203,21 @@ function TablePagination({
 
 // ─── Map API row → Account type ───────────────────────────────────────────────
 
-function toAccount(row: { id: string; name: string; email: string; created_at: string }): Account {
+function toAccount(row: {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+  last_login?: string | null;
+  login_count?: number | null;
+}): Account {
   return {
-    id: String(row.id),
-    name: row.name ?? '',
-    email: row.email ?? '',
-    createdAt: row.created_at ? String(row.created_at).split('T')[0] : '',
+    id:         String(row.id),
+    name:       row.name ?? '',
+    email:      row.email ?? '',
+    createdAt:  row.created_at ? String(row.created_at).split('T')[0] : '',
+    lastLogin:  row.last_login ?? null,
+    loginCount: row.login_count ?? 0,
   };
 }
 

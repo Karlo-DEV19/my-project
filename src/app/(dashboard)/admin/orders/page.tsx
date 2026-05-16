@@ -20,6 +20,7 @@ import OrderStatusBadge, {
   type OrderStatus,
 } from '@/components/pages/admin/components/order-status-badge';
 import { OrdersHeader, type OrderFilters } from '@/components/pages/admin/orders/orders-header';
+import { OrderDetailsModal } from '@/components/pages/admin/orders/order-details-modal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,13 +47,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -64,6 +58,16 @@ type OrderItem = {
   name: string;
   qty: number;
   price: number;
+};
+
+type ApiOrderItem = {
+  orderId: string;
+  productName: string;
+  productCode: string | null;
+  quantity: number;
+  unitPrice: string;
+  subtotal: string;
+  colorName: string | null;
 };
 
 /** Raw payment row returned by the backend inside each order */
@@ -96,6 +100,7 @@ type ApiOrder = {
   createdAt: string;
   updatedAt: string;
   payments: ApiPayment[];
+  orderItems: ApiOrderItem[];
 };
 
 /** Normalised payment row used by the UI */
@@ -369,7 +374,7 @@ export default function OrdersPage() {
   /** Flat list of payments derived from real order data — no extra API call */
   const allPayments = useMemo<Payment[]>(() =>
     ordersData.flatMap((order) =>
-      order.payments.map((p) => ({
+      (order.payments ?? []).map((p) => ({
         id: p.orderId + '-' + p.paymentType,
         orderId: order.id,
         customer: `${order.customerFirstName} ${order.customerLastName}`,
@@ -549,7 +554,7 @@ export default function OrdersPage() {
                               {customer}
                             </TableCell>
                             <TableCell className="px-5 py-3.5 text-sm tabular-nums text-muted-foreground">
-                              {o.payments.length}
+                              {(o.payments ?? []).length}
                             </TableCell>
                             <TableCell className="px-5 py-3.5 text-sm font-semibold tabular-nums text-foreground">
                               {formatCurrency(total)}
@@ -748,98 +753,11 @@ export default function OrdersPage() {
         )}
       </div>
 
-      {/* ── Order Details Dialog ── */}
-      <Dialog open={!!openOrderId} onOpenChange={(o) => !o && setOpenOrderId(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-base">Order Details</DialogTitle>
-            <DialogDescription>
-              {selectedOrder && (
-                <span className="font-mono text-xs">{selectedOrder.trackingNumber}</span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedOrder && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-lg border border-border bg-muted/30 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Customer
-                  </p>
-                  <p className="mt-1.5 text-sm font-medium text-foreground">
-                    {`${selectedOrder.customerFirstName} ${selectedOrder.customerLastName}`}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedOrder.customerPhone}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border bg-muted/30 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Payment
-                  </p>
-                  <p className="mt-1.5 text-sm font-medium text-foreground">
-                    {selectedOrder.paymentMethod}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedOrder.createdAt}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Reference
-                </p>
-                <p className="mt-1.5 text-sm font-mono text-foreground">{selectedOrder.referenceNumber}</p>
-              </div>
-
-              <div className="overflow-hidden rounded-lg border border-border">
-                <div className="bg-muted/50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Payments
-                  </p>
-                </div>
-                <div className="divide-y divide-border">
-                  {selectedOrder.payments.map((p) => (
-                    <div
-                      key={p.orderId + p.paymentType}
-                      className="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted/30 transition-colors"
-                    >
-                      <div>
-                        <p className="font-medium text-foreground capitalize">{p.paymentType}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{p.status}</p>
-                      </div>
-                      <p className="font-semibold tabular-nums text-foreground">
-                        {formatCurrency(parseFloat(p.amountDue ?? '0'))}
-                      </p>
-                    </div>
-                  ))}
-                  {selectedOrder.payments.length === 0 && (
-                    <div className="px-4 py-3 text-sm text-muted-foreground">No payment records.</div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between bg-muted/40 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Status
-                    </span>
-                    <OrderStatusBadge status={selectedOrder.status} />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Total
-                    </p>
-                    <p className="text-lg font-bold tabular-nums text-foreground">
-                      {formatCurrency(parseFloat(selectedOrder.totalAmount))}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* ── Order Details Modal ── */}
+      <OrderDetailsModal
+        order={selectedOrder}
+        onClose={() => setOpenOrderId(null)}
+      />
     </div>
   );
 }

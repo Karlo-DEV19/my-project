@@ -1,17 +1,20 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import AccountButton from '@/components/account/account-button';
-import AccountModal from '@/components/account/account-modal';
-import AccountForm from '@/components/account/account-form';
-import { NotificationBell } from '@/components/ui/notification-bell';
 import Link from 'next/link';
-import { Home, Info, ShoppingBag, Search, X, Menu, ShoppingCart, Mail } from 'lucide-react';
+import { Home, Info, LogOut, Menu, Mail, Package, Search, ShoppingBag, ShoppingCart, User, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/lib/zustand/use-cart-store';
-import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { axiosApiClient } from '@/app/api/axiosApiClient';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePathname } from 'next/navigation';
 import ThemeToggle from '@/components/theme-toggle';
+import { AuthDialogContent } from '@/components/customer-auth';
+import type { AuthCallbackMessage } from '@/app/auth/callback/page';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +54,222 @@ const CartButton = React.memo(() => {
 });
 
 CartButton.displayName = 'CartButton';
+
+// ─── Login Button (Magic Link + Session) ─────────────────────────────────────────────
+
+function LoginButton() {
+    const queryClient = useQueryClient();
+    // loginOpen  → controls the centered Dialog (logged-out flow)
+    // menuOpen   → controls the user account dropdown (logged-in flow)
+    const [loginOpen, setLoginOpen] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [session, setSession] = useState<import('@supabase/supabase-js').Session | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // ── Init session + subscribe to auth state changes ────────────────────────────
+    useEffect(() => {
+        let sub: { unsubscribe: () => void } | null = null;
+        let bc: BroadcastChannel | null = null;
+
+        const init = async () => {
+            const supabase = await createClient();
+
+            // Read current session immediately
+            const { data } = await supabase.auth.getSession();
+            setSession(data.session);
+
+            // Keep UI in sync with real-time auth changes (magic link callback, logout, etc.)
+            const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+                setSession(newSession);
+
+                if (_event === 'SIGNED_IN' && newSession?.user?.email) {
+                    setLoginOpen(false);
+
+                    // ── Sync user into the database ───────────────────────────────
+                    try {
+                        const user = newSession.user;
+                        const name =
+                            (user.user_metadata?.full_name as string | undefined) ??
+                            (user.user_metadata?.name     as string | undefined);
+                        await axiosApiClient.post('/users/sync', {
+                            id:    user.id,
+                            email: user.email,
+                            ...(name ? { name } : {}),
+                        });
+                        // Refresh admin accounts list if it is mounted in the same session
+                        queryClient.invalidateQueries({ queryKey: ['users'] });
+                    } catch (err) {
+                        // Non-fatal: log but never block the login flow
+                        console.warn('[user-sync] failed:', err);
+                    }
+                }
+            });
+            sub = listener.subscription;
+
+            // ── BroadcastChannel: react to magic-link callback tab ────────────
+            // The callback page broadcasts session tokens after OTP exchange.
+            // We call setSession() — NOT getSession() — because getSession()
+            // returns the stale in-memory cache (null in the original tab).
+            // setSession() hydrates the cache and fires onAuthStateChange.
+            try {
+                bc = new BroadcastChannel('mj-auth-callback');
+                bc.onmessage = async (evt: MessageEvent<AuthCallbackMessage>) => {
+                    if (evt.data?.event === 'SIGNED_IN') {
+                        const { data: { session: newSess }, error } =
+                            await supabase.auth.setSession({
+                                access_token: evt.data.accessToken,
+                                refresh_token: evt.data.refreshToken,
+                            });
+
+                        if (!error && newSess) {
+                            setSession(newSess);
+                            setLoginOpen(false);
+                            toast.success('Signed in successfully', {
+                                description: newSess.user.email,
+                            });
+                        }
+                    }
+                };
+            } catch {
+                // BroadcastChannel not supported — onAuthStateChange covers this
+            }
+        };
+
+        init();
+        return () => {
+            sub?.unsubscribe();
+            bc?.close();
+        };
+    }, [queryClient]);
+
+    // ── Close logged-in menu on outside click ──────────────────────────────────
+    useEffect(() => {
+        if (!menuOpen) return;
+        function onClickOutside(e: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setMenuOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, [menuOpen]);
+
+    // ── Close logged-in menu on ESC ────────────────────────────────────────────
+    useEffect(() => {
+        if (!menuOpen) return;
+        function onKey(e: KeyboardEvent) {
+            if (e.key === 'Escape') setMenuOpen(false);
+        }
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [menuOpen]);
+
+    // ── Logout ───────────────────────────────────────────────────────────────────
+    const handleLogout = async () => {
+        const supabase = await createClient();
+        await supabase.auth.signOut();
+        setMenuOpen(false);
+        toast.success('Logged out');
+    };
+
+    // ── Render: LOGGED IN ───────────────────────────────────────────────────────────
+    if (session) {
+        return (
+            <div ref={menuRef} className="relative">
+                {/* Avatar trigger */}
+                <button
+                    onClick={() => setMenuOpen((o) => !o)}
+                    className="flex items-center justify-center w-9 h-9 bg-foreground text-background hover:opacity-80 transition-opacity focus-visible:outline-none"
+                    aria-label="Account menu"
+                    aria-expanded={menuOpen}
+                    aria-haspopup="true"
+                >
+                    <User className="w-[15px] h-[15px]" strokeWidth={1.5} />
+                </button>
+
+                {/* Account dropdown */}
+                {menuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-background border border-border shadow-xl z-[200] animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
+                        {/* Email display */}
+                        <div className="px-4 py-3 border-b border-border">
+                            <p className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Signed in as</p>
+                            <p className="text-xs text-foreground truncate">{session.user.email}</p>
+                        </div>
+
+                        {/* Nav links */}
+                        <div className="py-1 border-b border-border">
+                            <Link
+                                href="/orders"
+                                onClick={() => setMenuOpen(false)}
+                                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+                            >
+                                <Package className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                                Orders
+                            </Link>
+                            <Link
+                                href="/profile"
+                                onClick={() => setMenuOpen(false)}
+                                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+                            >
+                                <User className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                                Profile
+                            </Link>
+                        </div>
+
+                        {/* Logout */}
+                        <button
+                            onClick={handleLogout}
+                            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                        >
+                            <LogOut className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                            Log out
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ── Render: LOGGED OUT — centered Dialog ───────────────────────────────────
+    // AuthDialogContent manages its own form/sent step state.
+    // key={loginOpen} resets it cleanly each time the dialog opens.
+    return (
+        <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+            <DialogTrigger asChild>
+                <button
+                    className="flex items-center gap-1.5 px-3 h-9 text-[11px] font-semibold uppercase tracking-widest text-foreground border border-border hover:bg-accent transition-colors"
+                    aria-label="Login"
+                >
+                    <User className="w-[14px] h-[14px]" strokeWidth={1.5} />
+                    Login
+                </button>
+            </DialogTrigger>
+
+            <DialogContent
+                className="sm:max-w-sm w-full p-6 shadow-2xl rounded-none border border-border"
+            >
+                {/* ── Accessibility: required by Radix for screen readers ────── */}
+                {/* Visually hidden — branding is rendered inside AuthDialogContent */}
+                <DialogTitle className="sr-only">
+                    Sign in to MJ Decors
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                    Enter your email address to receive a secure sign-in link.
+                    No password required.
+                </DialogDescription>
+
+                <AuthDialogContent
+                    key={String(loginOpen)}
+                    onAuthenticated={(email) => {
+                        setLoginOpen(false);
+                        toast.success('Signed in successfully', { description: email });
+                    }}
+                />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 // ─── Search Bar (inline, replaces nav) ───────────────────────────────────────
 
@@ -99,56 +318,12 @@ const SearchBar = ({
 
 const Header = ({ isVisible, isFixed }: HeaderProps) => {
     const pathname = usePathname();
-    const router = useRouter();
     const [searchOpen, setSearchOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [accountModalOpen, setAccountModalOpen] = useState(false);
-    const { registerOpenAuthModal, authModalContext, setAuthModalContext } = useCartStore();
 
     const openSearch = useCallback(() => setSearchOpen(true), []);
     const closeSearch = useCallback(() => setSearchOpen(false), []);
 
-    // Register openAuthModal into the cart store so CartSheet can call it
-    useEffect(() => {
-        registerOpenAuthModal(() => setAccountModalOpen(true));
-    }, [registerOpenAuthModal]);
-
-    // ── Reactive customer auth state ──────────────────────────────────────────
-    // Customers use localStorage (no Supabase Auth session).
-    // The storage event fires in the same tab via manual dispatch AND cross-tab.
-    const [loggedInUser, setLoggedInUser] = useState<{ id: string } | null>(null);
-
-    useEffect(() => {
-        // Initial read
-        try {
-            const stored = localStorage.getItem('user');
-            setLoggedInUser(stored ? JSON.parse(stored) : null);
-        } catch {
-            setLoggedInUser(null);
-        }
-
-        // Cross-tab + same-tab listener (account-form dispatches StorageEvent on login/logout)
-        function onStorage(e: StorageEvent) {
-            if (e.key !== 'user') return;
-            try {
-                setLoggedInUser(e.newValue ? JSON.parse(e.newValue) : null);
-            } catch {
-                setLoggedInUser(null);
-            }
-
-            // ── Post-login redirect ─────────────────────────────────────────
-            if (e.newValue) {
-                const redirect = localStorage.getItem('redirectAfterLogin');
-                if (redirect) {
-                    localStorage.removeItem('redirectAfterLogin');
-                    router.push(redirect);
-                }
-            }
-        }
-
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, [router]);
 
 
     const handleAboutClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -248,8 +423,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
 
                             <ThemeToggle />
                             <CartButton />
-                            {loggedInUser && <NotificationBell role="customer" userId={loggedInUser.id} />}
-                            <AccountButton onClick={() => setAccountModalOpen(true)} />
+                            <LoginButton />
                         </div>
 
                         {/* ── Mobile right actions ── */}
@@ -271,8 +445,7 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
 
                                     <ThemeToggle className="w-9 h-9" />
                                     <CartButton />
-                                    {loggedInUser && <NotificationBell role="customer" userId={loggedInUser.id} />}
-                                    <AccountButton onClick={() => setAccountModalOpen(true)} />
+                                    <LoginButton />
 
                                     {/* Mobile sheet menu */}
                                     <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -333,17 +506,6 @@ const Header = ({ isVisible, isFixed }: HeaderProps) => {
                     </div>
                 </div>
             </header>
-
-            <AccountModal
-                isOpen={accountModalOpen}
-                onClose={() => {
-                    setAccountModalOpen(false);
-                    setAuthModalContext('default'); // reset so next normal open has no context
-                }}
-                context={authModalContext}
-            >
-                <AccountForm />
-            </AccountModal>
         </>
     );
 };

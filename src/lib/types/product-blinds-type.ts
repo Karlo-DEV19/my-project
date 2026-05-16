@@ -13,6 +13,11 @@ export interface CreateBlindsResponse {
 
         thickness: string;
         unitPrice: number;
+        // ── Promo / Discount ───────────────────────────────────────────────
+        enablePromo:   boolean;
+        discountType:  'percentage' | 'fixed' | null;
+        discountValue: number | null;
+        // ──────────────────────────────────────────────────────────────────
         createdAt: string;
         updatedAt: string;
     };
@@ -46,6 +51,10 @@ export interface BlindsProduct {
     status: "active" | "inactive" | "draft" | string;
     unitPrice: number;
     createdAt: string;
+    // ── Promo / Discount ──────────────────────────────────────
+    enablePromo:   boolean;
+    discountType:  'percentage' | 'fixed' | null;
+    discountValue: number | null;
     // New nested relations from backend findMany({ with: ... })
     colors: BlindsProductColor[];
     images: BlindsProductImage[];
@@ -99,7 +108,7 @@ export interface BlindsProductDetailResponse {
         name: string;
         description: string | null;
         type: string;
-        collection: string | null; // Added missing collection field based on API JSON
+        collection: string | null;
         characteristic: string | null;
         composition: string | null;
         fabricWidth: string | null;
@@ -107,8 +116,13 @@ export interface BlindsProductDetailResponse {
         thickness: string | null;
         status: "active" | "archived" | string;
         unitPrice: number;
-        createdAt: string; // ISO Date string
-        updatedAt: string; // ISO Date string
+        // ── Promo / Discount ───────────────────────────────────────────────
+        enablePromo:   boolean;
+        discountType:  'percentage' | 'fixed' | null;
+        discountValue: number | null;
+        // ──────────────────────────────────────────────────────────────────
+        createdAt: string;
+        updatedAt: string;
         images: BlindsImage[];
         colors: BlindsColor[];
     };
@@ -135,6 +149,10 @@ export interface NewArrivalProduct {
     unitPrice: number
     collection: string
     createdAt: string
+    // ── Promo / Discount ──────────────────────────────────────
+    enablePromo:   boolean
+    discountType:  'percentage' | 'fixed' | null
+    discountValue: number | null
     colors: NewArrivalProductColor[]
     images: NewArrivalProductImage[]
 }
@@ -179,6 +197,10 @@ export interface BestSellerProduct {
     unitPrice: number
     collection: string
     createdAt: string
+    // ── Promo / Discount ──────────────────────────────────────
+    enablePromo:   boolean
+    discountType:  'percentage' | 'fixed' | null
+    discountValue: number | null
     colors: BestSellerProductColor[]
     images: BestSellerProductImage[]
 }
@@ -203,22 +225,26 @@ export interface GetAllBestSellerProductBlinds {
 
 
 export interface EditProductPayload {
-  productCode: string;
-  name: string;
-  description: string;
-  type: string;
-  collection: "Shop Only" | "New Arrival" | "Best Seller";
-  status: "active" | "inactive" | "archived";
-  composition: string;
-  fabricWidth: string;
-  thickness: string;
+    productCode: string;
+    name: string;
+    description: string;
+    type: string;
+    collection: "Shop Only" | "New Arrival" | "Best Seller";
+    status: "active" | "inactive" | "archived";
+    composition: string;
+    fabricWidth: string;
+    thickness: string;
 
-  characteristic: string;
-  unitPrice: number;
-  mainImages: string[]; // Array of URLs
-  availableColors: {
-    imageUrl: string; // The URL string for the swatch
-    name: string;     // Color name
-  }[];
-  userId: string;
+    characteristic: string;
+    unitPrice: number;
+    mainImages: string[];         // Array of URLs
+    availableColors: {
+        imageUrl: string;         // The URL string for the swatch
+        name: string;             // Color name
+    }[];
+    userId: string;
+    // ── Promo / Discount ─────────────────────────────────────────────────
+    enablePromo:   boolean;
+    discountType:  'percentage' | 'fixed' | null;
+    discountValue: number | null;
 }

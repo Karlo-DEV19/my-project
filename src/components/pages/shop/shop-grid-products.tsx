@@ -2,8 +2,26 @@
 
 import React, { useCallback } from 'react';
 import Image from 'next/image';
+import { Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BlindsProduct } from '@/lib/types/product-blinds-type';
+
+// ── Helpers ─────────────────────────────────────────────────────────────────────────────
+
+/** Computes the promo unit-price per sq.ft after discount. */
+function computePromoUnitPrice(
+    unitPrice: number,
+    discountType: 'percentage' | 'fixed',
+    discountValue: number,
+): number {
+    if (discountType === 'percentage') return unitPrice * (1 - discountValue / 100);
+    return Math.max(0, unitPrice - discountValue);
+}
+
+/** Quick PHP currency string without the ₱ sign so we can prepend it ourselves. */
+function fmtPrice(n: number): string {
+    return n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 interface ProductGridProps {
     products: BlindsProduct[];
     isLoading?: boolean;
@@ -95,11 +113,24 @@ const ProductGrid = ({ products, isLoading = false }: ProductGridProps) => {
                             {/* Status badge */}
                             {product.status && product.status !== 'active' && (
                                 <div className="absolute top-3 left-3">
-                                    <span className={`text-[9px] uppercase tracking-widest font-medium px-2 py-1 ${product.status === 'draft'
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-muted text-muted-foreground'
+                                    <span className={`text-[9px] uppercase tracking-widest font-medium px-2 py-1 ${
+                                        product.status === 'draft'
+                                            ? 'bg-amber-100 text-amber-700'
+                                            : 'bg-muted text-muted-foreground'
                                         }`}>
                                         {product.status}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Promo badge — top right */}
+                            {product.enablePromo && product.discountType && product.discountValue && (
+                                <div className="absolute top-3 right-3">
+                                    <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold px-2 py-1 bg-rose-600 text-white">
+                                        <Tag className="w-2.5 h-2.5" strokeWidth={2} />
+                                        {product.discountType === 'percentage'
+                                            ? `${product.discountValue}% OFF`
+                                            : `₱${product.discountValue} OFF`}
                                     </span>
                                 </div>
                             )}
@@ -118,11 +149,22 @@ const ProductGrid = ({ products, isLoading = false }: ProductGridProps) => {
                                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium truncate pr-2">
                                     {product.productCode} • {product.type}
                                 </span>
-                                {/* Price */}
+                                {/* Price — promo-aware */}
                                 {product.unitPrice != null && (
-                                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium shrink-0">
-                                        ₱{product.unitPrice.toLocaleString()}
-                                    </span>
+                                    product.enablePromo && product.discountType && product.discountValue ? (
+                                        <div className="flex flex-col items-end shrink-0 gap-0.5">
+                                            <span className="text-[9px] text-muted-foreground line-through leading-none">
+                                                ₱{fmtPrice(product.unitPrice)}
+                                            </span>
+                                            <span className="text-[10px] font-semibold text-rose-600 leading-none">
+                                                ₱{fmtPrice(computePromoUnitPrice(product.unitPrice, product.discountType, product.discountValue))}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium shrink-0">
+                                            ₱{product.unitPrice.toLocaleString()}
+                                        </span>
+                                    )
                                 )}
                             </div>
 

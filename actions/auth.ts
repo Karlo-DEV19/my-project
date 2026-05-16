@@ -60,17 +60,26 @@ export const getUserSession = cache(async (): Promise<AuthResponse> => {
     }
 
     // 2. Employees table
-    const employee = await db.query.employees.findFirst({
-        where: eq(employees.id, user.id),
-        columns: {
-            role: true,
-            isActive: true,
-            firstName: true,
-            lastName: true,
-            position: true,
-            profileImage: true,
-        },
-    })
+    // NOTE: employees table is optional.
+    // If not migrated yet, this will safely fail.
+    // Future: enable when staff system is implemented.
+    let employee = null
+
+    try {
+        employee = await db.query.employees.findFirst({
+            where: eq(employees.id, user.id),
+            columns: {
+                role: true,
+                isActive: true,
+                firstName: true,
+                lastName: true,
+                position: true,
+                profileImage: true,
+            },
+        })
+    } catch {
+        console.warn("[SAFE] employees table not ready yet — skipping employee lookup")
+    }
 
     if (employee) {
         if (!employee.isActive) return { isAuthenticated: false, user: null }
@@ -150,12 +159,21 @@ export async function initiateSignIn(email: string, password: string): Promise<A
     })
 
     // 2b. Fall through to employees if not an admin
-    const employee = admin
-        ? null
-        : await db.query.employees.findFirst({
-            where: eq(employees.id, userId),
-            columns: { isActive: true },
-        })
+    // NOTE: employees table is optional.
+    // If not migrated yet, this will safely fail.
+    // Future: enable when staff system is implemented.
+    let employee = null
+
+    if (!admin) {
+        try {
+            employee = await db.query.employees.findFirst({
+                where: eq(employees.id, userId),
+                columns: { isActive: true },
+            })
+        } catch {
+            console.warn("[SAFE] employees table not ready yet — skipping employee lookup")
+        }
+    }
 
     const record = admin ?? employee
 

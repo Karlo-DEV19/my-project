@@ -6,6 +6,7 @@ export const ActivityAction = {
     CREATE: "CREATE",
     UPDATE: "UPDATE",
     DELETE: "DELETE",
+    MAGIC_LINK_SENT: "MAGIC_LINK_SENT",
 } as const;
 
 export const ActivityModule = {

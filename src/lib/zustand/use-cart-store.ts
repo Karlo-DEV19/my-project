@@ -26,11 +26,18 @@ export interface BlindOrderFields {
         heightCm: number
         sqFt: number
         chargeableSqFt: number
+        /** Effective unit price used in all calculations (may be promo price) */
         unitPrice: number
+        /** Original regular unit price before any discount; equals unitPrice when no promo */
+        regularUnitPrice: number
         subTotalPerPanel: number
         panels: number
         total: number
         minimumApplied: boolean
+        // ── Promo metadata (optional — absent on legacy cart items) ──────────
+        enablePromo?: boolean
+        discountType?: 'percentage' | 'fixed' | null
+        discountValue?: number | null
     }
 }
 

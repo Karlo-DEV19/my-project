@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { ShoppingBag } from 'lucide-react'
+import { ShoppingBag, Tag } from 'lucide-react'
 import type { CartItem } from '@/lib/zustand/use-cart-store'
 import { computeCartTotals } from '@/lib/zustand/use-cart-store'
 
@@ -10,6 +10,12 @@ function php(n: number) {
     return new Intl.NumberFormat('en-PH', {
         style: 'currency', currency: 'PHP', minimumFractionDigits: 2,
     }).format(n)
+}
+
+function promoLabel(discountType: 'percentage' | 'fixed', discountValue: number): string {
+    return discountType === 'percentage'
+        ? `${discountValue}% OFF`
+        : `₱${discountValue.toLocaleString()} OFF`
 }
 
 interface OrderSummaryProps {
@@ -53,7 +59,15 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
             <div className="flex flex-col p-6 gap-6">
                 {items.map((item) => {
                     const { order, quantity, cartItemId } = item
-                    const lineTotal = order.priceBreakdown.total * quantity
+                    const pb = order.priceBreakdown
+                    const lineTotal = pb.total * quantity
+
+                    const hasActivePromo =
+                        pb.enablePromo === true &&
+                        !!pb.discountType &&
+                        pb.discountValue != null &&
+                        pb.discountValue > 0 &&
+                        pb.unitPrice !== pb.regularUnitPrice;
 
                     return (
                         <div key={cartItemId} className="flex gap-4">
@@ -107,13 +121,30 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
                                         )}
                                     </div>
 
+                                    {/* Promo badge */}
+                                    {hasActivePromo && pb.discountType && pb.discountValue != null && (
+                                        <span className="self-start inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 bg-rose-600 text-white leading-none mt-1">
+                                            <Tag className="w-2 h-2" strokeWidth={2} />
+                                            {promoLabel(pb.discountType, pb.discountValue)}
+                                        </span>
+                                    )}
+
+                                    {/* Unit price detail line */}
                                     <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                                        {php(order.priceBreakdown.unitPrice)}/sq·ft
-                                        {' · '}
-                                        {order.priceBreakdown.chargeableSqFt.toFixed(2)} sq·ft
+                                        {hasActivePromo ? (
+                                            <>
+                                                <span className="line-through">{php(pb.regularUnitPrice)}</span>
+                                                {' '}
+                                                <span className="text-rose-600 font-medium">{php(pb.unitPrice)}</span>
+                                            </>
+                                        ) : (
+                                            php(pb.unitPrice)
+                                        )}
+                                        {'/sq·ft · '}
+                                        {pb.chargeableSqFt.toFixed(2)} sq·ft
                                         {' · '}
                                         {order.panels} {order.panels === 1 ? 'panel' : 'panels'}
-                                        {order.priceBreakdown.minimumApplied && (
+                                        {pb.minimumApplied && (
                                             <span className="ml-1 text-amber-600">(min. applied)</span>
                                         )}
                                     </p>
@@ -123,7 +154,7 @@ export const OrderSummary = ({ items }: OrderSummaryProps) => {
                                     <span className="text-xs text-muted-foreground">
                                         {quantity > 1 ? `× ${quantity} sets` : `1 set`}
                                     </span>
-                                    <span className="text-sm font-medium text-foreground font-serif">
+                                    <span className={`text-sm font-medium font-serif ${hasActivePromo ? 'text-rose-600' : 'text-foreground'}`}>
                                         {php(lineTotal)}
                                     </span>
                                 </div>

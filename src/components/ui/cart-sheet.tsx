@@ -2,7 +2,7 @@
 
 import React, { useCallback } from 'react';
 import Image from 'next/image';
-import { X, ShoppingBag, Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
+import { X, ShoppingBag, Trash2, Plus, Minus, ArrowRight, Tag } from 'lucide-react';
 import {
     Sheet,
     SheetContent,
@@ -19,6 +19,13 @@ function php(n: number) {
     }).format(n);
 }
 
+/** Returns a short discount label, e.g. "50% OFF" or "₱45 OFF" */
+function promoLabel(discountType: 'percentage' | 'fixed', discountValue: number): string {
+    return discountType === 'percentage'
+        ? `${discountValue}% OFF`
+        : `₱${discountValue.toLocaleString()} OFF`;
+}
+
 // ─── Single cart line ─────────────────────────────────────────────────────────
 
 const RelativeImage = ({ url, name }: { url: string; name: string }) => (
@@ -29,10 +36,18 @@ const RelativeImage = ({ url, name }: { url: string; name: string }) => (
 
 const CartLineItem = React.memo(({ item }: { item: CartItem }) => {
     const { removeFromCart, updateQuantity } = useCartStore();
-    const router = useRouter();
     const { order, quantity, cartItemId } = item;
-    const lineTotal = order.priceBreakdown.total;
-    console.log("order", order)
+    const { priceBreakdown: pb } = order;
+
+    // Promo detection — safe for legacy items without promo fields
+    const hasActivePromo =
+        pb.enablePromo === true &&
+        !!pb.discountType &&
+        pb.discountValue != null &&
+        pb.discountValue > 0 &&
+        pb.unitPrice !== pb.regularUnitPrice;
+
+    const lineTotal = pb.total * quantity;
 
     return (
         <div className="flex gap-4 py-5 border-b border-border last:border-0 group">
@@ -97,8 +112,36 @@ const CartLineItem = React.memo(({ item }: { item: CartItem }) => {
                         ))}
                 </div>
 
+                {/* Promo badge */}
+                {hasActivePromo && pb.discountType && pb.discountValue != null && (
+                    <span className="self-start inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 bg-rose-600 text-white leading-none">
+                        <Tag className="w-2 h-2" strokeWidth={2} />
+                        {promoLabel(pb.discountType, pb.discountValue)}
+                    </span>
+                )}
+
+                {/* Unit price info line */}
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    {hasActivePromo ? (
+                        <>
+                            <span className="line-through">{php(pb.regularUnitPrice)}</span>
+                            {' '}
+                            <span className="text-rose-600 font-medium">{php(pb.unitPrice)}</span>
+                        </>
+                    ) : (
+                        php(pb.unitPrice)
+                    )}
+                    {'/sq·ft · '}
+                    {pb.chargeableSqFt.toFixed(2)} sq·ft
+                    {' · '}
+                    {order.panels} {order.panels === 1 ? 'panel' : 'panels'}
+                    {pb.minimumApplied && (
+                        <span className="ml-1 text-amber-600">(min. applied)</span>
+                    )}
+                </p>
+
                 {/* Quantity + Price row */}
-                <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center justify-between mt-1">
                     {/* Quantity stepper */}
                     <div className="flex items-center border border-border h-7">
                         <button
@@ -121,8 +164,8 @@ const CartLineItem = React.memo(({ item }: { item: CartItem }) => {
                     </div>
 
                     {/* Line total */}
-                    <span className="text-sm font-medium text-foreground font-serif">
-                        {php(lineTotal * quantity)}
+                    <span className={`text-sm font-medium font-serif ${hasActivePromo ? 'text-rose-600' : 'text-foreground'}`}>
+                        {php(lineTotal)}
                     </span>
                 </div>
             </div>

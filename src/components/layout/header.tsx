@@ -59,11 +59,18 @@ CartButton.displayName = 'CartButton';
 
 function LoginButton() {
     const queryClient = useQueryClient();
+    const { registerOpenAuthModal } = useCartStore();
     // loginOpen  → controls the centered Dialog (logged-out flow)
     // menuOpen   → controls the user account dropdown (logged-in flow)
     const [loginOpen, setLoginOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [session, setSession] = useState<import('@supabase/supabase-js').Session | null>(null);
+
+    // ── Register auth modal opener with cart store ─────────────────────────────
+    // This allows CartSheet to open the login dialog when guest clicks Checkout.
+    useEffect(() => {
+        registerOpenAuthModal(() => setLoginOpen(true));
+    }, [registerOpenAuthModal]);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // ── Init session + subscribe to auth state changes ────────────────────────────
@@ -78,12 +85,38 @@ function LoginButton() {
             const { data } = await supabase.auth.getSession();
             setSession(data.session);
 
+            // ── Sync localStorage user for cart/checkout autofill ─────────────
+            if (data.session?.user) {
+                const u = data.session.user;
+                try {
+                    localStorage.setItem('user', JSON.stringify({
+                        id: u.id,
+                        email: u.email ?? '',
+                        name: (u.user_metadata?.full_name as string | undefined)
+                            ?? (u.user_metadata?.name as string | undefined)
+                            ?? '',
+                    }));
+                } catch { /* storage unavailable */ }
+            }
+
             // Keep UI in sync with real-time auth changes (magic link callback, logout, etc.)
             const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
                 setSession(newSession);
 
                 if (_event === 'SIGNED_IN' && newSession?.user?.email) {
                     setLoginOpen(false);
+
+                    // ── Write to localStorage so cart checkout guard works ─────
+                    try {
+                        const u = newSession.user;
+                        localStorage.setItem('user', JSON.stringify({
+                            id: u.id,
+                            email: u.email ?? '',
+                            name: (u.user_metadata?.full_name as string | undefined)
+                                ?? (u.user_metadata?.name as string | undefined)
+                                ?? '',
+                        }));
+                    } catch { /* storage unavailable */ }
 
                     // ── Sync user into the database ───────────────────────────────
                     try {
@@ -102,6 +135,11 @@ function LoginButton() {
                         // Non-fatal: log but never block the login flow
                         console.warn('[user-sync] failed:', err);
                     }
+                }
+
+                if (_event === 'SIGNED_OUT') {
+                    // ── Clear localStorage so the cart guard re-gates correctly ─
+                    try { localStorage.removeItem('user'); } catch { /* storage unavailable */ }
                 }
             });
             sub = listener.subscription;
@@ -168,6 +206,9 @@ function LoginButton() {
     const handleLogout = async () => {
         const supabase = await createClient();
         await supabase.auth.signOut();
+        // SIGNED_OUT event from onAuthStateChange also removes the item,
+        // but clear immediately for snappier UI response.
+        try { localStorage.removeItem('user'); } catch { /* storage unavailable */ }
         setMenuOpen(false);
         toast.success('Logged out');
     };

@@ -212,11 +212,11 @@ function toAccount(row: {
   login_count?: number | null;
 }): Account {
   return {
-    id:         String(row.id),
-    name:       row.name ?? '',
-    email:      row.email ?? '',
-    createdAt:  row.created_at ? String(row.created_at).split('T')[0] : '',
-    lastLogin:  row.last_login ?? null,
+    id: String(row.id),
+    name: row.name ?? '',
+    email: row.email ?? '',
+    createdAt: row.created_at ? String(row.created_at).split('T')[0] : '',
+    lastLogin: row.last_login ?? null,
     loginCount: row.login_count ?? 0,
   };
 }

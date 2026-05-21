@@ -9,6 +9,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { CartItem, useCartStore } from '@/lib/zustand/use-cart-store';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -207,27 +208,31 @@ const CartSheet = () => {
     }, [closeCartSheet]);
 
     // ── Auth-aware checkout ────────────────────────────────────────
-    const handleCheckout = useCallback(() => {
-        let user = null;
-        try {
-            const stored = localStorage.getItem('user');
-            user = stored ? JSON.parse(stored) : null;
-        } catch { /* corrupted storage */ }
+    const handleCheckout = useCallback(async () => {
+        // Use Supabase session directly — avoids localStorage timing race:
+        // localStorage.user is written asynchronously by the Header on mount,
+        // so checking it synchronously always returns null on first load,
+        // causing the cart to close silently with nothing happening.
+        // getSession() reads from the Supabase client's in-memory cache and
+        // is reliable regardless of when Header finishes its async init.
+        const supabase = await createClient();
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (!user) {
-            // Save redirect target so the auth success handler can navigate there
-            localStorage.setItem('redirectAfterLogin', '/shop/checkout');
-            closeCartSheet();
-            // Signal checkout context so the modal shows the guided message
+        if (!session) {
+            // Guest: preserve redirect intent, close cart, open auth modal
+            try { localStorage.setItem('redirectAfterLogin', '/shop/checkout'); } catch { /* noop */ }
             setAuthModalContext('checkout');
-            // Trigger the existing auth modal registered by Header
+            closeCartSheet();
+            // _openAuthModal is registered by LoginButton (in Header) on mount.
+            // By the time a user can interact with the cart, Header is long mounted.
             _openAuthModal?.();
             return;
         }
 
+        // Authenticated: navigate to checkout page
         closeCartSheet();
         router.push('/shop/checkout');
-    }, [_openAuthModal, closeCartSheet, router]);
+    }, [_openAuthModal, closeCartSheet, router, setAuthModalContext]);
 
     return (
         <Sheet open={isSheetOpen} onOpenChange={handleOpenChange}>

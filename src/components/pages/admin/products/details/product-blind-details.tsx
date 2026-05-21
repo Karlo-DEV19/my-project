@@ -4,7 +4,7 @@ import { useGetBlindsDetailsByProductId } from "@/app/api/hooks/use-product-blin
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { NavigationLoader } from "@/components/ui/navigation-loader"; // Adjust path accordingly
 import { cn } from "@/lib/utils";
@@ -70,7 +70,8 @@ export const ProductViewDetails = ({ productId }: ProductViewDetailsProps) => {
             {/* Image Preview Modal */}
             <Dialog open={!!modalImage} onOpenChange={() => setModalImage(null)}>
                 <DialogContent className="max-w-3xl overflow-hidden border-none bg-transparent p-0 shadow-none">
-                    <DialogTitle className="sr-only">Image Preview</DialogTitle>
+                <DialogTitle className="sr-only">Image Preview</DialogTitle>
+                    <DialogDescription className="sr-only">Full-size product image preview.</DialogDescription>
                     {modalImage && (
                         <div className="relative aspect-square w-full">
                             <Image src={modalImage} alt="Preview" fill className="object-contain" priority />

@@ -741,11 +741,16 @@ const ShopProductDetailsView = ({ product }: Props) => {
                                         <span className="text-sm text-right font-medium text-foreground self-center">{value}</span>
                                     </div>
                                 ))}
-                                <div className="flex items-center justify-between px-4 py-4 bg-foreground text-background">
+                                {/* Installation / Delivery — display only, not included in total yet */}
+                                <div className="grid grid-cols-2 px-4 py-3 border-t border-border/40">
                                     <div className="flex flex-col gap-0.5">
-                                        <span className="text-[10px] uppercase tracking-widest font-semibold opacity-70">Total Estimate</span>
-                                        <span className="text-[10px] opacity-50">excl. installation / delivery</span>
+                                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Installation / Delivery</span>
+                                        <span className="text-[10px] text-muted-foreground/60">Final price confirmed later</span>
                                     </div>
+                                    <span className="text-sm text-right font-medium text-muted-foreground self-center italic">To be quoted</span>
+                                </div>
+                                <div className="flex items-center justify-between px-4 py-4 bg-foreground text-background">
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold opacity-70">Total Estimate</span>
                                     <span className="text-2xl font-serif font-medium tracking-wide">{php(price.total)}</span>
                                 </div>
                                 <p className="px-4 py-2.5 text-[10px] text-muted-foreground bg-accent/20 leading-relaxed">

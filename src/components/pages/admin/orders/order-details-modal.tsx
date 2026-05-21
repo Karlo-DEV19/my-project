@@ -6,6 +6,7 @@ import { axiosApiClient } from '@/app/api/axiosApiClient';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -286,6 +287,9 @@ function ModalShell({
                     <p className="font-mono text-[11px] text-muted-foreground mt-1">
                         {trackingNumber}
                     </p>
+                    <DialogDescription className="sr-only">
+                        Full details for order {trackingNumber}, including customer info, items, and payment history.
+                    </DialogDescription>
                 </DialogHeader>
                 {children}
             </DialogContent>
@@ -309,13 +313,7 @@ export function OrderDetailsModal({ order, onClose }: OrderDetailsModalProps) {
     });
 
     // ── Early exit: modal closed ─────────────────────────────────────────────
-    if (!order) {
-        return (
-            <Dialog open={false} onOpenChange={() => {}}>
-                <DialogContent />
-            </Dialog>
-        );
-    }
+    if (!order) return null;
 
     const statusKey    = order.status?.toLowerCase() ?? '';
     const payStatusKey = order.paymentStatus?.toLowerCase() ?? '';

@@ -37,13 +37,13 @@ const CheckoutPage = () => {
 
                 <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
 
-                    {/* Order Summary — sticky on desktop, shown first on mobile */}
-                    <div className="w-full lg:w-[45%] xl:w-[40%] shrink-0 lg:sticky lg:top-24 order-1 lg:order-2">
+                    {/* Order Summary — sticky on desktop, shown below form on mobile */}
+                    <div className="w-full lg:w-[45%] xl:w-[40%] shrink-0 lg:sticky lg:top-24 order-2 lg:order-2">
                         <OrderSummary items={items} />
                     </div>
 
-                    {/* Checkout Form */}
-                    <div className="flex-1 w-full order-2 lg:order-1">
+                    {/* Checkout Form — shown first on both mobile and desktop */}
+                    <div className="flex-1 w-full order-1 lg:order-1">
                         <CheckoutForm
                             items={items}
                             clearCart={clearCart}

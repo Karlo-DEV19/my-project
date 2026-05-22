@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { CheckoutForm } from '@/components/pages/shop/checkout/checkout-form'
 import { OrderSummary } from '@/components/pages/shop/checkout/order-summary'
 import { useCartStore } from '@/lib/zustand/use-cart-store'
@@ -14,6 +14,13 @@ import { computeCartTotals } from '@/lib/zustand/use-cart-store'
 const CheckoutPage = () => {
     const items = useCartStore((s) => s.items)
     const clearCart = useCartStore((s) => s.clearCart)
+
+    // Tracks city/province as the user fills in the address form so OrderSummary
+    // can compute the delivery fee in real time without Zustand or context.
+    const [deliveryAddress, setDeliveryAddress] = useState<{
+        city: string
+        province: string
+    }>({ city: "", province: "" })
 
     // Compute downpayment totals — what PayMongo actually charges (50% of full total)
     const totals = useMemo(() => computeCartTotals(items), [items])
@@ -39,7 +46,7 @@ const CheckoutPage = () => {
 
                     {/* Order Summary — sticky on desktop, shown below form on mobile */}
                     <div className="w-full lg:w-[45%] xl:w-[40%] shrink-0 lg:sticky lg:top-24 order-2 lg:order-2">
-                        <OrderSummary items={items} />
+                        <OrderSummary items={items} deliveryAddress={deliveryAddress} />
                     </div>
 
                     {/* Checkout Form — shown first on both mobile and desktop */}
@@ -48,6 +55,7 @@ const CheckoutPage = () => {
                             items={items}
                             clearCart={clearCart}
                             totals={totals}
+                            onAddressChange={setDeliveryAddress}
                         />
                     </div>
 

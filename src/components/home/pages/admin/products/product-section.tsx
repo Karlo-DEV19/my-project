@@ -1,0 +1,300 @@
+"use client"
+
+import React, { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import Image from "next/image"
+import { Eye, Trash2, Edit3, MoreVertical, Package, Tag } from "lucide-react"
+
+// ─── Promo helpers ────────────────────────────────────────────────────────────
+
+function computePromoPrice(
+    unitPrice: number,
+    discountType: 'percentage' | 'fixed',
+    discountValue: number,
+): number {
+    if (discountType === 'percentage') return unitPrice * (1 - discountValue / 100);
+    return Math.max(0, unitPrice - discountValue);
+}
+
+function fmtUnitPrice(n: number): string {
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+import { useDeleteBlinds, useGetBlindsProducts } from "@/app/api/hooks/use-product-blinds"
+import { ApiError } from "@/app/api/axiosApiClient"
+import { toast } from "sonner"
+import { ProductsTableHeader } from "./products-table-header"
+import { InventorySkeleton } from "./table-skeleton"
+import DataPagination from "@/components/ui/data-pagination"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+
+const ProductSection = () => {
+    const [mounted, setMounted] = useState(false)
+    const [page, setPage] = useState(1)
+    const [perPage, setPerPage] = useState(12)
+    const [search, setSearch] = useState("")
+    const [status, setStatus] = useState<string | null>(null)
+    const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined)
+
+    const router = useRouter()
+    const { deleteBlinds, isDeleting } = useDeleteBlinds()
+    const searchParams = useSearchParams()
+    const selectedId = searchParams.get("id")
+
+    // Fetch the signed-in admin's Supabase user ID once on mount
+    useEffect(() => {
+        setMounted(true)
+        createClient().then(async (supabase) => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user?.id) setCurrentUserId(user.id)
+        })
+    }, [])
+
+    // ── Step 3: auto-scroll to highlighted card ──────────────────────────────
+    useEffect(() => {
+        if (!selectedId) return
+        const element = document.getElementById(selectedId)
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+    }, [selectedId])
+
+    const { blinds, pagination, isPending } = useGetBlindsProducts({
+        page,
+        limit: perPage,
+        search,
+        status
+    })
+
+    const MAX_COLORS_DISPLAY = 4
+
+    if (!mounted) return <InventorySkeleton />
+
+    return (
+        <div className="space-y-8">
+            <ProductsTableHeader
+                search={search}
+                onSearchChange={(v) => { setSearch(v); setPage(1); }}
+                status={status}
+                onStatusChange={(v) => { setStatus(v); setPage(1); }}
+            />
+
+            {isPending ? (
+                <InventorySkeleton />
+            ) : blinds && blinds.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {blinds.map((product) => {
+                        const isHighlighted = product.id === selectedId
+                        return (
+                            <div
+                                id={product.id}
+                                key={product.id}
+                                className={`group relative flex flex-col rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${isHighlighted
+                                        ? 'border-amber-400/70 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-300/50 hover:border-amber-400'
+                                        : 'border-border/60 bg-card hover:border-primary/30'
+                                    }`}
+                            >
+                                {/* PREMIUM INSET IMAGE SECTION */}
+                                <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/50">
+                                    {/* Status Badge — top left */}
+                                    <div className="absolute left-3 top-3 z-10">
+                                        <Badge
+                                            variant={product.status === "active" ? "default" : "secondary"}
+                                            className="bg-background/90 text-foreground backdrop-blur-md hover:bg-background shadow-sm capitalize"
+                                        >
+                                            {product.status}
+                                        </Badge>
+                                    </div>
+
+                                    {/* Promo badge — top right */}
+                                    {product.enablePromo && product.discountType && product.discountValue != null && (
+                                        <div className="absolute right-3 top-3 z-10">
+                                            <span className="inline-flex items-center gap-1 rounded-sm bg-rose-600 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-white shadow-sm">
+                                                <Tag className="h-2.5 w-2.5" strokeWidth={2} />
+                                                {product.discountType === 'percentage'
+                                                    ? `${product.discountValue}% OFF`
+                                                    : `₱${product.discountValue} OFF`}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {product.images?.[0]?.imageUrl ? (
+                                        <Image
+                                            src={product.images[0].imageUrl}
+                                            alt={product.name}
+                                            fill
+                                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                            <Package className="h-10 w-10 opacity-20" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* STRUCTURED BODY SECTION */}
+                                <div className="flex flex-1 flex-col pt-4 px-1 pb-1">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                {product.productCode} • {product.type}
+                                            </p>
+                                            <h3 className="line-clamp-1 text-base font-bold tracking-tight text-foreground">
+                                                {product.name}
+                                            </h3>
+                                        </div>
+
+                                        {/* CLEAN ACTIONS MENU */}
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                                <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}`) }} className="cursor-pointer">
+                                                    <Eye className="mr-2 h-4 w-4" /> View Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => { router.push(`/admin/products/blinds/${product.id}/edit`) }} className="cursor-pointer">
+                                                    <Edit3 className="mr-2 h-4 w-4" /> Edit Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    disabled={isDeleting}
+                                                    onClick={async () => {
+                                                        const confirmed = window.confirm(
+                                                            `Are you sure you want to delete "${product.name}"? This cannot be undone.`
+                                                        )
+                                                        if (!confirmed) return
+                                                        try {
+                                                            await deleteBlinds({
+                                                                productId: product.id,
+                                                                userId: currentUserId,
+                                                            })
+                                                            toast.success(`"${product.name}" deleted successfully.`)
+                                                        } catch (err: any) {
+                                                            if (err instanceof ApiError && err.status === 400) {
+                                                                // Business rule block — show exact backend reason
+                                                                toast.error(err.message)
+                                                            } else {
+                                                                // Unexpected failure (500, network, etc.)
+                                                                console.error('[delete product]', err)
+                                                                toast.error('Failed to delete product. Please try again.')
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    {isDeleting ? "Deleting…" : "Delete Product"}
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    {/* FOOTER (Price & Colors) */}
+                                    <div className="mt-auto flex items-end justify-between pt-6">
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-medium text-muted-foreground">Price (sq.ft)</span>
+                                            {product.enablePromo && product.discountType && product.discountValue != null ? (
+                                                <>
+                                                    <span className="text-xs text-muted-foreground line-through leading-none">
+                                                        ₱{fmtUnitPrice(product.unitPrice)}
+                                                    </span>
+                                                    <span className="text-lg font-bold text-rose-600 leading-tight">
+                                                        ₱{fmtUnitPrice(computePromoPrice(product.unitPrice, product.discountType, product.discountValue))}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="text-lg font-bold text-foreground">
+                                                    ₱{fmtUnitPrice(product.unitPrice)}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center">
+                                            <div className="flex -space-x-2">
+                                                <TooltipProvider delayDuration={100}>
+                                                    {product.colors?.slice(0, MAX_COLORS_DISPLAY).map((color, idx) => (
+                                                        <Tooltip key={idx}>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="relative h-8 w-8 rounded-full border-2 border-card ring-1 ring-border/50 overflow-hidden bg-muted shadow-sm transition-transform hover:z-10 hover:scale-110">
+                                                                    <Image
+                                                                        src={color.imageUrl as string}
+                                                                        alt={color.name}
+                                                                        fill
+                                                                        className="object-cover"
+                                                                    />
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top" className="text-xs font-medium">
+                                                                {color.name}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    ))}
+                                                </TooltipProvider>
+
+                                                {product.colors && product.colors.length > MAX_COLORS_DISPLAY && (
+                                                    <div className="relative z-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-[10px] font-bold text-secondary-foreground ring-1 ring-border/50">
+                                                        +{product.colors.length - MAX_COLORS_DISPLAY}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-dashed border-border/60 bg-card/50">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+                        <Package className="h-8 w-8 text-muted-foreground/60" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">No inventory found</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Adjust your search or filters to find products.</p>
+                </div>
+            )}
+
+            {pagination && (
+                <div className="mt-8 border-t border-border/50 pt-6">
+                    <DataPagination
+                        pagination={{
+                            currentPage: pagination.page,
+                            totalPages: pagination.totalPages,
+                            totalItems: pagination.total,
+                            perPage: pagination.limit,
+                            hasNextPage: pagination.hasNextPage,
+                            hasPrevPage: pagination.hasPrevPage,
+                        }}
+                        onPageChange={setPage}
+                        onPerPageChange={(v) => { setPerPage(v); setPage(1); }}
+                        itemLabel="product"
+                        isLoading={isPending}
+                    />
+                </div>
+            )}
+        </div>
+    )
+}
+
+export default ProductSection

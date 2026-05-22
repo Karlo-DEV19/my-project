@@ -11,6 +11,7 @@ import { blindsProductImages } from "@/schema/products/blinds/blinds-product-ima
 import { sendOrderStatusEmail } from "../services/nodemailer/send-order-status-service"
 import { createOrderPaymentSession } from "../services/paymongo/order-checkout-payment"
 import { NotificationsService } from "../services/notification-service/notifications.service"
+import { getDeliveryFee } from "@/lib/utils/delivery-fee"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -341,7 +342,22 @@ export const checkoutOrder = async (ctx: Context) => {
             last.amount = round2(last.amount + drift / last.quantity)
         }
 
-        // ── 8. Generate identifiers ────────────────────────────────────────────
+        // ── 8. Compute delivery fee server-side ────────────────────────────────
+        // The fee is computed from the validated server-side address — the client
+        // never sends a delivery fee and it is never trusted from the request body.
+        // "free" (Metro Manila) => "0.00" | "fixed" (matrix) => e.g. "1500.00"
+        // "quoted" (unknown/unsupported) => "0.00" (to be confirmed separately)
+        const deliveryFeeResult = getDeliveryFee({
+            city:        input.address.city,
+            province:    input.address.province,
+            fullAddress: input.coordinates.formattedAddress,
+        })
+        const computedDeliveryFee: string =
+            deliveryFeeResult.status === "fixed"
+                ? deliveryFeeResult.fee.toFixed(2)
+                : "0.00"
+
+        // ── 9. Generate identifiers ────────────────────────────────────────────
         const trackingNumber = generateTrackingNumber()
         const referenceNumber = generateReferenceNumber()
 
@@ -377,7 +393,7 @@ export const checkoutOrder = async (ctx: Context) => {
                     deliveryNotes: input.deliveryNotes ?? null,
 
                     subtotal: fullSubtotal.toFixed(2),
-                    deliveryFee: "0.00",
+                    deliveryFee: computedDeliveryFee,
                     vat: fullVat.toFixed(2),
                     totalAmount: fullTotal.toFixed(2),
 

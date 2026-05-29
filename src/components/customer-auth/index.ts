@@ -7,4 +7,4 @@
 
 export { AuthDialogContent } from './auth-dialog-content'
 export { MagicLinkForm } from './magic-link-form'
-export { SentConfirmation } from './sent-confirmation'
+export { VerifyCodeForm } from './verify-code-form'

@@ -1,17 +1,20 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────
-// Customer Auth — Magic Link Form
+// Customer Auth — Magic Link Form (Step 1: Email)
 //
-// Email input screen (step 1 of 2 in the auth dialog).
-// Uses React Hook Form + Zod for validation.
-// Uses useSendMagicLink (Hono API) — never calls Supabase directly.
+// Email input screen — step 1 of the "Get the Code" flow.
+// Calls sendCustomerOtpCode server action which:
+//   • Creates the Supabase account if new (preserving sign-in + sign-up)
+//   • Stores a 6-digit OTP in otp_codes
+//   • Emails the code via Nodemailer (branded)
 //
 // Props:
-//   onSuccess(email) — called after API responds with success:true
-//                       (triggers the parent to switch to 'sent' step)
+//   onSuccess(email) — called when the action returns success:true
+//                       (triggers parent to switch to 'verify' step)
 // ─────────────────────────────────────────────────────────────
 
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Mail } from 'lucide-react'
@@ -29,7 +32,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 import { customerMagicLinkSchema, type CustomerMagicLinkValues } from '@/lib/zod-schema/customer-auth.schema'
-import { useSendMagicLink } from '@/app/api/hooks/use-magic-link'
+import { sendCustomerOtpCode } from '../../../actions/auth'
 
 // ─── Props ────────────────────────────────────────────────────
 
@@ -41,7 +44,7 @@ interface MagicLinkFormProps {
 // ─────────────────────────────────────────────────────────────
 
 export function MagicLinkForm({ onSuccess }: MagicLinkFormProps) {
-    const { mutate, isPending } = useSendMagicLink()
+    const [isPending, setIsPending] = useState(false)
 
     const form = useForm<CustomerMagicLinkValues>({
         resolver: zodResolver(customerMagicLinkSchema),
@@ -49,24 +52,20 @@ export function MagicLinkForm({ onSuccess }: MagicLinkFormProps) {
         mode: 'onSubmit',
     })
 
-    const onSubmit = (values: CustomerMagicLinkValues) => {
-        mutate(
-            { email: values.email },
-            {
-                onSuccess: (data) => {
-                    if (data.success) {
-                        // Success — hand off to parent for step transition
-                        onSuccess(values.email)
-                    } else {
-                        // API returned success:false (e.g. 500 from email service)
-                        toast.error(data.message)
-                    }
-                },
-                onError: (err) => {
-                    toast.error(err.message ?? 'Something went wrong. Please try again.')
-                },
-            },
-        )
+    const onSubmit = async (values: CustomerMagicLinkValues) => {
+        setIsPending(true)
+        try {
+            const result = await sendCustomerOtpCode(values.email)
+            if (result.success) {
+                onSuccess(values.email)
+            } else {
+                toast.error(result.error ?? 'Something went wrong. Please try again.')
+            }
+        } catch {
+            toast.error('Something went wrong. Please try again.')
+        } finally {
+            setIsPending(false)
+        }
     }
 
     return (
@@ -95,7 +94,7 @@ export function MagicLinkForm({ onSuccess }: MagicLinkFormProps) {
                         Continue with Email
                     </h2>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                        Enter your email and we&apos;ll send a secure sign-in link.
+                        Enter your email and we&apos;ll send a secure login code.
                         <br />
                         <span className="text-[11px] text-muted-foreground/70">
                             No password required.
@@ -148,10 +147,10 @@ export function MagicLinkForm({ onSuccess }: MagicLinkFormProps) {
                     {isPending ? (
                         <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
-                            Sending link…
+                            Sending code…
                         </>
                     ) : (
-                        'Send Sign-In Link'
+                        'GET THE CODE'
                     )}
                 </Button>
 

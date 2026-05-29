@@ -123,9 +123,9 @@ function LoginButton() {
                         const user = newSession.user;
                         const name =
                             (user.user_metadata?.full_name as string | undefined) ??
-                            (user.user_metadata?.name     as string | undefined);
+                            (user.user_metadata?.name as string | undefined);
                         await axiosApiClient.post('/users/sync', {
-                            id:    user.id,
+                            id: user.id,
                             email: user.email,
                             ...(name ? { name } : {}),
                         });
@@ -304,6 +304,14 @@ function LoginButton() {
                     onAuthenticated={(email) => {
                         setLoginOpen(false);
                         toast.success('Signed in successfully', { description: email });
+                        // The session was established server-side (cookie). The client-side
+                        // Supabase instance hasn't seen the SIGNED_IN event yet, so we pull
+                        // the fresh session from the cookie immediately to update the header.
+                        createClient().then((supabase) => {
+                            supabase.auth.getSession().then(({ data }) => {
+                                setSession(data.session);
+                            });
+                        });
                     }}
                 />
             </DialogContent>

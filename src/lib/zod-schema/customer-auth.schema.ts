@@ -21,3 +21,15 @@ export const customerMagicLinkSchema = z.object({
 })
 
 export type CustomerMagicLinkValues = z.infer<typeof customerMagicLinkSchema>
+
+// ─────────────────────────────────────────────────────────────
+// Step 2 — OTP code entry
+// ─────────────────────────────────────────────────────────────
+export const customerOtpSchema = z.object({
+    code: z
+        .string({ error: 'Verification code is required.' })
+        .length(6, 'Please enter the 6-digit code.')
+        .regex(/^\d{6}$/, 'Code must be 6 digits.'),
+})
+
+export type CustomerOtpValues = z.infer<typeof customerOtpSchema>

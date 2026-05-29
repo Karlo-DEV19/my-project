@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import {
   ArrowLeft,
   Check,
@@ -17,9 +18,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Auth helper ──────────────────────────────────────────────────────────────
 
-type StoredUser = { id: string; name?: string; email?: string };
+function getBrowserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type OrderDetail = {
   id: string;
@@ -59,21 +67,21 @@ type OrderItem = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  pending:          'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-300/50',
-  confirmed:        'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-300/50',
-  processing:       'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-300/50',
-  ready:            'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-300/50',
+  pending: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-300/50',
+  confirmed: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-300/50',
+  processing: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-300/50',
+  ready: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-300/50',
   out_for_delivery: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-300/50',
-  delivered:        'bg-green-500/10 text-green-600 dark:text-green-400 border-green-300/50',
-  completed:        'bg-green-500/10 text-green-600 dark:text-green-400 border-green-300/50',
-  cancelled:        'bg-destructive/10 text-destructive border-destructive/30',
+  delivered: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-300/50',
+  completed: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-300/50',
+  cancelled: 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
 const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  unpaid:   'bg-yellow-500/10 text-yellow-600 border-yellow-300/50',
+  unpaid: 'bg-yellow-500/10 text-yellow-600 border-yellow-300/50',
   downpaid: 'bg-blue-500/10 text-blue-600 border-blue-300/50',
-  paid:     'bg-green-500/10 text-green-600 border-green-300/50',
-  failed:   'bg-destructive/10 text-destructive border-destructive/30',
+  paid: 'bg-green-500/10 text-green-600 border-green-300/50',
+  failed: 'bg-destructive/10 text-destructive border-destructive/30',
   refunded: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -130,41 +138,41 @@ function Row({ label, value, mono }: { label: string; value: React.ReactNode; mo
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OrderDetailPage() {
-  const router   = useRouter();
+  const router = useRouter();
   const { orderId } = useParams<{ orderId: string }>();
 
-  const [order,     setOrder]     = useState<OrderDetail | null>(null);
-  const [items,     setItems]     = useState<OrderItem[]>([]);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [items, setItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let userEmail = '';
-    try {
-      const stored = localStorage.getItem('user');
-      if (stored) userEmail = (JSON.parse(stored) as StoredUser).email ?? '';
-    } catch { /* ignore */ }
+    const supabase = getBrowserClient();
 
-    if (!userEmail) {
-      router.replace('/');
-      return;
-    }
+    supabase.auth.getUser().then(({ data }) => {
+      const userEmail = data.user?.email ?? '';
 
-    fetch(`/api/v1/orders/${orderId}?email=${encodeURIComponent(userEmail)}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success) {
-          setOrder(json.data.order);
-          setItems(json.data.items ?? []);
-        } else {
-          // 403 → user trying to view someone else's order
-          setError(json.message === 'Unauthorized'
-            ? 'You do not have permission to view this order.'
-            : (json.message ?? 'Order not found.'));
-        }
-      })
-      .catch(() => setError('Network error. Please try again.'))
-      .finally(() => setIsLoading(false));
+      if (!userEmail) {
+        router.replace('/');
+        return;
+      }
+
+      fetch(`/api/v1/orders/${orderId}?email=${encodeURIComponent(userEmail)}`)
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success) {
+            setOrder(json.data.order);
+            setItems(json.data.items ?? []);
+          } else {
+            // 403 → user trying to view someone else's order
+            setError(json.message === 'Unauthorized'
+              ? 'You do not have permission to view this order.'
+              : (json.message ?? 'Order not found.'));
+          }
+        })
+        .catch(() => setError('Network error. Please try again.'))
+        .finally(() => setIsLoading(false));
+    });
   }, [orderId, router]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
@@ -182,7 +190,7 @@ export default function OrderDetailPage() {
       <div className="min-h-screen bg-muted/30">
         <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 space-y-6">
           <button
-            onClick={() => router.replace('/profile?tab=orders')}
+            onClick={() => router.replace('/orders')}
             className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
@@ -193,7 +201,7 @@ export default function OrderDetailPage() {
             <p className="text-sm font-semibold text-destructive">{error ?? 'Order not found.'}</p>
             <Button
               variant="outline"
-              onClick={() => router.replace('/profile?tab=orders')}
+              onClick={() => router.replace('/orders')}
               className="mt-2 h-9 rounded-xl text-xs font-semibold uppercase tracking-[0.15em]"
             >
               Go to Orders
@@ -212,7 +220,7 @@ export default function OrderDetailPage() {
 
         {/* ── Back ── */}
         <button
-          onClick={() => router.replace('/profile?tab=orders')}
+          onClick={() => router.replace('/orders')}
           className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
         >
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
@@ -248,27 +256,27 @@ export default function OrderDetailPage() {
             </p>
             {(() => {
               const STEPS = [
-                { key: 'pending',          label: 'Order Placed',    icon: <Check className="h-3 w-3" /> },
-                { key: 'confirmed',        label: 'Confirmed',       icon: <Check className="h-3 w-3" /> },
-                { key: 'processing',       label: 'Processing',      icon: <Package className="h-3 w-3" /> },
-                { key: 'ready',            label: 'Ready',           icon: <Clock className="h-3 w-3" /> },
+                { key: 'pending', label: 'Order Placed', icon: <Check className="h-3 w-3" /> },
+                { key: 'confirmed', label: 'Confirmed', icon: <Check className="h-3 w-3" /> },
+                { key: 'processing', label: 'Processing', icon: <Package className="h-3 w-3" /> },
+                { key: 'ready', label: 'Ready', icon: <Clock className="h-3 w-3" /> },
                 { key: 'out_for_delivery', label: 'Out for Delivery', icon: <Truck className="h-3 w-3" /> },
-                { key: 'delivered',        label: 'Delivered',       icon: <Check className="h-3 w-3" /> },
+                { key: 'delivered', label: 'Delivered', icon: <Check className="h-3 w-3" /> },
               ];
               const currentIdx = STEPS.findIndex((s) => s.key === order.status);
               return (
                 <div className="flex items-center gap-0">
                   {STEPS.map((step, idx) => {
-                    const done    = idx < currentIdx;
+                    const done = idx < currentIdx;
                     const current = idx === currentIdx;
                     return (
                       <React.Fragment key={step.key}>
                         <div className="flex flex-col items-center gap-1.5 shrink-0">
                           <div className={[
                             'flex h-6 w-6 items-center justify-center rounded-full border text-[10px] transition-colors',
-                            done    ? 'bg-foreground border-foreground text-background' :
-                            current ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/20' :
-                                      'bg-muted border-border text-muted-foreground',
+                            done ? 'bg-foreground border-foreground text-background' :
+                              current ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/20' :
+                                'bg-muted border-border text-muted-foreground',
                           ].join(' ')}>
                             {step.icon}
                           </div>
@@ -298,11 +306,11 @@ export default function OrderDetailPage() {
 
           {/* ── Order Info ── */}
           <Section title="Order Info">
-            <Row label="Tracking #"   value={order.trackingNumber}                mono />
-            <Row label="Reference #"  value={order.referenceNumber}               mono />
-            <Row label="Date Placed"  value={formatDate(order.createdAt)}              />
-            <Row label="Order Type"   value={order.orderType.replace(/_/g, ' ')}       />
-            <Row label="Payment"      value={order.paymentMethod.toUpperCase()}    mono />
+            <Row label="Tracking #" value={order.trackingNumber} mono />
+            <Row label="Reference #" value={order.referenceNumber} mono />
+            <Row label="Date Placed" value={formatDate(order.createdAt)} />
+            <Row label="Order Type" value={order.orderType.replace(/_/g, ' ')} />
+            <Row label="Payment" value={order.paymentMethod.toUpperCase()} mono />
           </Section>
 
           {/* ── Customer Info ── */}
@@ -364,11 +372,11 @@ export default function OrderDetailPage() {
 
         {/* ── Financials ── */}
         <Section title="Payment Summary">
-          <Row label="Subtotal"         value={formatCurrency(order.subtotal)}          />
-          <Row label="VAT (12%)"        value={formatCurrency(order.vat)}               />
-          <Row label="Delivery Fee"     value={formatCurrency(order.deliveryFee)}       />
+          <Row label="Subtotal" value={formatCurrency(order.subtotal)} />
+          <Row label="VAT (12%)" value={formatCurrency(order.vat)} />
+          <Row label="Delivery Fee" value={formatCurrency(order.deliveryFee)} />
           <div className="border-t border-border mt-2 pt-2">
-            <Row label="Total Amount"   value={<span className="font-semibold">{formatCurrency(order.totalAmount)}</span>} />
+            <Row label="Total Amount" value={<span className="font-semibold">{formatCurrency(order.totalAmount)}</span>} />
           </div>
           <div className="mt-3 space-y-1">
             <div className="flex items-center justify-between gap-4">
@@ -393,7 +401,7 @@ export default function OrderDetailPage() {
         {/* ── Action ── */}
         <Button
           variant="outline"
-          onClick={() => router.replace('/profile?tab=orders')}
+          onClick={() => router.replace('/orders')}
           className="w-full h-9 rounded-xl text-xs font-semibold uppercase tracking-[0.15em]"
         >
           <ArrowLeft className="mr-2 h-3.5 w-3.5" strokeWidth={1.75} />

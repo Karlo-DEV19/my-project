@@ -7,9 +7,9 @@
 // ─────────────────────────────────────────────────────────────
 
 // ─── Dialog step machine ──────────────────────────────────────
-// 'form'  → email input screen
-// 'sent'  → check-your-inbox confirmation screen
-export type MagicLinkStep = 'form' | 'sent'
+// 'form'   → email input screen (step 1)
+// 'verify' → OTP code entry screen (step 2)
+export type MagicLinkStep = 'form' | 'verify'
 
 // ─── API request payload ──────────────────────────────────────
 // Matches the Hono controller's validated body.

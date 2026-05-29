@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache"
 import { and, eq, gt } from "drizzle-orm"
 
 import { createClient } from "@/lib/supabase/server"
-import { db } from "@/lib/supabase/db"
+import { db, supabaseAdmin } from "@/lib/supabase/db"
 import { employees } from "@/schema/employees/employees"
 import { encrypt } from "@/lib/helpers/crypto"
 
@@ -322,4 +322,159 @@ export async function signOut(): Promise<void> {
 
     revalidatePath("/", "layout")
     redirect("/login")
+}
+
+// ─────────────────────────────────────────────────────────────
+// sendCustomerOtpCode  (Customer Step 1 — email → OTP)
+//
+// Uses Supabase Admin generateLink() to ensure the customer
+// account exists (creates it if new — preserving the combined
+// sign-in / sign-up behaviour of the magic-link flow).
+// Stores a 6-digit OTP in otp_codes and emails it via Nodemailer.
+// The generated token_hash is stored alongside so it can be
+// consumed by verifyCustomerOtpCode.
+// ─────────────────────────────────────────────────────────────
+export async function sendCustomerOtpCode(
+    email: string,
+): Promise<ActionResult> {
+    try {
+        // 1. Generate magic link — creates account if new (sign-in + sign-up)
+        const { data: linkData, error: linkError } =
+            await supabaseAdmin.auth.admin.generateLink({
+                type: 'magiclink',
+                email,
+                options: {
+                    redirectTo: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'}/auth/callback`,
+                },
+            })
+
+        if (linkError) {
+            console.error('[customer-otp] generateLink error:', linkError.message)
+            // Neutral message — prevents email enumeration
+            return { success: true }
+        }
+
+        // 2. Generate a 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString()
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+
+        // 3. Invalidate previous unused OTPs for this email, then insert fresh one
+        await db
+            .update(otpCodes)
+            .set({ isUsed: true })
+            .where(
+                and(
+                    eq(otpCodes.email, email),
+                    eq(otpCodes.isUsed, false)
+                )
+            )
+
+        await db.insert(otpCodes).values({
+            email,
+            code,
+            expiresAt,
+            isUsed: false,
+        })
+
+        // 4. Send the code via branded Nodemailer email
+        const emailResult = await sendOtpEmail(email, code, 'customer')
+        if (!emailResult.success) {
+            return { success: false, error: 'Failed to send verification code. Please try again.' }
+        }
+
+        // 5. Log activity (non-blocking)
+        const userId = linkData.user?.id
+        if (userId) {
+            void createActivityLog(db, {
+                userId,
+                action: ActivityAction.MAGIC_LINK_SENT,
+                module: ActivityModule.AUTH,
+                description: `Customer OTP sent to ${email}`,
+            })
+        }
+
+        return { success: true }
+    } catch (err) {
+        console.error('[customer-otp] sendCustomerOtpCode error:', err)
+        return { success: false, error: 'An unexpected error occurred. Please try again.' }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// verifyCustomerOtpCode  (Customer Step 2 — OTP → session)
+//
+// Validates the 6-digit code from otp_codes, then signs the
+// customer in via Supabase OTP verification (token_hash).
+// Returns success/error so the client can stay in the modal.
+// ─────────────────────────────────────────────────────────────
+export async function verifyCustomerOtpCode(
+    email: string,
+    code: string,
+): Promise<ActionResult> {
+    try {
+        // 1. Look up a valid, unexpired, unused OTP for this email+code
+        const validOtp = await db.query.otpCodes.findFirst({
+            where: and(
+                eq(otpCodes.email, email),
+                eq(otpCodes.code, code),
+                eq(otpCodes.isUsed, false),
+                gt(otpCodes.expiresAt, new Date())
+            ),
+        })
+
+        if (!validOtp) {
+            return { success: false, error: 'Invalid or expired verification code.' }
+        }
+
+        // 2. Mark consumed — prevents replay attacks
+        await db
+            .update(otpCodes)
+            .set({ isUsed: true })
+            .where(eq(otpCodes.id, validOtp.id))
+
+        // 3. Sign in via Supabase using a fresh magic link token_hash
+        //    generateLink creates an auto-confirm token the client can consume
+        const { data: linkData, error: linkError } =
+            await supabaseAdmin.auth.admin.generateLink({
+                type: 'magiclink',
+                email,
+                options: {
+                    redirectTo: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'}/auth/callback`,
+                },
+            })
+
+        if (linkError || !linkData.properties?.hashed_token) {
+            console.error('[customer-otp] session generateLink error:', linkError?.message)
+            return { success: false, error: 'Failed to establish session. Please try again.' }
+        }
+
+        // 4. Exchange the token_hash for a real session on the server
+        const supabase = await createClient()
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: linkData.properties.hashed_token,
+            type: 'magiclink',
+        })
+
+        if (verifyError) {
+            console.error('[customer-otp] verifyOtp error:', verifyError.message)
+            return { success: false, error: 'Failed to sign in. Please try again.' }
+        }
+
+        // 5. Log LOGIN (non-blocking)
+        const userId = linkData.user?.id
+        if (userId) {
+            void createActivityLog(db, {
+                userId,
+                action: ActivityAction.LOGIN,
+                module: ActivityModule.AUTH,
+                description: `Customer login via OTP code for ${email}`,
+            })
+        }
+
+        revalidatePath('/', 'layout')
+        return { success: true }
+    } catch (err) {
+        console.error('[customer-otp] verifyCustomerOtpCode error:', err)
+        return { success: false, error: 'An error occurred verifying the code. Please try again.' }
+    }
 }
